@@ -48,15 +48,18 @@ SIDECAR_SUFFIXES = [
 ]
 
 # ---------------------------------------------------------------------------
-# Logging setup
+# Logging setup  (file handler is attached in main() once --log-file is known)
 # ---------------------------------------------------------------------------
 
-logging.basicConfig(
-    format="%(message)s",
-    level=logging.INFO,
-    stream=sys.stdout,
-)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def setup_log_file(log_path: Path) -> None:
+    handler = logging.FileHandler(log_path, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-7s  %(message)s"))
+    logger.addHandler(handler)
+    print(f"Logging to: {log_path}\n", flush=True)
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +114,7 @@ def parse_timestamp(sidecar_path: Path) -> datetime | None:
         with open(sidecar_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("\n  ✗  Could not read JSON %s: %s", sidecar_path.name, exc)
+        logger.warning("  ✗  Could not read JSON %s: %s", sidecar_path.name, exc)
         return None
 
     for key in ("photoTakenTime", "creationTime"):
@@ -123,7 +126,7 @@ def parse_timestamp(sidecar_path: Path) -> datetime | None:
             except (ValueError, OSError):
                 continue
 
-    logger.warning("\n  ✗  No usable timestamp in %s", sidecar_path.name)
+    logger.warning("  ✗  No usable timestamp in %s", sidecar_path.name)
     return None
 
 
@@ -201,7 +204,7 @@ def write_jpeg_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
         return True
 
     except Exception as exc:
-        logger.error("\n  ✗  Failed to write EXIF to %s: %s", image_path.name, exc)
+        logger.error("  ✗  Failed to write EXIF to %s: %s", image_path.name, exc)
         return False
 
 
@@ -229,7 +232,7 @@ def write_png_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
         return True
 
     except Exception as exc:
-        logger.error("\n  ✗  Failed to write PNG metadata to %s: %s", image_path.name, exc)
+        logger.error("  ✗  Failed to write PNG metadata to %s: %s", image_path.name, exc)
         return False
 
 
@@ -254,12 +257,12 @@ def write_exiftool_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
         stat = image_path.stat()
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
-            logger.error("\n  ✗  exiftool error on %s: %s", image_path.name, result.stderr.strip())
+            logger.error("  ✗  exiftool error on %s: %s", image_path.name, result.stderr.strip())
             return False
         os.utime(image_path, (stat.st_atime, stat.st_mtime))
         return True
     except Exception as exc:
-        logger.error("\n  ✗  exiftool failed on %s: %s", image_path.name, exc)
+        logger.error("  ✗  exiftool failed on %s: %s", image_path.name, exc)
         return False
 
 
@@ -291,7 +294,7 @@ def process_file(image_path: Path, dry_run: bool, verbose: bool) -> str:
     # --- Find sidecar ---
     sidecar = find_sidecar(image_path)
     if sidecar is None:
-        logger.warning("\n  ✗  No JSON sidecar found for: %s", image_path)
+        logger.warning("  ✗  No JSON sidecar found for: %s", image_path)
         return "no_json"
 
     # --- Parse timestamp ---
@@ -351,7 +354,11 @@ def main():
     parser.add_argument("--verbose", action="store_true", help="Also log already-dated files")
     parser.add_argument("--workers", type=int, default=min(64, (os.cpu_count() or 4) * 8),
                         help="Number of parallel worker threads (default: 8x CPU cores)")
+    parser.add_argument("--log-file", type=Path, default=Path("fix_metadata.log"),
+                        help="Path to log file (default: fix_metadata.log)")
     args = parser.parse_args()
+
+    setup_log_file(args.log_file.expanduser().resolve())
 
     photos_dir: Path = args.photos_dir.expanduser().resolve()
     if not photos_dir.is_dir():
@@ -384,7 +391,7 @@ def main():
             try:
                 result = future.result()
             except Exception as exc:
-                logger.error("\n  ✗  Unexpected error on %s: %s", futures[future].name, exc)
+                logger.error("  ✗  Unexpected error on %s: %s", futures[future].name, exc)
                 result = "write_failed"
             counters[result] += 1
             processed += 1
