@@ -15,6 +15,8 @@ import os
 import shutil
 import subprocess
 import sys
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -109,7 +111,7 @@ def parse_timestamp(sidecar_path: Path) -> datetime | None:
         with open(sidecar_path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as exc:
-        logger.warning("  ✗  Could not read JSON %s: %s", sidecar_path.name, exc)
+        logger.warning("\n  ✗  Could not read JSON %s: %s", sidecar_path.name, exc)
         return None
 
     for key in ("photoTakenTime", "creationTime"):
@@ -121,7 +123,7 @@ def parse_timestamp(sidecar_path: Path) -> datetime | None:
             except (ValueError, OSError):
                 continue
 
-    logger.warning("  ✗  No usable timestamp in %s", sidecar_path.name)
+    logger.warning("\n  ✗  No usable timestamp in %s", sidecar_path.name)
     return None
 
 
@@ -180,7 +182,8 @@ def write_jpeg_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
     try:
         try:
             exif_data = piexif.load(str(image_path))
-        except piexif.InvalidImageDataError:
+        except Exception:
+            # Covers InvalidImageDataError, struct.error (malformed EXIF buffers), etc.
             exif_data = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
 
         exif_data.setdefault("0th", {})[piexif.ImageIFD.DateTime] = exif_str
@@ -198,7 +201,7 @@ def write_jpeg_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
         return True
 
     except Exception as exc:
-        logger.error("  ✗  Failed to write EXIF to %s: %s", image_path.name, exc)
+        logger.error("\n  ✗  Failed to write EXIF to %s: %s", image_path.name, exc)
         return False
 
 
@@ -226,7 +229,7 @@ def write_png_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
         return True
 
     except Exception as exc:
-        logger.error("  ✗  Failed to write PNG metadata to %s: %s", image_path.name, exc)
+        logger.error("\n  ✗  Failed to write PNG metadata to %s: %s", image_path.name, exc)
         return False
 
 
@@ -251,12 +254,12 @@ def write_exiftool_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
         stat = image_path.stat()
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
-            logger.error("  ✗  exiftool error on %s: %s", image_path.name, result.stderr.strip())
+            logger.error("\n  ✗  exiftool error on %s: %s", image_path.name, result.stderr.strip())
             return False
         os.utime(image_path, (stat.st_atime, stat.st_mtime))
         return True
     except Exception as exc:
-        logger.error("  ✗  exiftool failed on %s: %s", image_path.name, exc)
+        logger.error("\n  ✗  exiftool failed on %s: %s", image_path.name, exc)
         return False
 
 
@@ -288,7 +291,7 @@ def process_file(image_path: Path, dry_run: bool, verbose: bool) -> str:
     # --- Find sidecar ---
     sidecar = find_sidecar(image_path)
     if sidecar is None:
-        logger.warning("  ✗  No JSON sidecar found for: %s", image_path)
+        logger.warning("\n  ✗  No JSON sidecar found for: %s", image_path)
         return "no_json"
 
     # --- Parse timestamp ---
@@ -304,7 +307,7 @@ def process_file(image_path: Path, dry_run: bool, verbose: bool) -> str:
     else:
         if not shutil.which("exiftool"):
             logger.warning(
-                "  ⚠  Skipping %s (%s) — install exiftool to handle this format",
+                "\n  ⚠  Skipping %s (%s) — install exiftool to handle this format",
                 image_path.name, ext,
             )
             return "no_exiftool"
@@ -346,6 +349,8 @@ def main():
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing")
     parser.add_argument("--no-recursive", action="store_true", help="Do not walk subdirectories")
     parser.add_argument("--verbose", action="store_true", help="Also log already-dated files")
+    parser.add_argument("--workers", type=int, default=min(64, (os.cpu_count() or 4) * 8),
+                        help="Number of parallel worker threads (default: 8x CPU cores)")
     args = parser.parse_args()
 
     photos_dir: Path = args.photos_dir.expanduser().resolve()
@@ -356,21 +361,39 @@ def main():
     if args.dry_run:
         logger.info("=== DRY RUN — no files will be modified ===\n")
 
-    counters = {
-        "fixed":         0,
-        "already_dated": 0,
-        "no_json":       0,
-        "no_timestamp":  0,
-        "write_failed":  0,
-        "no_exiftool":   0,
-    }
+    counters: Counter = Counter()
 
-    for image_path in walk_directory(photos_dir, recursive=not args.no_recursive):
-        result = process_file(image_path, dry_run=args.dry_run, verbose=args.verbose)
-        counters[result] += 1
+    print("Scanning for image files...", flush=True)
+    image_paths = list(walk_directory(photos_dir, recursive=not args.no_recursive))
+    total_found = len(image_paths)
+    print(f"Found {total_found:,} image files — processing with {args.workers} workers...\n", flush=True)
+
+    processed = 0
+
+    def _print_progress():
+        print(f"\r  Progress: {processed:,} / {total_found:,}", end="", flush=True)
+
+    _print_progress()
+
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        futures = {
+            executor.submit(process_file, p, args.dry_run, args.verbose): p
+            for p in image_paths
+        }
+        for future in as_completed(futures):
+            try:
+                result = future.result()
+            except Exception as exc:
+                logger.error("\n  ✗  Unexpected error on %s: %s", futures[future].name, exc)
+                result = "write_failed"
+            counters[result] += 1
+            processed += 1
+            _print_progress()
+
+    print()  # newline after progress line
 
     # --- Summary ---
-    total = sum(counters.values())
+    total = total_found
     action = "Would fix" if args.dry_run else "Fixed"
     print()
     print("=" * 50)
