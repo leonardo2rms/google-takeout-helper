@@ -135,6 +135,25 @@ def dt_to_exif_str(dt: datetime) -> str:
     return dt.strftime("%Y:%m:%d %H:%M:%S")
 
 
+# EXIF lives in the APP1 segment near the start of a JPEG. 128 KB is enough
+# to cover any real-world EXIF header (metadata + small thumbnail) without
+# loading the full image pixel data, which can be tens of megabytes.
+_EXIF_HEADER_BYTES = 131072
+
+
+def _load_exif_header(image_path: Path) -> dict:
+    """
+    Read only the first _EXIF_HEADER_BYTES of a JPEG/TIFF and parse EXIF from
+    that slice. Avoids loading full image pixel data just to read metadata.
+    """
+    with open(image_path, "rb") as f:
+        header = f.read(_EXIF_HEADER_BYTES)
+    try:
+        return piexif.load(header)
+    except Exception:
+        return {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
+
+
 # ---------------------------------------------------------------------------
 # EXIF date checkers
 # ---------------------------------------------------------------------------
@@ -142,9 +161,8 @@ def dt_to_exif_str(dt: datetime) -> str:
 def jpeg_has_date(image_path: Path) -> bool:
     """Return True if the JPEG/TIFF already has DateTimeOriginal set."""
     try:
-        exif_data = piexif.load(str(image_path))
-        exif_ifd = exif_data.get("Exif", {})
-        value = exif_ifd.get(piexif.ExifIFD.DateTimeOriginal)
+        exif_data = _load_exif_header(image_path)
+        value = exif_data.get("Exif", {}).get(piexif.ExifIFD.DateTimeOriginal)
         return bool(value and value.strip(b"\x00"))
     except Exception:
         return False
@@ -183,11 +201,8 @@ def write_jpeg_date(image_path: Path, dt: datetime, dry_run: bool) -> bool:
     exif_str = dt_to_exif_str(dt).encode("ascii")
 
     try:
-        try:
-            exif_data = piexif.load(str(image_path))
-        except Exception:
-            # Covers InvalidImageDataError, struct.error (malformed EXIF buffers), etc.
-            exif_data = {"0th": {}, "Exif": {}, "GPS": {}, "1st": {}}
+        # Load only the header slice — no need to read pixel data to get existing tags
+        exif_data = _load_exif_header(image_path)
 
         exif_data.setdefault("0th", {})[piexif.ImageIFD.DateTime] = exif_str
         exif_data.setdefault("Exif", {})[piexif.ExifIFD.DateTimeOriginal]   = exif_str
