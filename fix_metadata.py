@@ -311,8 +311,6 @@ def process_file(image_path: Path, dry_run: bool, verbose: bool) -> str:
         ok = write_exiftool_date(image_path, dt, dry_run)
 
     if ok:
-        tag = "[DRY RUN] Would fix" if dry_run else "Fixed"
-        logger.info("  ✔  %s: %s  →  %s", tag, image_path.name, dt_to_exif_str(dt))
         return "fixed"
     else:
         return "write_failed"
