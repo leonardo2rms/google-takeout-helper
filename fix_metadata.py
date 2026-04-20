@@ -45,8 +45,6 @@ GOOGLE_TRUNCATE_LEN = 46
 SIDECAR_SUFFIXES = [
     ".json",
     ".supplemental-metadata.json",
-    ".suppl.json",
-    ".sup.json",
 ]
 
 # ---------------------------------------------------------------------------
@@ -112,6 +110,13 @@ def find_sidecar(image_path: Path) -> Path | None:
     for candidate in candidates:
         if candidate.exists():
             return candidate
+
+    # Glob fallback: catch any .sup*.json variant (suppl, supple, sup, etc.)
+    # Try both "{filename}.sup*.json" and "{stem}.sup*.json"
+    for pattern in (name + ".sup*.json", stem + ".sup*.json"):
+        matches = sorted(parent.glob(pattern))
+        if matches:
+            return matches[0]
 
     return None
 
