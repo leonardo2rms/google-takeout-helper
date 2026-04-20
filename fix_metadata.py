@@ -173,11 +173,18 @@ def _load_exif_header(image_path: Path) -> dict:
 # ---------------------------------------------------------------------------
 
 def jpeg_has_date(image_path: Path) -> bool:
-    """Return True if the JPEG/TIFF already has DateTimeOriginal set."""
+    """
+    Return True if the JPEG/TIFF already has a usable date.
+    Checks DateTimeOriginal first, then falls back to DateTime (IFD0 0x0132),
+    which is what Windows shows as "Media created" when DateTimeOriginal is absent.
+    """
     try:
         exif_data = _load_exif_header(image_path)
-        value = exif_data.get("Exif", {}).get(piexif.ExifIFD.DateTimeOriginal)
-        return bool(value and value.strip(b"\x00"))
+        dto = exif_data.get("Exif", {}).get(piexif.ExifIFD.DateTimeOriginal)
+        if dto and dto.strip(b"\x00"):
+            return True
+        dt = exif_data.get("0th", {}).get(piexif.ImageIFD.DateTime)
+        return bool(dt and dt.strip(b"\x00"))
     except Exception:
         return False
 
@@ -193,12 +200,17 @@ def png_has_date(image_path: Path) -> bool:
 
 
 def exiftool_has_date(image_path: Path) -> bool:
-    """Return True if exiftool reports a DateTimeOriginal for this file."""
+    """
+    Return True if exiftool finds any usable date in the file.
+    Checks DateTimeOriginal, then CreateDate (QuickTime/MP4 container date —
+    what Windows shows as "Media created" for video files).
+    """
     if not shutil.which("exiftool"):
         return False
     try:
         result = subprocess.run(
-            ["exiftool", "-DateTimeOriginal", "-s3", str(image_path)],
+            ["exiftool", "-DateTimeOriginal", "-CreateDate", "-MediaCreateDate",
+             "-s3", str(image_path)],
             capture_output=True, text=True, timeout=10,
         )
         return bool(result.stdout.strip())
