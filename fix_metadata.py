@@ -12,6 +12,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -85,7 +86,20 @@ def find_sidecar(image_path: Path) -> Path | None:
     for suffix in SIDECAR_SUFFIXES:
         candidates.append(parent / (stem + suffix))
 
-    # Pattern 7: truncation fallback — Google truncates long stems
+    # Pattern 7: duplicate-number fallback — Google moves the (N) from the image
+    # stem to just before ".json" in the sidecar name.
+    # e.g. "IMG_4294(1).mov" → "IMG_4294.mov.supplemental-metadata(1).json"
+    dup_match = re.search(r'^(.*?)(\(\d+\))$', stem)
+    if dup_match:
+        base_stem = dup_match.group(1)   # "IMG_4294"
+        num       = dup_match.group(2)   # "(1)"
+        for suffix in SIDECAR_SUFFIXES:
+            # suffix is e.g. ".supplemental-metadata.json" → insert (N) before ".json"
+            suffix_body = suffix[:-5]    # ".supplemental-metadata"
+            candidates.append(parent / (base_stem + image_path.suffix + suffix_body + num + ".json"))
+            candidates.append(parent / (base_stem + suffix_body + num + ".json"))
+
+    # Pattern 8: truncation fallback — Google truncates long stems
     # e.g. "A_very_long_filename_that_exceeds_the_limit.jpg" →
     #      "A_very_long_filename_that_exceeds_the_li.jpg.json"
     if len(stem) > GOOGLE_TRUNCATE_LEN:
