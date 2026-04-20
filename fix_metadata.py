@@ -46,6 +46,7 @@ SIDECAR_SUFFIXES = [
     ".json",
     ".supplemental-metadata.json",
     ".suppl.json",
+    ".sup.json",
 ]
 
 # ---------------------------------------------------------------------------
