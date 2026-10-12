@@ -1,0 +1,196 @@
+id: spring
+title: Spring in Depth
+emoji: "🍃"
+color: "#58cc02"
+description: Proxies, transactions, auto-configuration, JPA pitfalls and the Spring + Kotlin gotchas.
+lessons:
+  - id: spring-core
+    title: Beans, proxies & transactions
+    questions:
+      - type: single
+        prompt: "`placeOrder` is called from a controller. Why is `save` NOT transactional?"
+        code:
+          source: |
+            @Service
+            class OrderService(private val repo: OrderRepository) {
+
+                fun placeOrder(o: Order) {
+                    validate(o)
+                    save(o)
+                }
+
+                @Transactional
+                fun save(o: Order) {
+                    repo.save(o)
+                }
+            }
+        options:
+          - { id: a, text: "Self-invocation bypasses the Spring proxy, so the transactional advice never runs" }
+          - { id: b, text: "`@Transactional` only works on `private` methods" }
+          - { id: c, text: "Spring only creates transactions for repository methods" }
+          - { id: d, text: "`@Transactional` must be placed on the interface" }
+        answer: a
+        explanation: "Spring AOP wraps the bean in a proxy; only calls that come through the proxy are intercepted. A call from inside the same instance goes straight to `this.save`. Fix: move `save` to another bean, annotate `placeOrder`, or use programmatic `TransactionTemplate`."
+
+      - type: single
+        prompt: "A Kotlin `@Service` class fails at startup because Spring can't create a CGLIB proxy for a final class. What is the idiomatic fix?"
+        options:
+          - { id: a, text: "Apply the kotlin-spring (all-open) compiler plugin so Spring-annotated classes become open" }
+          - { id: b, text: "Mark every method `public`" }
+          - { id: c, text: "Switch the bean to `@Scope(\"prototype\")`" }
+          - { id: d, text: "Add `@JvmStatic` to the class" }
+        answer: a
+        explanation: "Kotlin classes and members are final by default; CGLIB proxies subclass the bean. The `kotlin-spring` plugin opens classes annotated with `@Component`, `@Transactional`, `@Configuration` etc. (Spring Initializr adds it by default)."
+
+      - type: multi
+        prompt: Select ALL real benefits of constructor injection over field injection.
+        options:
+          - { id: a, text: "Dependencies can be `val`s (immutability)" }
+          - { id: b, text: "The class can be instantiated in a plain unit test without Spring or reflection" }
+          - { id: c, text: "Circular dependencies are resolved more easily" }
+          - { id: d, text: "An object can never exist in a partially-initialised state" }
+          - { id: e, text: "It is required for `@Autowired` to work" }
+        answers: [a, b, d]
+        explanation: "Constructor injection makes dependencies explicit and mandatory, and circular dependencies fail fast instead of being silently tolerated. With a single constructor `@Autowired` isn't even needed."
+
+      - type: single
+        prompt: "A singleton bean has a `@Scope(\"prototype\")` bean injected through its constructor. How many prototype instances does the singleton use?"
+        options:
+          - { id: a, text: "One: it's injected once, when the singleton is created" }
+          - { id: b, text: "A new one for every method call" }
+          - { id: c, text: "One per HTTP request" }
+          - { id: d, text: "One per thread" }
+        answer: a
+        explanation: "Injection happens once. To get a fresh instance per use, inject an `ObjectProvider<T>` (call `getObject()`), or use a scoped proxy."
+
+      - type: single
+        prompt: What happens to the data when this method runs?
+        code:
+          source: |
+            @Transactional
+            fun import(file: Path) {
+                repo.save(Record("a"))
+                throw IOException("disk error")
+            }
+        options:
+          - { id: a, text: "The record is committed: by default only unchecked exceptions (RuntimeException/Error) trigger rollback" }
+          - { id: b, text: "The transaction rolls back because any exception triggers rollback" }
+          - { id: c, text: "The code doesn't compile because Kotlin has no checked exceptions" }
+          - { id: d, text: "The record is saved in a separate transaction and survives only if REQUIRES_NEW is set" }
+        answer: a
+        explanation: "Kotlin has no checked exceptions, but `IOException` is still a checked type from Spring's point of view. Use `@Transactional(rollbackFor = [Exception::class])` or throw an unchecked exception."
+
+      - type: fill
+        prompt: Complete the REST controller annotations.
+        template: |
+          @RestController
+          @RequestMapping("/orders")
+          class OrderController(private val service: OrderService) {
+
+              @[[1]]("/{id}")
+              fun get(@[[2]] id: Long) = service.find(id)
+
+              @PostMapping
+              fun create(@[[3]] @Valid cmd: CreateOrder) = service.create(cmd)
+          }
+        bank: ["GetMapping", "PathVariable", "RequestBody", "RequestParam", "PostMapping", "ResponseBody"]
+        answers: ["GetMapping", "PathVariable", "RequestBody"]
+        explanation: "`@PathVariable` binds `{id}` from the URL, `@RequestParam` binds query-string values, `@RequestBody` deserialises the JSON body (then `@Valid` triggers Bean Validation)."
+
+      - type: open
+        prompt: How does Spring Boot auto-configuration work, and how would you find out why a bean wasn't created?
+        modelAnswer: "@SpringBootApplication enables auto-configuration, which loads the candidate configuration classes listed in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. Each is guarded by conditions such as @ConditionalOnClass, @ConditionalOnProperty and @ConditionalOnMissingBean, so it only applies if the classpath and properties match and your own beans haven't already defined the same thing (user config backs off the default). To debug, start with --debug (or debug=true) to print the conditions evaluation report, or use the Actuator conditions endpoint."
+        keyPoints:
+          - point: "Auto-configuration classes are discovered from the AutoConfiguration.imports file (via @EnableAutoConfiguration/@SpringBootApplication)"
+            keywords: ["autoconfiguration.imports", "spring.factories", "enableautoconfiguration", "springbootapplication", "imports"]
+          - point: "Conditional annotations (OnClass, OnProperty, OnMissingBean) decide whether each applies; user beans make defaults back off"
+            keywords: ["conditionalonclass", "conditionalonmissingbean", "conditionalonproperty", "conditional", "back off", "backs off"]
+          - point: "Debug using the conditions report (--debug) or the Actuator conditions endpoint"
+            keywords: ["--debug", "debug", "conditions report", "condition evaluation", "actuator", "conditions endpoint"]
+
+  - id: spring-data-web
+    title: Data, web & performance
+    questions:
+      - type: single
+        prompt: "`items` is a lazy `@OneToMany`. For 100 orders, how many SQL queries does this run?"
+        code:
+          source: |
+            val orders = orderRepo.findAll()
+            orders.forEach { println(it.items.size) }
+        options:
+          - { id: a, text: "101" }
+          - { id: b, text: "1" }
+          - { id: c, text: "2" }
+          - { id: d, text: "100" }
+        answer: a
+        explanation: "The classic N+1: one query for the orders, then one lazy-load per order. It's invisible in small test data and devastating in production."
+
+      - type: multi
+        prompt: Select ALL effective fixes for the N+1 problem above.
+        options:
+          - { id: a, text: "`JOIN FETCH` in the query" }
+          - { id: b, text: "`@EntityGraph` on the repository method" }
+          - { id: c, text: "`hibernate.default_batch_fetch_size`" }
+          - { id: d, text: "Switch the association to `FetchType.EAGER`" }
+          - { id: e, text: "Add an index on the foreign key" }
+        answers: [a, b, c]
+        explanation: "Fetch joins/entity graphs load the association in the same query; batch fetching turns N queries into N/batch. EAGER doesn't fix it for `findAll()` (it still issues one select per parent) and makes every other query heavier. An index speeds each query but doesn't reduce their number."
+
+      - type: single
+        prompt: "Spring Boot enables `spring.jpa.open-in-view` by default. What is its main production risk?"
+        options:
+          - { id: a, text: "The DB connection is held for the whole web request, and lazy loading in the view/serialisation layer hides N+1s, risking pool exhaustion" }
+          - { id: b, text: "It disables second-level caching" }
+          - { id: c, text: "It makes every transaction read-only" }
+          - { id: d, text: "It opens a new transaction for every repository call" }
+        answer: a
+        explanation: "Many teams set it to false and fetch what they need explicitly (projections or fetch joins) inside the service layer."
+
+      - type: single
+        prompt: "A service is CPU-bound, uses blocking JDBC and a small team. Which stack is the best default?"
+        options:
+          - { id: a, text: "Spring MVC (optionally with virtual threads)" }
+          - { id: b, text: "Spring WebFlux with R2DBC, to be \"non-blocking\"" }
+          - { id: c, text: "WebFlux, but call JDBC directly on the event loop" }
+          - { id: d, text: "Raw servlets" }
+        answer: a
+        explanation: "Reactive stacks pay off for high-concurrency, I/O-bound workloads with non-blocking drivers end to end. Blocking JDBC on a WebFlux event loop is an outage waiting to happen. For CPU-bound work, reactive gives you nothing."
+
+      - type: single
+        prompt: Which Spring Boot 3.2+ property switches request handling to virtual threads?
+        options:
+          - { id: a, text: "spring.threads.virtual.enabled=true" }
+          - { id: b, text: "server.tomcat.virtual=true" }
+          - { id: c, text: "spring.mvc.async.virtual=true" }
+          - { id: d, text: "spring.main.lightweight=true" }
+        answer: a
+        explanation: "It needs Java 21+. Virtual threads help with blocking I/O concurrency; they don't make CPU-bound work faster, and a bounded resource (like the DB pool) is still your real limit."
+
+      - type: fill
+        prompt: Cache exchange rates per currency, and allow clearing the whole cache.
+        template: |
+          @Service
+          class RateService(private val client: RateClient) {
+
+              @[[1]](cacheNames = ["rates"], key = "#currency")
+              fun rate(currency: String): BigDecimal = client.fetch(currency)
+
+              @[[2]](cacheNames = ["rates"], allEntries = true)
+              fun refresh() {}
+          }
+        bank: ["Cacheable", "CacheEvict", "CachePut", "Transactional", "Async"]
+        answers: ["Cacheable", "CacheEvict"]
+        explanation: "`@Cacheable` skips the method on a hit; `@CachePut` always runs and updates the cache; `@CacheEvict` removes entries. Remember the same proxy caveat as `@Transactional`: self-invocation bypasses caching."
+
+      - type: open
+        prompt: An endpoint got slow under load and the database CPU is high. Walk through how you'd diagnose and fix it at the Spring/JPA level.
+        modelAnswer: "Measure first: look at p95/p99 latency and traces to confirm which endpoint and which queries, using metrics/APM and the DB's slow-query log. Enable SQL logging or a tool like Hibernate statistics to spot N+1 and unbounded queries, and run EXPLAIN on the heavy ones to find missing indexes. Fix with fetch joins/entity graphs or batch fetching, DTO projections instead of full entities, pagination, and the right indexes. Then reduce repeated reads with caching, check the Hikari pool size, and re-run a load test to verify the improvement."
+        keyPoints:
+          - point: "Measure first: metrics/traces/slow-query log to find the actual hot query or endpoint"
+            keywords: ["measure", "profil", "apm", "trace", "slow query", "slow-query", "metrics", "p99"]
+          - point: "Find N+1 / missing indexes using SQL logging and EXPLAIN"
+            keywords: ["n+1", "explain", "index", "sql log", "statistics", "query plan"]
+          - point: "Fix with fetch joins/entity graphs/batching, projections, pagination"
+            keywords: ["fetch join", "entitygraph", "entity graph", "batch", "projection", "dto", "pagina"]
+          - point: "Add caching / tune the connection pool and verify with a load test"
+            keywords: ["cache", "caching", "hikari", "pool", "load test", "verify"]

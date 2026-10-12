@@ -1,0 +1,169 @@
+id: jvm
+title: JVM Internals
+emoji: "☕"
+color: "#ff9600"
+description: Memory layout, garbage collection, the JIT, the memory model and virtual threads.
+lessons:
+  - id: jvm-memory
+    title: Memory & garbage collection
+    questions:
+      - type: single
+        prompt: Which memory area is shared by all threads and managed by the garbage collector?
+        options:
+          - { id: a, text: "The heap" }
+          - { id: b, text: "The thread stack" }
+          - { id: c, text: "The program counter register" }
+          - { id: d, text: "The code cache" }
+        answer: a
+        explanation: "Objects live on the heap. Each thread's stack holds frames with local primitives and references, and is freed automatically when frames pop (no GC involved)."
+
+      - type: single
+        prompt: Since Java 8, where is class metadata (the PermGen replacement) stored?
+        options:
+          - { id: a, text: "Metaspace, in native memory" }
+          - { id: b, text: "The old generation of the heap" }
+          - { id: c, text: "The thread stacks" }
+          - { id: d, text: "The code cache" }
+        answer: a
+        explanation: "Metaspace lives outside the Java heap and grows up to the available native memory unless capped with `-XX:MaxMetaspaceSize`. Classloader leaks (e.g. repeated redeploys) are the classic way to exhaust it."
+
+      - type: multi
+        prompt: Select ALL statements that are true for generational garbage collection on the JVM.
+        options:
+          - { id: a, text: "It relies on the observation that most objects die young" }
+          - { id: b, text: "Young-generation collections are usually frequent and short" }
+          - { id: c, text: "Every old-generation collection is always a full stop-the-world pause" }
+          - { id: d, text: "Objects surviving several minor GCs are promoted to the old generation" }
+          - { id: e, text: "In G1, humongous objects are allocated in the young generation" }
+        answers: [a, b, d]
+        explanation: "Modern collectors (G1, ZGC, Shenandoah) do much of the old-gen work concurrently. G1 allocates humongous objects (>= half a region) directly into dedicated humongous regions in the old generation."
+
+      - type: single
+        prompt: "Your latency SLO needs GC pauses well under a millisecond even with a multi-GB heap. Which collector is designed for that?"
+        options:
+          - { id: a, text: "ZGC" }
+          - { id: b, text: "SerialGC" }
+          - { id: c, text: "ParallelGC" }
+          - { id: d, text: "CMS" }
+        answer: a
+        explanation: "ZGC does marking, relocation and reference processing concurrently, with pauses that don't grow with heap size. Parallel favours throughput; Serial is for tiny heaps; CMS was removed in Java 14. G1 (the default) targets pause *goals* in the tens to hundreds of ms."
+
+      - type: single
+        prompt: Why does the heap keep growing here?
+        code:
+          lang: kotlin
+          source: |
+            object Registry {
+                private val listeners = mutableListOf<Listener>()
+                fun add(l: Listener) { listeners += l }
+            }
+            // components call Registry.add(this) when created and never remove themselves
+        options:
+          - { id: a, text: "Listeners stay reachable from a static root, so the GC can never collect them" }
+          - { id: b, text: "mutableListOf is not thread safe" }
+          - { id: c, text: "Kotlin objects are allocated off-heap" }
+          - { id: d, text: "The GC doesn't collect objects stored in a List" }
+        answer: a
+        explanation: "The GC collects what is unreachable from GC roots (statics, thread stacks, JNI refs). A forgotten listener, ThreadLocal or unbounded cache keeps whole object graphs alive. Fix with explicit deregistration, weak references or a bounded cache."
+
+      - type: single
+        prompt: "A container is OOMKilled although heap usage was well below `-Xmx`. What is the most likely explanation?"
+        options:
+          - { id: a, text: "Non-heap memory (metaspace, thread stacks, direct buffers, code cache) pushed the process over the container limit" }
+          - { id: b, text: "The GC was disabled in containers" }
+          - { id: c, text: "`-Xmx` is ignored when running in Docker" }
+          - { id: d, text: "The kernel counts only heap memory against the limit" }
+        answer: a
+        explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
+
+      - type: open
+        prompt: A Spring service's heap usage grows over hours and GC pauses get longer. How do you investigate?
+        modelAnswer: "First confirm and characterise the problem with GC logs (-Xlog:gc*) and metrics: does old-gen usage keep rising after full collections, which suggests a leak rather than just load? Then capture a class histogram or a heap dump (jcmd <pid> GC.class_histogram / GC.heap_dump) and open it in Eclipse MAT or VisualVM: look at the dominator tree and the paths to GC roots of the biggest retained sets. Typical culprits are static collections, unbounded caches, listeners and ThreadLocals. Fix the retention, and verify with a soak test and the same metrics."
+        keyPoints:
+          - point: "Use GC logs/metrics to confirm old-gen growth that survives full GCs (a leak, not load)"
+            keywords: ["gc log", "xlog", "metrics", "old gen", "old-gen", "survives", "grafana", "gc pause"]
+          - point: "Take a heap dump / histogram (jcmd, jmap) and analyse it (MAT, VisualVM) via dominator tree and GC-root paths"
+            keywords: ["heap dump", "histogram", "jcmd", "jmap", "mat", "visualvm", "dominator", "gc root"]
+          - point: "Identify typical retainers (static maps, unbounded caches, listeners, ThreadLocals) and fix them"
+            keywords: ["static", "cache", "listener", "threadlocal", "unbounded", "leak"]
+          - point: "Verify the fix (soak/load test, compare metrics)"
+            keywords: ["verify", "soak", "load test", "re-test", "compare", "regression"]
+
+  - id: jvm-runtime
+    title: JIT, memory model & threads
+    questions:
+      - type: single
+        prompt: Why is the first call of a method often much slower than later calls on the JVM?
+        options:
+          - { id: a, text: "It starts interpreted; hot code is later compiled by the tiered JIT (C1, then C2) with profile-guided optimisations" }
+          - { id: b, text: "The class has to be downloaded from the network" }
+          - { id: c, text: "The garbage collector runs on first call" }
+          - { id: d, text: "Bytecode is only verified on the first call, which dominates" }
+        answer: a
+        explanation: "That's why microbenchmarks need warm-up (use JMH, not `System.nanoTime` loops) and why services show a latency bump right after deployment."
+
+      - type: single
+        prompt: Two threads run `counter++` 1,000,000 times each on this field. What is the likely final value?
+        code:
+          source: |
+            @Volatile
+            var counter = 0
+        options:
+          - { id: a, text: "Often less than 2,000,000: volatile gives visibility but `++` is not atomic" }
+          - { id: b, text: "Exactly 2,000,000, because volatile makes operations atomic" }
+          - { id: c, text: "Exactly 1,000,000" }
+          - { id: d, text: "Always 0: volatile blocks writes from other threads" }
+        answer: a
+        explanation: "`counter++` is read-modify-write. Use `AtomicInteger`/`LongAdder` (or a lock). `volatile` guarantees visibility and ordering of single reads/writes, not compound actions."
+
+      - type: multi
+        prompt: Select ALL true statements about `synchronized` and `ReentrantLock`.
+        options:
+          - { id: a, text: "`synchronized` is reentrant" }
+          - { id: b, text: "`ReentrantLock` supports `tryLock` with a timeout" }
+          - { id: c, text: "Releasing a monitor happens-before a later acquisition of the same monitor" }
+          - { id: d, text: "`ReentrantLock` is released automatically at the end of the enclosing block" }
+          - { id: e, text: "`synchronized` supports multiple `Condition`s per lock" }
+        answers: [a, b, c]
+        explanation: "With `ReentrantLock` you must `unlock()` in a `finally` block. Multiple conditions are a `Lock` feature (`newCondition()`); a monitor has a single wait set."
+
+      - type: single
+        prompt: Virtual threads (Java 21) give the biggest win for which workload?
+        options:
+          - { id: a, text: "Many concurrent tasks that mostly block on I/O (HTTP calls, JDBC)" }
+          - { id: b, text: "Tight CPU-bound numeric loops" }
+          - { id: c, text: "A single long-running batch job" }
+          - { id: d, text: "Code that holds `synchronized` blocks around network calls" }
+        answer: a
+        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and the last option is a pinning hazard (next question)."
+
+      - type: single
+        prompt: "In JDK 21, a virtual thread blocks on I/O while inside a `synchronized` block. What is the effect, and the usual remedy?"
+        options:
+          - { id: a, text: "The carrier thread is pinned (can't be reused); prefer `ReentrantLock` around blocking code" }
+          - { id: b, text: "The JVM throws IllegalMonitorStateException; wrap in try/catch" }
+          - { id: c, text: "The virtual thread is converted to a platform thread permanently; nothing to do" }
+          - { id: d, text: "No effect at all; monitors are fully supported by virtual threads" }
+        answer: a
+        explanation: "Pinning limits scalability because the carrier is stuck. It's been largely addressed in later JDKs for `synchronized`, but on 21 it is a real tuning concern (`-Djdk.tracePinnedThreads`)."
+
+      - type: single
+        prompt: "At runtime you get `NoClassDefFoundError` for a class that was present at compile time. What does that usually mean?"
+        options:
+          - { id: a, text: "The class was on the compile classpath but is missing at runtime (or its static initialiser failed earlier)" }
+          - { id: b, text: "The code called `Class.forName` with a typo" }
+          - { id: c, text: "A syntax error in the class" }
+          - { id: d, text: "The class is deprecated" }
+        answer: a
+        explanation: "`ClassNotFoundException` is thrown by explicit reflective loading (`Class.forName`); `NoClassDefFoundError` is a linkage error when the JVM can't find or initialise a class it needs. Typical causes: `provided`/`compileOnly` dependency, version conflicts, or an `ExceptionInInitializerError` first."
+
+      - type: open
+        prompt: "Explain \"happens-before\" in the Java Memory Model and give two ways to safely publish an object to another thread."
+        modelAnswer: "Happens-before is the JMM's guarantee that if action A happens-before action B, then A's effects (writes) are visible to B and ordered before it. Without such an edge, the compiler, CPU and caches may reorder or delay writes so another thread can see stale or partially constructed state. Edges come from volatile write/read, monitor unlock/lock, Thread.start/join, and final-field semantics. Safe publication means establishing that edge: for example store the object in a volatile field, publish via synchronized/locks, put it in a concurrent collection or queue, hand it over through a static initialiser, or make its fields final."
+        keyPoints:
+          - point: "Happens-before = visibility and ordering guarantee between actions across threads; absent it, stale/reordered reads are possible"
+            keywords: ["visibility", "ordering", "reorder", "stale", "guarantee", "visible"]
+          - point: "Sources of the relation: volatile, synchronized/lock, thread start/join, final fields"
+            keywords: ["volatile", "synchronized", "lock", "start", "join", "final"]
+          - point: "Names at least two safe-publication mechanisms (volatile field, locks, concurrent collections, static initialiser, final fields)"
+            keywords: ["safe publication", "concurrenthashmap", "blockingqueue", "queue", "static initial", "volatile field", "final field", "atomicreference"]

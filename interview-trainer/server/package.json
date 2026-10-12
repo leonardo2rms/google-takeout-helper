@@ -1,0 +1,17 @@
+{
+  "name": "@trainer/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../.env src/main.ts",
+    "start": "tsx --env-file-if-exists=../.env src/main.ts",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "@trainer/shared": "*",
+    "express": "^5.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": { "@types/express": "^5.0.0", "@types/node": "^22.0.0" }
+}

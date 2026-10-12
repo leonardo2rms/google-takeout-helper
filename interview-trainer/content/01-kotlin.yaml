@@ -1,0 +1,182 @@
+id: kotlin
+title: Kotlin Essentials
+emoji: "🧩"
+color: "#7f52ff"
+description: Null safety, idioms and the language features seniors are expected to know cold.
+lessons:
+  - id: kotlin-null-types
+    title: Null safety & types
+    questions:
+      - type: single
+        prompt: What does this print?
+        code:
+          source: |
+            val name: String? = null
+            println(name?.length ?: -1)
+        options:
+          - { id: a, text: "-1" }
+          - { id: b, text: "null" }
+          - { id: c, text: "NullPointerException" }
+          - { id: d, text: "It does not compile" }
+        answer: a
+        explanation: "`?.` short-circuits to null when the receiver is null, and the Elvis operator `?:` supplies the fallback -1. No NPE is possible without `!!`."
+
+      - type: multi
+        prompt: Select ALL statements that are true about `lateinit`.
+        options:
+          - { id: a, text: "It can only be applied to `var` properties" }
+          - { id: b, text: "It can be used on `Int` properties" }
+          - { id: c, text: "The property type must be non-nullable" }
+          - { id: d, text: "Reading it before assignment throws UninitializedPropertyAccessException" }
+          - { id: e, text: "It can be applied to `val` properties" }
+        answers: [a, c, d]
+        explanation: "`lateinit` needs a mutable, non-null, non-primitive property. Primitives (Int, Boolean...) are not allowed because the JVM field would need a null sentinel. You can test with `::prop.isInitialized`."
+
+      - type: fill
+        prompt: Return the length of `name`, or 0 when it is null.
+        template: "val len = name[[1]]length [[2]] 0"
+        bank: ["?.", "?:", "!!", "?", "::"]
+        answers: ["?.", "?:"]
+        explanation: "Safe call `?.` yields `Int?`; the Elvis operator `?:` unwraps it with a default. `!!` would throw instead."
+
+      - type: single
+        prompt: What do the two lines print?
+        code:
+          source: |
+            data class P(val x: Int)
+            val a = P(1)
+            val b = P(1)
+            println(a == b)
+            println(a === b)
+        options:
+          - { id: a, text: "true, false" }
+          - { id: b, text: "false, false" }
+          - { id: c, text: "true, true" }
+          - { id: d, text: "false, true" }
+        answer: a
+        explanation: "`==` is structural equality (calls `equals`, which data classes generate from the primary-constructor properties). `===` is reference identity, and these are two different instances."
+
+      - type: single
+        prompt: Why does this not compile?
+        code:
+          source: |
+            class Box(var value: Any)
+
+            fun describe(b: Box) {
+                if (b.value is String) {
+                    println(b.value.length)
+                }
+            }
+        options:
+          - { id: a, text: "`value` is a mutable property, so the compiler can't guarantee it is still a String on the next line" }
+          - { id: b, text: "`is` can only be used inside `when`" }
+          - { id: c, text: "`Any` has no `length` and smart casts only work on parameters" }
+          - { id: d, text: "`Box` must be declared `open` for smart casts" }
+        answer: a
+        explanation: "Smart casts only work when the value can't change between the check and the use: local `val`s, local `var`s not captured in a modifying lambda, and `val` properties without custom getters in the same module. Copy it to a local `val` (`val v = b.value`) first."
+
+      - type: order
+        prompt: Arrange the lines to form an extension function returning the second element, or null.
+        lines:
+          - "fun <T> List<T>.secondOrNull(): T? {"
+          - "    if (size < 2) return null"
+          - "    return this[1]"
+          - "}"
+        explanation: "Guard first, then index. The type parameter `T` belongs before the receiver type in the declaration."
+
+      - type: open
+        prompt: When would you use `by lazy` instead of `lateinit var`?
+        modelAnswer: "`by lazy` is for a `val` whose value is computed from an initializer lambda the first time it is read; it is thread-safe by default (SYNCHRONIZED mode) and works for any type, including primitives and nullables. `lateinit` is for a `var` that something else assigns after construction (dependency injection, test setup, lifecycle callbacks); there's no initializer, and reading it too early throws. So: lazy for expensive, self-contained, immutable values; lateinit when initialisation is external."
+        keyPoints:
+          - point: "lazy computes the value on first access via an initializer lambda (expensive/deferred work)"
+            keywords: ["first access", "first use", "on demand", "initializer", "lambda", "deferred", "computed"]
+          - point: "lazy gives an immutable val and is thread-safe by default; lateinit is a mutable var"
+            keywords: ["thread-safe", "thread safe", "synchronized", "val", "immutable"]
+          - point: "lateinit fits values assigned externally later (DI, tests, lifecycle) and throws if read too early"
+            keywords: ["injection", "di", "setup", "lifecycle", "assigned later", "uninitialized", "externally", "test"]
+
+  - id: kotlin-idioms
+    title: Idiomatic Kotlin
+    questions:
+      - type: single
+        prompt: What is the main benefit of a `sealed` hierarchy when used with `when`?
+        options:
+          - { id: a, text: "The compiler knows all subtypes, so `when` can be exhaustive without an `else` branch" }
+          - { id: b, text: "Sealed classes are faster than open classes at runtime" }
+          - { id: c, text: "Subclasses can be declared in any module" }
+          - { id: d, text: "It automatically generates `copy()` for each subtype" }
+        answer: a
+        explanation: "Direct subtypes of a sealed type are known at compile time, so adding a new subtype turns every non-exhaustive `when` expression into a compile error. That is a safety net for evolving domain models."
+
+      - type: single
+        prompt: What does this expression evaluate to?
+        code:
+          source: |
+            val sb = StringBuilder().apply { append("a"); append("b") }
+        options:
+          - { id: a, text: "The StringBuilder itself (the receiver)" }
+          - { id: b, text: "The string \"ab\"" }
+          - { id: c, text: "Unit" }
+          - { id: d, text: "The result of the last `append` call, a new StringBuilder" }
+        answer: a
+        explanation: "`apply` and `also` return the receiver; `let`, `run` and `with` return the lambda result. `apply` uses `this` inside the block, `also` uses `it`."
+
+      - type: multi
+        prompt: Select ALL statements that are true about `data class`.
+        options:
+          - { id: a, text: "`equals`/`hashCode` only use properties from the primary constructor" }
+          - { id: b, text: "A data class can be declared `open`" }
+          - { id: c, text: "`copy()` makes a shallow copy" }
+          - { id: d, text: "The primary constructor must have at least one parameter" }
+          - { id: e, text: "A no-arg constructor is generated automatically" }
+        answers: [a, c, d]
+        explanation: "Data classes can't be open, abstract, sealed or inner. `copy()` copies references, not deep structure, so a mutable list inside is shared. No no-arg constructor is generated (that's the JPA `no-arg` plugin's job)."
+
+      - type: single
+        prompt: How many times does the `map` lambda run?
+        code:
+          source: |
+            val first = (1..1_000_000)
+                .asSequence()
+                .map { it * 2 }
+                .filter { it % 3 == 0 }
+                .first()
+        options:
+          - { id: a, text: "3" }
+          - { id: b, text: "1,000,000" }
+          - { id: c, text: "1" }
+          - { id: d, text: "333,333" }
+        answer: a
+        explanation: "Sequences are lazy and process element by element. 1*2=2 and 2*2=4 fail the filter; 3*2=6 passes, and `first()` stops there. With a List, every operator would run over all 1,000,000 elements and allocate intermediate lists."
+
+      - type: fill
+        prompt: Build a sorted list of the names of active users.
+        template: |
+          val names = users
+              .[[1]] { it.active }
+              .[[2]] { it.name }
+              .[[3]]()
+        bank: ["filter", "map", "sorted", "flatMap", "forEach", "groupBy"]
+        answers: ["filter", "map", "sorted"]
+        explanation: "Narrow first (`filter`), then transform (`map`), then order the final, smaller list (`sorted`). Filtering early keeps the work small."
+
+      - type: single
+        prompt: "What is the main purpose of `@JvmInline value class UserId(val raw: Long)`?"
+        options:
+          - { id: a, text: "Compile-time type safety (UserId vs OrderId) with no wrapper allocation in most uses" }
+          - { id: b, text: "It makes the class immutable and thread-safe" }
+          - { id: c, text: "It generates `equals`, `copy` and `componentN` like a data class" }
+          - { id: d, text: "It lets the class be shared across coroutines without synchronisation" }
+        answer: a
+        explanation: "Value classes are erased to the underlying type where possible, avoiding allocation. They are boxed when used as a nullable, a generic type argument or through an interface, so it's not free everywhere."
+
+      - type: open
+        prompt: How are Kotlin extension functions resolved, and what's one pitfall of that?
+        modelAnswer: "Extension functions are resolved statically, at compile time, based on the declared type of the receiver expression, not its runtime type. They compile to static methods taking the receiver as the first parameter, so they can't access private members and they aren't overridden polymorphically. If a class has a member with the same signature, the member always wins. A typical pitfall is expecting `animal.speak()` to dispatch on the runtime subclass when `speak` is an extension."
+        keyPoints:
+          - point: "Resolved statically on the declared receiver type, not dynamically (no polymorphic dispatch)"
+            keywords: ["static", "compile time", "compile-time", "declared type", "not dynamic", "not polymorphic"]
+          - point: "Compiled to a static method with the receiver as first parameter; cannot access private members"
+            keywords: ["static method", "first parameter", "private", "utility"]
+          - point: "A member function with the same signature always wins over an extension"
+            keywords: ["member wins", "members win", "member always", "shadow", "takes precedence", "member function"]

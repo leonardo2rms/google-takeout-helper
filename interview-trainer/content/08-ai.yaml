@@ -1,0 +1,173 @@
+id: ai
+title: AI-Assisted Engineering
+emoji: "🤖"
+color: "#2b70c9"
+description: Using AI assistants well, reviewing what they write, and building safe LLM features.
+lessons:
+  - id: ai-coding
+    title: Working with AI assistants
+    questions:
+      - type: single
+        prompt: "An assistant proposes building a SQL query by concatenating a request parameter into the string. What do you do?"
+        code:
+          source: |
+            val sql = "SELECT * FROM users WHERE email = '" + email + "'"
+            jdbc.query(sql, mapper)
+        options:
+          - { id: a, text: "Reject it and use a parameterised query: AI output gets the same review as any other contributor's code" }
+          - { id: b, text: "Accept it; the assistant is usually right" }
+          - { id: c, text: "Accept it but add a comment" }
+          - { id: d, text: "Ask the assistant to make it 'more secure' and merge without reading" }
+        answer: a
+        explanation: "Assistants reproduce common patterns, including insecure ones. You remain accountable for what you merge: review for injection, authz, error handling and secrets, whoever (or whatever) wrote it."
+
+      - type: multi
+        prompt: Select ALL habits that improve the quality of AI-assisted coding.
+        options:
+          - { id: a, text: "Provide relevant context: conventions, constraints and the files involved" }
+          - { id: b, text: "Work in small steps, with tests or a clear acceptance check for each" }
+          - { id: c, text: "Accept large multi-file diffs without reading them if the tests pass" }
+          - { id: d, text: "Feed failing tests and compiler errors back to the assistant" }
+          - { id: e, text: "Turn off static analysis so the assistant isn't distracted by warnings" }
+        answers: [a, b, d]
+        explanation: "Tight feedback loops (compile, test, lint) are what let an assistant correct itself, and small diffs are reviewable. Passing tests only prove what the tests cover."
+
+      - type: single
+        prompt: "The assistant suggests `list.chunkedBy(3)`, which doesn't exist in the Kotlin stdlib (`chunked(3)` does). What's the best general defence against this kind of hallucination?"
+        options:
+          - { id: a, text: "Compile and run it, and check unfamiliar APIs against official docs; don't trust that an API exists because it looks plausible" }
+          - { id: b, text: "Ask the assistant 'are you sure?' and trust the answer" }
+          - { id: c, text: "Never use generated code for anything involving a library" }
+          - { id: d, text: "Rely on the IDE to hide the error" }
+        answer: a
+        explanation: "Models generate plausible text, not verified facts. Compilers, type checkers and tests are cheap, objective verifiers, and 'are you sure?' just samples another answer."
+
+      - type: single
+        prompt: "In a long session the assistant starts ignoring a constraint you gave at the start. What is the most effective response?"
+        options:
+          - { id: a, text: "Start a fresh session with a concise summary or spec, and keep standing rules in a persistent project instructions file" }
+          - { id: b, text: "Repeat the constraint in capital letters in every message" }
+          - { id: c, text: "Keep going; models never lose track of earlier context" }
+          - { id: d, text: "Paste the entire chat history again" }
+        answer: a
+        explanation: "Long contexts get cluttered with dead ends and stale decisions. A clean context with the current state and rules (e.g. CLAUDE.md-style project instructions) usually beats trying to rescue a long one."
+
+      - type: single
+        prompt: "The assistant wrote both a function and its unit tests, and they all pass. Is that sufficient evidence the function is correct?"
+        options:
+          - { id: a, text: "No: the tests share the same assumptions as the code. Review them against the spec and add edge-case/property tests" }
+          - { id: b, text: "Yes: passing tests prove correctness" }
+          - { id: c, text: "Yes, if there are more than 10 tests" }
+          - { id: d, text: "No: AI-written tests can never be trusted, so delete them" }
+        answer: a
+        explanation: "If the model misunderstood the requirement, it will usually encode the same misunderstanding in both code and tests. Write (or at least carefully read) tests from the requirement, include boundaries, and mutation-test if it matters."
+
+      - type: single
+        prompt: A teammate wants to paste a production database dump with customer emails into a public AI chat tool to debug a query. What is the right call?
+        options:
+          - { id: a, text: "Don't: use anonymised/synthetic data and an approved tool under your company's data policy" }
+          - { id: b, text: "Fine, since the chat history is private" }
+          - { id: c, text: "Fine if you delete the chat afterwards" }
+          - { id: d, text: "Fine for the first 100 rows" }
+        answer: a
+        explanation: "Sending data to a third party is a disclosure, regardless of later deletion. Redact or generate representative data, and use tools your organisation has vetted for the data's classification."
+
+      - type: open
+        prompt: You're asked to use an AI assistant to migrate a 3,000-line Java service to Kotlin. How do you do it responsibly?
+        modelAnswer: "I'd first make sure existing behaviour is pinned down by tests (characterisation tests where coverage is thin), so I have an objective check. Then migrate incrementally, class by class or package by package, keeping the build green and the diff reviewable instead of a big-bang rewrite. I'd review the generated Kotlin for semantic traps: platform types and nullability, default-final classes needing the Spring/JPA compiler plugins, equals/hashCode and data class differences, static members, checked exceptions and SAM conversions. CI gates (compile, tests, static analysis) must pass, a human reviews every diff, and I'd keep secrets and proprietary data out of unapproved tools."
+        keyPoints:
+          - point: "Establish a safety net first: existing or characterisation tests"
+            keywords: ["test", "characteri", "coverage", "safety net", "baseline"]
+          - point: "Migrate incrementally in small reviewable steps with the build green"
+            keywords: ["incremental", "small", "step", "class by class", "package", "iterative", "gradual"]
+          - point: "Review for semantic differences (nullability/platform types, final classes + plugins, equals/data classes, etc.)"
+            keywords: ["nullab", "platform type", "null", "open", "final", "plugin", "equals", "semantic", "data class"]
+          - point: "Human review plus CI gates; protect secrets and proprietary data"
+            keywords: ["review", "ci", "pipeline", "static analysis", "secret", "confidential", "proprietary", "policy"]
+
+  - id: ai-llm-apps
+    title: Building LLM features
+    questions:
+      - type: single
+        prompt: What is the primary purpose of retrieval-augmented generation (RAG)?
+        options:
+          - { id: a, text: "Ground the model in your own, current documents by retrieving relevant passages and including them in the prompt" }
+          - { id: b, text: "Retrain the model on your data every night" }
+          - { id: c, text: "Make the model faster by shrinking its weights" }
+          - { id: d, text: "Guarantee the model never hallucinates" }
+        answer: a
+        explanation: "RAG reduces (not eliminates) hallucination and keeps knowledge fresh without retraining. Quality hinges on retrieval: chunking, embeddings, filters and re-ranking."
+
+      - type: single
+        prompt: "In a RAG system, what does the vector store enable?"
+        options:
+          - { id: a, text: "Finding chunks whose embeddings are semantically close to the query, even when they share no keywords" }
+          - { id: b, text: "Exact SQL joins between documents" }
+          - { id: c, text: "Fine-tuning the model" }
+          - { id: d, text: "Compressing the prompt losslessly" }
+        answer: a
+        explanation: "Embeddings map text to vectors where similar meaning means small distance. Production systems often combine this with keyword (BM25) search and metadata filters."
+
+      - type: multi
+        prompt: Select ALL sound mitigations against prompt injection in an LLM app that reads web pages and emails.
+        options:
+          - { id: a, text: "Treat retrieved and user content as untrusted data: delimit it and never let it act as instructions" }
+          - { id: b, text: "Give the model's tools least privilege and require human confirmation for destructive actions" }
+          - { id: c, text: "Rely on the system prompt saying 'ignore malicious instructions' as the only defence" }
+          - { id: d, text: "Validate model output against a schema/allow-list before acting on it" }
+          - { id: e, text: "Give the agent admin credentials so it can fix its own mistakes" }
+        answers: [a, b, d]
+        explanation: "You cannot reliably prompt your way out of injection, so limit the blast radius: minimal permissions, server-side authorisation checks, and deterministic validation between the model and anything with side effects."
+
+      - type: single
+        prompt: How do you know whether a prompt change actually improved your feature?
+        options:
+          - { id: a, text: "Run it against an eval set of representative cases (including hard ones) and compare scores before and after" }
+          - { id: b, text: "Try two or three examples by hand and go with your gut" }
+          - { id: c, text: "Ask the model whether the new prompt is better" }
+          - { id: d, text: "Ship it and see if support tickets go down" }
+        answer: a
+        explanation: "LLM outputs vary, so anecdotes mislead. Grade with code where possible, otherwise with a model judge calibrated against human labels, and track regressions as you change prompts or models."
+
+      - type: single
+        prompt: "Each request to your LLM feature includes the same 20,000-token policy document followed by a short user question. What is the best cost and latency optimisation?"
+        options:
+          - { id: a, text: "Use prompt caching: keep the static document as a stable prefix so repeated reads are cheap and fast" }
+          - { id: b, text: "Shorten the user's question" }
+          - { id: c, text: "Send the document only on every tenth request" }
+          - { id: d, text: "Split the document across several parallel requests" }
+        answer: a
+        explanation: "Caching works on identical prefixes, so put stable content first and per-request content last, and avoid changing it (timestamps in the prefix break it). Also consider a smaller model for simple steps."
+
+      - type: single
+        prompt: Your Spring service needs to consume the model's answer as data (an object with typed fields). What is the most reliable approach?
+        options:
+          - { id: a, text: "Request structured output against a JSON schema, then validate and deserialise it, with a defined fallback on failure" }
+          - { id: b, text: "Ask nicely for JSON and parse it with a regex" }
+          - { id: c, text: "Parse free-form prose with string splitting" }
+          - { id: d, text: "Trust the output and cast it" }
+        answer: a
+        explanation: "Schema-constrained output removes most format errors, but you still validate semantically (ranges, enums, business rules) because valid JSON can still be wrong."
+
+      - type: single
+        prompt: "Unit tests that call a live LLM are flaky and slow. What's the better testing strategy?"
+        options:
+          - { id: a, text: "Hide the model behind an interface and use fakes/recorded responses in unit tests; measure quality separately with an eval suite" }
+          - { id: b, text: "Retry each test until it passes" }
+          - { id: c, text: "Mock everything and skip quality checks" }
+          - { id: d, text: "Only test manually" }
+        answer: a
+        explanation: "Separate deterministic plumbing (parsing, retries, routing: unit-testable) from model quality (statistical: evals). Keep a few live integration checks outside the main CI gate."
+
+      - type: open
+        prompt: Design the guardrails for a customer-support chatbot that can issue refunds through a tool call.
+        modelAnswer: "The model must never be the authority. The refund tool should be least-privilege and enforced server-side: it re-checks that the order belongs to the authenticated customer, caps amounts, limits frequency and requires human approval above a threshold. Treat all customer text (and any retrieved content) as untrusted to defend against prompt injection, and validate tool arguments against a schema before executing. Log every tool call for audit, rate-limit abuse, monitor and evaluate conversations (including adversarial test cases), and provide a fallback to a human agent."
+        keyPoints:
+          - point: "Authorisation and limits enforced server-side in the tool (ownership check, amount caps, frequency limits), not by the model"
+            keywords: ["server-side", "server side", "authoriz", "authoris", "ownership", "cap", "limit", "least privilege", "least-privilege", "permission"]
+          - point: "Human approval for high-risk or high-value refunds"
+            keywords: ["human", "approval", "approve", "confirm", "escalat", "threshold", "review"]
+          - point: "Treat user input as untrusted: prompt-injection defences and schema validation of tool arguments"
+            keywords: ["injection", "untrusted", "validate", "validation", "schema", "sanitiz", "sanitis"]
+          - point: "Audit logging, monitoring/evals (including adversarial cases) and a human fallback"
+            keywords: ["audit", "log", "monitor", "eval", "red team", "adversarial", "fallback", "rate limit"]
