@@ -2,7 +2,11 @@
   "name": "interview-trainer",
   "private": true,
   "type": "module",
-  "workspaces": ["shared", "server", "web"],
+  "workspaces": [
+    "shared",
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev": "concurrently -k -n web,api -c cyan,magenta \"npm:dev:web\" \"npm:dev:server\"",
     "dev:web": "npm run dev -w web",
@@ -11,7 +15,8 @@
     "start": "npm run start -w server",
     "test": "vitest run",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web",
-    "content:check": "tsx scripts/check-content.ts"
+    "content:check": "tsx scripts/check-content.ts",
+    "build:standalone": "node scripts/build-standalone.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.0.0",

@@ -57,6 +57,16 @@ How the grader is built (`server/src/grader.ts`):
   trainer.)
 - Rate-limited (30/min/IP by default), 32 kB body limit, and upstream errors are never leaked to the client.
 
+### Single-file build (no server, no install)
+
+```bash
+npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, ~400 kB)
+```
+
+Everything (course, logic, styles) is inlined, with no service worker and no API server. Hosts that provide
+a `sample` capability (a claude.ai artifact does) grade open questions through the viewer's own Claude account;
+anywhere else it falls back to self-assessment. Handy for trying the app from a phone with nothing installed.
+
 ## Layout
 
 ```
@@ -65,7 +75,7 @@ interview-trainer/
   shared/           schema (zod), grading, lesson-session engine, streak/progress logic. Pure TS, fully tested
   server/           Express API: /api/health, /api/grade (+ serves web/dist in production)
   web/              React + Vite PWA
-  scripts/          content:check
+  scripts/          content:check, build-standalone
 ```
 
 Content is plain YAML on purpose: it is the most portable part of this project (any backend, a Kotlin/Spring

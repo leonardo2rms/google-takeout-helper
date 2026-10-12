@@ -23,25 +23,61 @@
   --radius: 16px;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  color-scheme: light dark;
+  --tok-keyword: #cf222e;
+  --tok-string: #0a7b3e;
+  --tok-comment: #6e7781;
+  --tok-number: #0550ae;
+  --tok-annotation: #8250df;
+  --tok-type: #953800;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #131f24;
-    --surface: #1f2c33;
-    --border: #37464f;
-    --text: #e5edf1;
-    --muted: #93a4ad;
-    --green-bg: #1d3b17;
-    --green-text: #8ee04a;
-    --red-bg: #3b1d1f;
-    --red-text: #ff8a8a;
-    --amber-bg: #3b3017;
-    --amber-text: #ffd36b;
-    --blue-bg: #17323f;
-    --code-bg: #0e171b;
-    --code-text: #d7e2e7;
+  :root:not([data-theme="light"]) {
+  --bg: #131f24;
+  --surface: #1f2c33;
+  --border: #37464f;
+  --text: #e5edf1;
+  --muted: #93a4ad;
+  --green-bg: #1d3b17;
+  --green-text: #8ee04a;
+  --red-bg: #3b1d1f;
+  --red-text: #ff8a8a;
+  --amber-bg: #3b3017;
+  --amber-text: #ffd36b;
+  --blue-bg: #17323f;
+  --code-bg: #0e171b;
+  --code-text: #d7e2e7;
+  --tok-keyword: #ff7b72;
+  --tok-string: #7ee787;
+  --tok-comment: #8b949e;
+  --tok-number: #79c0ff;
+  --tok-annotation: #d2a8ff;
+  --tok-type: #ffa657;
+  color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #131f24;
+  --surface: #1f2c33;
+  --border: #37464f;
+  --text: #e5edf1;
+  --muted: #93a4ad;
+  --green-bg: #1d3b17;
+  --green-text: #8ee04a;
+  --red-bg: #3b1d1f;
+  --red-text: #ff8a8a;
+  --amber-bg: #3b3017;
+  --amber-text: #ffd36b;
+  --blue-bg: #17323f;
+  --code-bg: #0e171b;
+  --code-text: #d7e2e7;
+  --tok-keyword: #ff7b72;
+  --tok-string: #7ee787;
+  --tok-comment: #8b949e;
+  --tok-number: #79c0ff;
+  --tok-annotation: #d2a8ff;
+  --tok-type: #ffa657;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
@@ -76,7 +112,7 @@ button:disabled { cursor: default; }
 
 /* ---------- home ---------- */
 .home { padding: 16px 16px 48px; }
-.home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: 0; background: var(--bg); padding: 8px 0 12px; z-index: 5; }
+.home-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); padding: 8px 0 12px; z-index: 5; }
 .home-top h1 { font-size: 22px; }
 .stats { display: flex; gap: 8px; }
 .stat, .xp-chip { font-weight: 800; padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 2px solid var(--border); white-space: nowrap; }
@@ -113,7 +149,7 @@ button:disabled { cursor: default; }
 
 /* ---------- lesson ---------- */
 .lesson { display: flex; flex-direction: column; min-height: 100dvh; }
-.lesson-top { display: flex; align-items: center; gap: 8px; padding: 12px 12px 4px; position: sticky; top: 0; background: var(--bg); z-index: 5; }
+.lesson-top { display: flex; align-items: center; gap: 8px; padding: 12px 12px 4px; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
 .bar { flex: 1; height: 16px; border-radius: 999px; background: var(--border); overflow: hidden; }
 .bar-fill { height: 100%; background: var(--accent); border-radius: 999px; transition: width .35s ease; position: relative; }
 .bar-fill::after { content: ""; position: absolute; left: 8px; right: 8px; top: 4px; height: 4px; border-radius: 4px; background: rgba(255,255,255,.35); }
@@ -146,16 +182,12 @@ button:disabled { cursor: default; }
   font-size: 14px; line-height: 1.6; overflow-x: auto; white-space: pre; tab-size: 4; max-width: 100%;
 }
 .code code { font: inherit; }
-.tok-keyword { color: #cf222e; font-weight: 600; }
-.tok-string { color: #0a7b3e; }
-.tok-comment { color: #6e7781; font-style: italic; }
-.tok-number { color: #0550ae; }
-.tok-annotation { color: #8250df; }
-.tok-type { color: #953800; }
-@media (prefers-color-scheme: dark) {
-  .tok-keyword { color: #ff7b72; } .tok-string { color: #7ee787; } .tok-comment { color: #8b949e; }
-  .tok-number { color: #79c0ff; } .tok-annotation { color: #d2a8ff; } .tok-type { color: #ffa657; }
-}
+.tok-keyword { color: var(--tok-keyword); font-weight: 600; }
+.tok-string { color: var(--tok-string); }
+.tok-comment { color: var(--tok-comment); font-style: italic; }
+.tok-number { color: var(--tok-number); }
+.tok-annotation { color: var(--tok-annotation); }
+.tok-type { color: var(--tok-type); }
 .blank {
   display: inline-block; min-width: 56px; padding: 0 8px; margin: 0 2px; font: inherit; line-height: 1.4; vertical-align: baseline;
   background: var(--bg); color: var(--code-text); border: 2px dashed var(--muted); border-radius: 8px; text-align: center;

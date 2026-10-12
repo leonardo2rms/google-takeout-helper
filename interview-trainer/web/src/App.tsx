@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
   allQuestions, dayKey, findLesson, liveStreak, recordResult, seededShuffle,
   type HealthResponse, type Question, type SessionSummary,
 } from '@trainer/shared';
-import { fetchHealth } from './lib/api';
+import { fetchHealth, gradeOpen } from './lib/api';
+import type { GradeFn } from './lib/evaluate';
+import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { useProgress } from './lib/store';
 import { Home } from './screens/Home';
 import { LessonScreen } from './screens/Lesson';
@@ -34,8 +36,19 @@ export function App() {
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
 
+  const [sampleGrade, setSampleGrade] = useState<GradeFn | undefined>();
+
   useEffect(() => {
-    void fetchHealth().then(setHealth);
+    if (!isStandalone) {
+      void fetchHealth().then(setHealth);
+      return;
+    }
+    // Hosted single-file build: no API server; grade through the viewer's own Claude when offered.
+    void loadSample().then((sample) => {
+      if (!sample) return;
+      setSampleGrade(() => createSampleGrader(course, sample));
+      setHealth({ ok: true, ai: true, model: 'your Claude account' });
+    });
   }, []);
 
   const finish = useCallback(
@@ -50,7 +63,7 @@ export function App() {
     [progress, update],
   );
 
-  const ai = Boolean(health?.ai);
+  const grade = useMemo<GradeFn | undefined>(() => (isStandalone ? sampleGrade : health?.ai ? gradeOpen : undefined), [sampleGrade, health]);
 
   if (route.startsWith('/lesson/')) {
     const found = findLesson(course, route.slice('/lesson/'.length));
@@ -61,15 +74,15 @@ export function App() {
         title={found.lesson.title}
         color={found.unit.color}
         questions={found.lesson.questions}
-        aiAvailable={ai}
+        grade={grade}
         onExit={() => go('/')}
         onFinish={(s) => finish(found.lesson.title, s, found.lesson.id)}
       />
     );
   }
 
-  if (route === '/mix') return <Practice key="mix" kind="mix" title="Mixed practice" ai={ai} missed={progress.missed} onFinish={finish} />;
-  if (route === '/review') return <Practice key="review" kind="review" title="Review mistakes" ai={ai} missed={progress.missed} onFinish={finish} />;
+  if (route === '/mix') return <Practice key="mix" kind="mix" title="Mixed practice" grade={grade} missed={progress.missed} onFinish={finish} />;
+  if (route === '/review') return <Practice key="review" kind="review" title="Review mistakes" grade={grade} missed={progress.missed} onFinish={finish} />;
 
   if (route === '/done') {
     if (!finished) {
@@ -83,10 +96,10 @@ export function App() {
 }
 
 /** Mixed / review sessions: the question list is picked once, when the screen mounts. */
-function Practice({ kind, title, ai, missed, onFinish }: {
+function Practice({ kind, title, grade, missed, onFinish }: {
   kind: 'mix' | 'review';
   title: string;
-  ai: boolean;
+  grade?: GradeFn;
   missed: string[];
   onFinish: (title: string, s: SessionSummary) => void;
 }) {
@@ -111,7 +124,7 @@ function Practice({ kind, title, ai, missed, onFinish }: {
       title={title}
       color={kind === 'mix' ? '#1cb0f6' : '#ff9600'}
       questions={questions}
-      aiAvailable={ai}
+      grade={grade}
       onExit={() => go('/')}
       onFinish={(s) => onFinish(title, s)}
     />

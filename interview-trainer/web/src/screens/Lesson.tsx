@@ -10,14 +10,14 @@ import { Inline } from '../components/Inline';
 import { FillQuestion } from '../components/FillQuestion';
 import { OpenQuestion } from '../components/OpenQuestion';
 import { OrderQuestion } from '../components/OrderQuestion';
-import { gradeOpen } from '../lib/api';
-import { evaluate, isPass, skipOutcome, type Answer, type Outcome } from '../lib/evaluate';
+import { evaluate, isPass, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 
 interface Props {
   title: string;
   color: string;
   questions: Question[];
-  aiAvailable: boolean;
+  /** Grades open answers with AI; undefined means offline (self-assessment). */
+  grade?: GradeFn;
   onExit: () => void;
   onFinish: (summary: SessionSummary) => void;
 }
@@ -38,7 +38,8 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, color, questions, aiAvailable, onExit, onFinish }: Props) {
+export function LessonScreen({ title, color, questions, grade, onExit, onFinish }: Props) {
+  const aiAvailable = Boolean(grade);
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [phase, setPhase] = useState<Phase>('answer');
@@ -52,10 +53,10 @@ export function LessonScreen({ title, color, questions, aiAvailable, onExit, onF
   const check = useCallback(async () => {
     if (!q || !answer || phase !== 'answer') return;
     setPhase('grading');
-    const result = await evaluate(q, answer, aiAvailable ? gradeOpen : undefined);
+    const result = await evaluate(q, answer, grade);
     setOutcome(result);
     setPhase('feedback');
-  }, [q, answer, phase, aiAvailable]);
+  }, [q, answer, phase, grade]);
 
   const skip = useCallback(() => {
     if (!q || phase !== 'answer') return;

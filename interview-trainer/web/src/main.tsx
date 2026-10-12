@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { App } from './App';
+import { isStandalone } from './lib/sample-grader';
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(
@@ -10,7 +11,7 @@ createRoot(document.getElementById('root')!).render(
 );
 
 // Offline support: cache the app shell so practice works on a plane.
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isStandalone) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
