@@ -1,0 +1,11 @@
+{
+  "name": "@trainer/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/load-content.ts"
+  },
+  "scripts": { "typecheck": "tsc -p ." },
+  "dependencies": { "yaml": "^2.6.0", "zod": "^3.25.0" }
+}

@@ -1,0 +1,242 @@
+id: complexity
+title: Algorithms & Complexity
+emoji: "📈"
+color: "#ff4b4b"
+description: Read a snippet, name its Big-O, and know what the JVM collections really cost.
+lessons:
+  - id: complexity-reading
+    title: Reading Big-O
+    questions:
+      - type: single
+        prompt: What is the time complexity?
+        code:
+          source: |
+            fun hasDuplicate(xs: List<Int>): Boolean {
+                for (i in xs.indices) {
+                    for (j in i + 1 until xs.size) {
+                        if (xs[i] == xs[j]) return true
+                    }
+                }
+                return false
+            }
+        options:
+          - { id: a, text: "O(n²)" }
+          - { id: b, text: "O(n)" }
+          - { id: c, text: "O(n log n)" }
+          - { id: d, text: "O(2ⁿ)" }
+        answer: a
+        explanation: "The inner loop runs n-1, n-2, ... 1 times: n(n-1)/2 comparisons, which is O(n²) in the worst case (no duplicates)."
+
+      - type: single
+        prompt: "What are the time and space complexity of this version?"
+        code:
+          source: |
+            fun hasDuplicate(xs: List<Int>): Boolean {
+                val seen = HashSet<Int>()
+                for (x in xs) {
+                    if (!seen.add(x)) return true
+                }
+                return false
+            }
+        options:
+          - { id: a, text: "O(n) time, O(n) space" }
+          - { id: b, text: "O(n) time, O(1) space" }
+          - { id: c, text: "O(n²) time, O(n) space" }
+          - { id: d, text: "O(n log n) time, O(1) space" }
+        answer: a
+        explanation: "One pass with expected O(1) hash operations, but the set can grow to n elements. You've traded memory for time. Sorting first gives O(n log n) time with O(1) extra space if you may mutate the input."
+
+      - type: single
+        prompt: What is the time complexity as a function of n?
+        code:
+          source: |
+            fun f(n: Int) {
+                var i = 1
+                while (i < n) {
+                    i *= 2
+                }
+            }
+        options:
+          - { id: a, text: "O(log n)" }
+          - { id: b, text: "O(n)" }
+          - { id: c, text: "O(√n)" }
+          - { id: d, text: "O(1)" }
+        answer: a
+        explanation: "`i` doubles each iteration, so it takes log₂(n) steps to reach n."
+
+      - type: single
+        prompt: What is the time complexity?
+        code:
+          source: |
+            fun g(n: Int) {
+                for (i in 0 until n) {
+                    var j = n
+                    while (j > 1) {
+                        j /= 2
+                    }
+                }
+            }
+        options:
+          - { id: a, text: "O(n log n)" }
+          - { id: b, text: "O(n²)" }
+          - { id: c, text: "O(log n)" }
+          - { id: d, text: "O(n)" }
+        answer: a
+        explanation: "The outer loop runs n times and the inner loop halves j each time: log n steps. The product is n log n."
+
+      - type: single
+        prompt: "What is the time complexity of the naive recursive `fib`, and what does memoisation turn it into?"
+        code:
+          source: |
+            fun fib(n: Int): Long =
+                if (n < 2) n.toLong() else fib(n - 1) + fib(n - 2)
+        options:
+          - { id: a, text: "O(2ⁿ), reduced to O(n) with memoisation" }
+          - { id: b, text: "O(n), reduced to O(log n)" }
+          - { id: c, text: "O(n²), reduced to O(n)" }
+          - { id: d, text: "O(n!), reduced to O(n²)" }
+        answer: a
+        explanation: "The call tree roughly doubles at each level (tight bound ≈ 1.618ⁿ, commonly quoted as O(2ⁿ)). With a cache each value of n is computed once."
+
+      - type: single
+        prompt: "`a` has n elements and `b` has m elements (both `List<Int>`). What is the time complexity, and how do you improve it?"
+        code:
+          source: |
+            val common = a.filter { it in b }
+        options:
+          - { id: a, text: "O(n·m); convert `b` to a HashSet first for O(n + m)" }
+          - { id: b, text: "O(n + m); no improvement possible" }
+          - { id: c, text: "O(n); `in` on a list is O(1)" }
+          - { id: d, text: "O(n log m); sort `b` first for O(n)" }
+        answer: a
+        explanation: "`in` on a List is a linear scan. `val set = b.toSet()` costs O(m) once, then each `in` is expected O(1). A hidden O(n²) like this is one of the most common production performance bugs."
+
+      - type: single
+        prompt: "Why is building a big string like this O(n²) in the number of appends, and what is the fix?"
+        code:
+          source: |
+            var s = ""
+            for (i in 0 until n) {
+                s += i.toString()
+            }
+        options:
+          - { id: a, text: "Each `+=` copies the whole string so far; use StringBuilder (or buildString)" }
+          - { id: b, text: "Strings are stored in a linked list" }
+          - { id: c, text: "`toString` is O(n)" }
+          - { id: d, text: "It is O(n); there is no problem" }
+        answer: a
+        explanation: "Strings are immutable, so concatenation allocates a new string and copies both parts. Total copying is 1+2+...+n. `buildString { ... }` appends in amortised O(1)."
+
+      - type: order
+        prompt: Arrange the lines of an O(n) two-sum that returns the indices of two numbers adding up to `target`.
+        lines:
+          - "fun twoSum(nums: IntArray, target: Int): IntArray? {"
+          - "    val seen = HashMap<Int, Int>()"
+          - "    for ((i, x) in nums.withIndex()) {"
+          - "        seen[target - x]?.let { return intArrayOf(it, i) }"
+          - "        seen[x] = i"
+          - "    }"
+          - "    return null"
+          - "}"
+        explanation: "Look up the complement before inserting the current element, so an element is never paired with itself. One pass with expected O(1) map operations gives O(n) time and O(n) space, versus O(n²) for checking every pair."
+
+      - type: open
+        format: code
+        prompt: "Write `fun <T> List<T>.firstDuplicate(): T?` that returns the first element that has already appeared earlier in the list, or null. Aim for O(n)."
+        modelAnswer: |
+          fun <T> List<T>.firstDuplicate(): T? {
+              val seen = HashSet<T>()
+              for (x in this) {
+                  if (!seen.add(x)) return x
+              }
+              return null
+          }
+        maxChars: 800
+        keyPoints:
+          - point: "Uses a hash-based set (HashSet / mutableSetOf / hashSetOf) to remember seen elements"
+            keywords: ["hashset", "mutableSetOf", "hashSetOf", "set<", "set()", "linkedhashset"]
+          - point: "Returns as soon as an element is already in the set (e.g. via add() returning false or contains)"
+            keywords: ["add(", "contains", " in seen", "in set", "return x", "return it", "return item"]
+          - point: "Returns null when no duplicate exists, and the whole thing is a single pass (O(n))"
+            keywords: ["return null", "null"]
+
+  - id: complexity-collections
+    title: JVM collection costs
+    questions:
+      - type: single
+        prompt: Which structure gives O(1) access to the i-th element?
+        options:
+          - { id: a, text: "ArrayList" }
+          - { id: b, text: "LinkedList" }
+          - { id: c, text: "TreeSet" }
+          - { id: d, text: "ArrayDeque, by index" }
+        answer: a
+        explanation: "ArrayList is backed by an array. LinkedList.get(i) walks the nodes: O(n), and it is slower than ArrayList in practice for nearly everything because of pointer chasing. ArrayDeque has no index access."
+
+      - type: single
+        prompt: "A HashMap's keys all collide into one bucket. On Java 8+, what is the typical lookup cost for Comparable keys?"
+        options:
+          - { id: a, text: "O(log n): large buckets are converted to balanced trees" }
+          - { id: b, text: "O(n) always" }
+          - { id: c, text: "O(1) always" }
+          - { id: d, text: "O(n²)" }
+        answer: a
+        explanation: "Since Java 8, a bucket with 8+ entries (and table size >= 64) becomes a red-black tree. It defends against hash-collision attacks and bad hashCode implementations, but a good hash function is still what makes lookups O(1)."
+
+      - type: single
+        prompt: "What is the cost of `list.add(x)` on an `ArrayList` vs `list.add(0, x)`?"
+        options:
+          - { id: a, text: "Amortised O(1) at the end; O(n) at the front because all elements shift" }
+          - { id: b, text: "O(1) for both" }
+          - { id: c, text: "O(n) for both" }
+          - { id: d, text: "O(log n) for both" }
+        answer: a
+        explanation: "Appends occasionally trigger a resize-and-copy, but averaged over many appends each is O(1). Use ArrayDeque if you need cheap insertion at both ends."
+
+      - type: multi
+        prompt: Select ALL operations that run in O(log n).
+        options:
+          - { id: a, text: "TreeMap.get" }
+          - { id: b, text: "PriorityQueue.offer" }
+          - { id: c, text: "Collections.binarySearch on a sorted ArrayList" }
+          - { id: d, text: "HashMap.get (expected)" }
+          - { id: e, text: "ArrayDeque.addFirst" }
+        answers: [a, b, c]
+        explanation: "TreeMap is a red-black tree, PriorityQueue is a binary heap (offer/poll are O(log n); peek is O(1)), and binary search halves the range. HashMap.get and ArrayDeque.addFirst are O(1)."
+
+      - type: single
+        prompt: "What is the complexity of this loop on an `ArrayList`, and what is a better data structure?"
+        code:
+          source: |
+            while (list.isNotEmpty()) {
+                process(list.removeAt(0))
+            }
+        options:
+          - { id: a, text: "O(n²); use ArrayDeque (removeFirst is O(1)) or iterate without removing" }
+          - { id: b, text: "O(n); nothing to improve" }
+          - { id: c, text: "O(n log n); use a TreeSet" }
+          - { id: d, text: "O(1) per loop; fine as is" }
+        answer: a
+        explanation: "Each `removeAt(0)` shifts all remaining elements. If you just need to visit every element, `for (x in list)` is O(n). If it's a queue, use ArrayDeque."
+
+      - type: fill
+        prompt: Find the 3 most frequent words.
+        template: |
+          val counts = words.groupingBy { it }.[[1]]()
+          val top = counts.entries
+              .[[2]](compareByDescending { it.value })
+              .take(3)
+        bank: ["eachCount", "sortedWith", "sortedBy", "count", "groupBy", "maxOf"]
+        answers: ["eachCount", "sortedWith"]
+        explanation: "`groupingBy{}.eachCount()` builds Map<String, Int> in one O(n) pass. `sortedWith(comparator)` then sorts the entries in O(k log k) for k distinct words (`sortedBy` takes a selector, not a comparator). For a very large k and small top-N, a bounded min-heap does it in O(k log N)."
+
+      - type: open
+        prompt: When would you choose HashMap, LinkedHashMap or TreeMap?
+        modelAnswer: "HashMap is the default for key lookups: expected O(1) get/put with no ordering guarantee. LinkedHashMap is a HashMap that also preserves insertion order (or access order with accessOrder=true), which makes it a simple LRU cache by overriding removeEldestEntry. TreeMap keeps keys sorted (natural order or a Comparator) at O(log n) per operation, which is what you need for ordered iteration or range/nearest queries such as subMap, floorKey and ceilingKey. For concurrent use, prefer ConcurrentHashMap."
+        keyPoints:
+          - point: "HashMap: expected O(1) lookups, unordered; the default choice"
+            keywords: ["o(1)", "constant", "unordered", "no order", "default"]
+          - point: "LinkedHashMap: predictable iteration order; access-order mode for LRU caches"
+            keywords: ["insertion order", "access order", "accessorder", "lru", "removeeldest", "linkedhashmap"]
+          - point: "TreeMap: sorted keys, O(log n), range/navigation queries (floor/ceiling/subMap)"
+            keywords: ["sorted", "o(log n)", "range", "floorkey", "ceilingkey", "submap", "navigable", "comparator"]

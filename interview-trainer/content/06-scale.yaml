@@ -1,0 +1,173 @@
+id: scale
+title: Scale & Performance
+emoji: "⚡"
+color: "#ffc800"
+description: Load, caching, pools and the resilience patterns that keep microservices alive under pressure.
+lessons:
+  - id: scale-load
+    title: Load & latency
+    questions:
+      - type: single
+        prompt: "By Little's Law (L = λ × W), a service handles 200 requests/second with an average latency of 0.25 s. How many requests are in flight on average?"
+        options:
+          - { id: a, text: "50" }
+          - { id: b, text: "200" }
+          - { id: c, text: "800" }
+          - { id: d, text: "5" }
+        answer: a
+        explanation: "L = 200 × 0.25 = 50. This is how you size thread/connection pools: if each in-flight request holds a DB connection for its full duration, you need about 50 connections at that load (more for headroom)."
+
+      - type: single
+        prompt: "Latency climbs sharply under load, yet CPU on both the app and the database is nearly idle. The app has 200 request threads and a HikariCP pool of 10. What is the most likely cause?"
+        options:
+          - { id: a, text: "Threads are queuing for a database connection (pool saturation)" }
+          - { id: b, text: "The JIT is recompiling constantly" }
+          - { id: c, text: "The GC is using all the CPU" }
+          - { id: d, text: "The database needs more CPU cores" }
+        answer: a
+        explanation: "Idle CPUs plus rising latency means waiting. Check pool metrics (active/pending/connection-acquire time) before touching anything else. Raising the pool blindly can overload the DB, so find out why connections are held so long first."
+
+      - type: multi
+        prompt: Select ALL sensible ways to reduce read load on a hot database.
+        options:
+          - { id: a, text: "Cache frequently-read, rarely-changed data" }
+          - { id: b, text: "Route read-only queries to read replicas" }
+          - { id: c, text: "Return projections and paginate instead of loading full entities" }
+          - { id: d, text: "Raise the connection pool size to 1,000" }
+          - { id: e, text: "Retry timed-out queries immediately and indefinitely" }
+        answers: [a, b, c]
+        explanation: "Option D makes the database spend more time context-switching, and E is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
+
+      - type: single
+        prompt: A very popular cache key expires and 5,000 concurrent requests all miss and hit the database. What is this called, and what's a good mitigation?
+        options:
+          - { id: a, text: "Cache stampede; coalesce loads (single-flight / lock per key), add TTL jitter or refresh ahead of expiry" }
+          - { id: b, text: "Cache poisoning; encrypt the keys" }
+          - { id: c, text: "Cache eviction; use a bigger cache" }
+          - { id: d, text: "Write-through; switch to write-behind" }
+        answer: a
+        explanation: "Also called thundering herd. Let one request recompute while others wait or serve slightly stale data, and spread expiry times so keys don't all expire together."
+
+      - type: single
+        prompt: Why do SREs track p99 latency instead of just the average?
+        options:
+          - { id: a, text: "Averages hide the slow tail; with fan-out (one request calling many services) most users experience the tail" }
+          - { id: b, text: "p99 is cheaper to compute" }
+          - { id: c, text: "The average is always equal to the median" }
+          - { id: d, text: "p99 excludes network time" }
+        answer: a
+        explanation: "If a page makes 20 backend calls, each with 1% slow outliers, ~18% of page loads hit at least one slow call (1 - 0.99^20). Tail latency amplifies with fan-out."
+
+      - type: single
+        prompt: "You want to add more instances of a service behind a load balancer, but users randomly get logged out. What is the likely blocker?"
+        options:
+          - { id: a, text: "Session state kept in a single instance's memory; make it stateless or move it to a shared store" }
+          - { id: b, text: "Load balancers cannot route HTTP" }
+          - { id: c, text: "Spring Boot can't run more than one instance" }
+          - { id: d, text: "The JVM shares sessions across processes automatically" }
+        answer: a
+        explanation: "Stateless services scale horizontally. Put session/state in Redis, a database, or a signed token (e.g. JWT) so that any instance can serve any request."
+
+      - type: open
+        prompt: "A downstream microservice suddenly gets 10x its normal traffic during a flash sale. Describe your plan to keep the system up."
+        modelAnswer: "Combine capacity with protection. Make the service stateless and autoscale it, serve what you can from caches/CDN, and put a queue in front of non-urgent work to absorb the spike (asynchronous processing with backpressure). Protect dependencies with rate limiting and load shedding at the edge, timeouts, bulkheads and circuit breakers, so a slow dependency can't exhaust threads. Degrade gracefully (disable non-critical features, serve stale data) and prepare ahead with load tests, capacity planning and observability/alerts on saturation."
+        keyPoints:
+          - point: "Scale out (stateless, autoscaling) and reduce load with caching/CDN"
+            keywords: ["autoscal", "scale out", "horizontal", "stateless", "cache", "cdn"]
+          - point: "Absorb spikes with queues / async processing and backpressure"
+            keywords: ["queue", "async", "asynchronous", "backpressure", "kafka", "buffer"]
+          - point: "Protect with rate limiting/load shedding, timeouts, bulkheads, circuit breakers"
+            keywords: ["rate limit", "load shed", "timeout", "bulkhead", "circuit breaker", "throttl"]
+          - point: "Degrade gracefully and prepare with load testing and monitoring"
+            keywords: ["degrad", "graceful", "stale", "load test", "capacity", "monitor", "alert", "observab"]
+
+  - id: scale-resilience
+    title: Resilience patterns
+    questions:
+      - type: single
+        prompt: A circuit breaker has been OPEN and its wait time elapses. What does it do next?
+        options:
+          - { id: a, text: "Moves to HALF-OPEN and lets a limited number of trial calls through to test whether the dependency recovered" }
+          - { id: b, text: "Closes immediately and lets all traffic through" }
+          - { id: c, text: "Stays open forever until restarted" }
+          - { id: d, text: "Retries every queued request at once" }
+        answer: a
+        explanation: "CLOSED (normal) → OPEN (fail fast) → HALF-OPEN (probe) → CLOSED if the probes succeed, else back to OPEN. Failing fast gives the struggling dependency room to recover."
+
+      - type: single
+        prompt: "A client retries `POST /payments` after a timeout and the customer is charged twice. What is the standard fix?"
+        options:
+          - { id: a, text: "Require an idempotency key so the server returns the original result for a repeated request" }
+          - { id: b, text: "Never retry anything" }
+          - { id: c, text: "Use GET instead of POST" }
+          - { id: d, text: "Increase the timeout to 10 minutes" }
+        answer: a
+        explanation: "The client can't know whether the first attempt succeeded. The server stores the key with the outcome (in the same transaction as the charge) and replays it on duplicates."
+
+      - type: multi
+        prompt: Select ALL practices for safe retries.
+        options:
+          - { id: a, text: "Exponential backoff" }
+          - { id: b, text: "Random jitter" }
+          - { id: c, text: "Retry immediately and without limit until it works" }
+          - { id: d, text: "Only retry idempotent operations (or ones with idempotency keys)" }
+          - { id: e, text: "Retry at every layer of the call chain" }
+        answers: [a, b, d]
+        explanation: "Retrying at every layer multiplies traffic (3 layers × 3 attempts = 27 calls to the bottom service). Retry at one layer, with a budget, and jitter so clients don't synchronise."
+
+      - type: single
+        prompt: "A consumer is slower than the producer feeding it through an unbounded in-memory queue. What happens, and what's the right design?"
+        options:
+          - { id: a, text: "Memory grows until OOM; use a bounded queue/backpressure so the producer slows down or work is rejected" }
+          - { id: b, text: "Nothing; queues self-balance" }
+          - { id: c, text: "The consumer speeds up automatically" }
+          - { id: d, text: "The queue deletes the oldest items safely" }
+        answer: a
+        explanation: "Backpressure propagates 'slow down' upstream: bounded queues, `Flow` operators with buffers, reactive streams demand, or consumer lag-based autoscaling for Kafka."
+
+      - type: single
+        prompt: "One slow dependency (e.g. a reports API) uses up all your servlet threads, so unrelated endpoints also time out. Which pattern prevents this?"
+        options:
+          - { id: a, text: "Bulkhead: isolate resources (thread/semaphore pools) per dependency" }
+          - { id: b, text: "Sidecar" }
+          - { id: c, text: "Strangler fig" }
+          - { id: d, text: "Blue/green deployment" }
+        answer: a
+        explanation: "Named after ship compartments: a leak in one doesn't sink the vessel. Pair with timeouts, because without them even a bulkhead's pool eventually fills with stuck calls."
+
+      - type: single
+        prompt: "An order spans three services, each with its own database. Which approach keeps data consistent without distributed locks?"
+        options:
+          - { id: a, text: "A saga: local transactions chained by events/commands, with compensating actions on failure" }
+          - { id: b, text: "Two-phase commit across all databases as the default" }
+          - { id: c, text: "A shared database for all services" }
+          - { id: d, text: "Ignore failures; run a nightly job" }
+        answer: a
+        explanation: "Sagas trade atomicity for availability and give eventual consistency. Design compensations (refund, release stock) and make every step idempotent."
+
+      - type: order
+        prompt: Arrange the lines to build a retry helper with exponential backoff.
+        lines:
+          - "suspend fun <T> retry(times: Int, block: suspend () -> T): T {"
+          - "    var delayMs = 100L"
+          - "    repeat(times - 1) {"
+          - "        try { return block() } catch (e: IOException) { }"
+          - "        delay(delayMs)"
+          - "        delayMs *= 2"
+          - "    }"
+          - "    return block()"
+          - "}"
+        explanation: "The wait happens after a failed attempt and before doubling. The final attempt is outside the loop so its exception propagates to the caller. In production add jitter and a cap on `delayMs`, and don't swallow CancellationException."
+
+      - type: open
+        prompt: Explain the transactional outbox pattern. What problem does it solve and how does it work?
+        modelAnswer: "It solves the dual-write problem: updating your database and publishing a message to a broker can't be made atomic, so a crash between the two leaves them inconsistent. With an outbox, the service writes the event to an outbox table in the same local DB transaction as the business change. A separate relay (a polling publisher or change-data-capture such as Debezium) reads the outbox and publishes to the broker, marking rows as sent. Delivery is at-least-once, so consumers must be idempotent (deduplicate by event id)."
+        keyPoints:
+          - point: "Dual-write problem: DB change and message publish are not atomic"
+            keywords: ["dual write", "dual-write", "atomic", "inconsisten", "crash between", "two systems"]
+          - point: "Write the event to an outbox table in the same local transaction as the business data"
+            keywords: ["same transaction", "outbox table", "single transaction", "local transaction", "atomically"]
+          - point: "A relay/CDC process (polling publisher, Debezium) publishes events afterwards"
+            keywords: ["relay", "cdc", "debezium", "polling", "publisher", "change data capture"]
+          - point: "At-least-once delivery means consumers must be idempotent"
+            keywords: ["at-least-once", "at least once", "idempoten", "dedup", "duplicate"]

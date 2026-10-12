@@ -1,0 +1,177 @@
+id: ddd
+title: Domain-Driven Design
+emoji: "🏛️"
+color: "#ce82ff"
+description: Aggregates, value objects, bounded contexts and how DDD shapes service boundaries.
+lessons:
+  - id: ddd-tactical
+    title: Tactical design
+    questions:
+      - type: single
+        prompt: "Which of these is best modelled as a Value Object?"
+        options:
+          - { id: a, text: "Money(amount, currency)" }
+          - { id: b, text: "Customer with a customer number" }
+          - { id: c, text: "An Order that moves through states over time" }
+          - { id: d, text: "A BankAccount whose balance changes" }
+        answer: a
+        explanation: "Value objects have no identity: two Money(10, EUR) are interchangeable, they're immutable, and equality is by attributes. Entities (customer, order, account) are tracked by identity across changes."
+
+      - type: multi
+        prompt: Select ALL rules that good aggregate design follows.
+        options:
+          - { id: a, text: "Reference other aggregates by identity (id), not by object reference" }
+          - { id: b, text: "Modify one aggregate per transaction" }
+          - { id: c, text: "All changes go through the aggregate root, which enforces the invariants" }
+          - { id: d, text: "Every entity gets its own repository" }
+          - { id: e, text: "Make aggregates as large as possible to keep everything consistent" }
+        answers: [a, b, c]
+        explanation: "An aggregate is a consistency boundary. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events. Repositories exist per aggregate root, not per entity."
+
+      - type: single
+        prompt: What design smell does this show?
+        code:
+          source: |
+            class Order {
+                var status: String = "NEW"
+                val items = mutableListOf<Item>()
+            }
+
+            class OrderService {
+                fun ship(o: Order) {
+                    if (o.status != "PAID") throw IllegalStateException()
+                    o.status = "SHIPPED"
+                }
+            }
+        options:
+          - { id: a, text: "Anemic domain model: the rules live in a service while the domain object is just data" }
+          - { id: b, text: "Primitive obsession is the only issue; the structure is fine" }
+          - { id: c, text: "A God Class" }
+          - { id: d, text: "Shotgun surgery" }
+        answer: a
+        explanation: "Behaviour should live with the data it protects: `order.ship()` enforces the invariant, and the status can't be set to arbitrary strings from outside. (The raw String status is also primitive obsession.)"
+
+      - type: fill
+        prompt: Make the aggregate protect its own invariant, with a strongly-typed id.
+        template: |
+          @JvmInline value class [[1]](val value: UUID)
+
+          class Order(val id: OrderId, private var status: Status = Status.NEW) {
+              fun pay() {
+                  [[2]](status == Status.NEW) { "Only new orders can be paid" }
+                  status = Status.PAID
+              }
+          }
+        bank: ["OrderId", "check", "require", "assert", "UUID", "Order"]
+        answers: ["OrderId", "check"]
+        explanation: "`require` validates arguments (IllegalArgumentException); `check` validates object state (IllegalStateException), which is what a state-machine guard is. `assert` is disabled unless the JVM runs with `-ea`."
+
+      - type: single
+        prompt: "Where should \"load the order, call `order.pay()`, save it, then publish `OrderPaid`\" live?"
+        options:
+          - { id: a, text: "An application service (use case), which orchestrates and owns the transaction" }
+          - { id: b, text: "Inside the Order entity" }
+          - { id: c, text: "In the REST controller" }
+          - { id: d, text: "In the repository implementation" }
+        answer: a
+        explanation: "Domain logic belongs to entities/value objects/domain services; orchestration, transactions and I/O belong to application services. Controllers only translate HTTP to a use-case call."
+
+      - type: single
+        prompt: "In a hexagonal/DDD layout, where does the `OrderRepository` *interface* belong?"
+        options:
+          - { id: a, text: "The domain layer; the JPA implementation lives in infrastructure" }
+          - { id: b, text: "Infrastructure, next to the JPA implementation" }
+          - { id: c, text: "The web layer" }
+          - { id: d, text: "A shared 'common' module used by all services" }
+        answer: a
+        explanation: "The domain declares what it needs in domain terms (`save(order)`, `findById(id)`), and infrastructure implements it. That's the dependency inversion that keeps the domain free of Spring/JPA."
+
+      - type: open
+        prompt: "What is a Value Object, and why model `Email` or `Money` as one instead of using `String` or `BigDecimal`?"
+        modelAnswer: "A Value Object has no identity and is defined purely by its attributes; it's immutable and compared by value. Modelling Email or Money as one lets the type enforce its invariants at construction (a valid email, a non-negative amount with a currency), so an invalid instance can't exist anywhere in the system. It also removes primitive obsession (you can't pass an Email where a UserName is expected), documents domain language in signatures, and gives a natural home for behaviour such as Money.plus rejecting mixed currencies."
+        keyPoints:
+          - point: "No identity; immutable; equality by attributes"
+            keywords: ["identity", "immutable", "equality", "by value", "attributes", "equal by"]
+          - point: "Validates invariants at construction so invalid values can't exist"
+            keywords: ["invariant", "validat", "valid", "construction", "always valid", "constructor"]
+          - point: "Avoids primitive obsession / type confusion and expresses the ubiquitous language"
+            keywords: ["primitive obsession", "type safety", "type-safe", "ubiquitous", "language", "mix up", "confus"]
+          - point: "Holds related behaviour (e.g. currency-safe arithmetic)"
+            keywords: ["behaviour", "behavior", "method", "currency", "arithmetic", "plus", "add"]
+
+  - id: ddd-strategic
+    title: Strategic design
+    questions:
+      - type: single
+        prompt: "In Sales, a \"Customer\" has credit limits and discounts. In Shipping, a \"Customer\" is just a delivery address and phone number. What does DDD recommend?"
+        options:
+          - { id: a, text: "Separate bounded contexts, each with its own model of Customer, linked by an identifier" }
+          - { id: b, text: "One shared Customer class containing every field for every team" }
+          - { id: c, text: "A single global database table" }
+          - { id: d, text: "Rename one of them to avoid the clash and keep one model" }
+        answer: a
+        explanation: "A model is only valid within a boundary. Trying to build one canonical model forces every team to couple to every other team's concerns."
+
+      - type: single
+        prompt: What problem does an Anti-Corruption Layer (ACL) solve?
+        options:
+          - { id: a, text: "It translates between an external/legacy model and your own so the foreign concepts don't leak into your domain" }
+          - { id: b, text: "It encrypts traffic between services" }
+          - { id: c, text: "It prevents SQL injection" }
+          - { id: d, text: "It caches calls to third parties" }
+        answer: a
+        explanation: "Typically an adapter + translator in front of a legacy system or third-party API, so your domain keeps speaking its own language."
+
+      - type: multi
+        prompt: Select ALL valid context-mapping relationships.
+        options:
+          - { id: a, text: "Shared Kernel" }
+          - { id: b, text: "Conformist" }
+          - { id: c, text: "Open Host Service" }
+          - { id: d, text: "Singleton Kernel" }
+          - { id: e, text: "Global Domain Model" }
+        answers: [a, b, c]
+        explanation: "Other real patterns: Customer/Supplier, Partnership, Published Language, Anti-Corruption Layer, Separate Ways. A conformist simply adopts the upstream's model; a shared kernel is a small commonly-owned subset."
+
+      - type: single
+        prompt: "Which event should carry a stable, versioned schema because other teams' services depend on it?"
+        options:
+          - { id: a, text: "An integration event published across bounded contexts" }
+          - { id: b, text: "An internal domain event raised and handled inside one aggregate" }
+          - { id: c, text: "Neither; events have no schema" }
+          - { id: d, text: "Any event, since all events are public" }
+        answer: a
+        explanation: "Domain events are internal facts and may change freely. An integration event is a published contract: design it deliberately, version it, and don't leak your internal model through it."
+
+      - type: single
+        prompt: "A service saves an order to its DB and then publishes `OrderPlaced` to Kafka. The process crashes between the two steps. Which pattern fixes the inconsistency?"
+        options:
+          - { id: a, text: "Transactional outbox: write the event to an outbox table in the same DB transaction, and relay it afterwards" }
+          - { id: b, text: "Publish first, then save" }
+          - { id: c, text: "Wrap both in a try/catch and retry the save" }
+          - { id: d, text: "Use a bigger Kafka cluster" }
+        answer: a
+        explanation: "A DB and a broker can't share a transaction (the dual-write problem). The outbox makes the event part of the local atomic commit, and a relay or CDC process delivers it at-least-once."
+
+      - type: single
+        prompt: "What is the best starting heuristic for drawing microservice boundaries?"
+        options:
+          - { id: a, text: "Align with bounded contexts / business capabilities" }
+          - { id: b, text: "One service per database table" }
+          - { id: c, text: "One service per Java package" }
+          - { id: d, text: "One service per developer" }
+        answer: a
+        explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is cheaper than merging prematurely split services."
+
+      - type: open
+        prompt: "Your team proposes one microservice per database table. What do you say, and what do you propose instead?"
+        modelAnswer: "That boundary follows the data schema rather than the business, so almost every use case would need several services: chatty synchronous calls, distributed transactions or sagas, and a 'distributed monolith' where services must be deployed together. Instead identify subdomains and bounded contexts, for example with Event Storming, and size services around business capabilities and aggregates: an aggregate is the unit of transactional consistency and should never be split across services. Aim for high cohesion, loose coupling and clear team ownership, and start with fewer, larger services that you split when there's evidence."
+        keyPoints:
+          - point: "Table-per-service follows the schema, not the business: chatty calls, distributed transactions, distributed monolith"
+            keywords: ["chatty", "distributed transaction", "distributed monolith", "coupling", "latency", "saga", "network"]
+          - point: "Use bounded contexts / subdomains / business capabilities (e.g. Event Storming) to find boundaries"
+            keywords: ["bounded context", "subdomain", "business capabilit", "event storming", "domain"]
+          - point: "An aggregate is a consistency boundary and must not be split across services"
+            keywords: ["aggregate", "consistency boundary", "transaction"]
+          - point: "Favour cohesion, autonomy and team ownership; start coarse and split with evidence"
+            keywords: ["cohesion", "autonomy", "team", "ownership", "start coarse", "monolith first", "split later", "evolve"]
