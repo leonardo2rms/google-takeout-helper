@@ -21,3 +21,5 @@ export * from './migrate';
 export * from './backup';
 export * from './storage';
 export * from './explain';
+export * from './prefs';
+export * from './reminders';

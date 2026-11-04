@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
 import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
+import { RemindersSection } from './RemindersSection';
 import { RestDays } from './RestDays';
 import { Sheet } from './Sheet';
 
@@ -115,6 +116,8 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
           </label>
         ))}
       </section>
+
+      <RemindersSection progress={progress} update={update} />
 
       <section>
         <h3>Your data</h3>

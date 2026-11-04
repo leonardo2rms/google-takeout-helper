@@ -10,6 +10,7 @@ import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/expl
 import type { GradeFn } from './lib/evaluate';
 import { inDays } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
+import { useReminderCheck } from './lib/reminders';
 import { getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
 import { LessonScreen } from './screens/Lesson';
@@ -41,6 +42,7 @@ export function App() {
   const { progress, update, reset } = useProgress();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
+  useReminderCheck(course);
 
   const [sampleGrade, setSampleGrade] = useState<GradeFn | undefined>();
   const [sampleExplain, setSampleExplain] = useState<ExplainFn | undefined>();

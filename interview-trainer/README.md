@@ -135,6 +135,20 @@ Settings -> **Your data**:
 - **Import backup file** validates everything first (bad JSON, wrong app, damaged or edited file by checksum, a newer format, wrong field types are all rejected with a plain message and **nothing changes**). A good file shows what is inside and asks: **Merge** (keep the best of both: larger XP and counters, the streak from whichever side practised most recently, each card from the side that saw it last, union of mistakes and milestones; settings stay as they are on this device) or **Replace my progress**.
 - Older (v1) backups and a bare progress blob are accepted too. **Reset progress** asks for confirmation and suggests downloading a backup first.
 
+### Reminders (optional)
+
+Settings -> **Reminders**: pick a daily time, then either or both of:
+
+- **Add to my calendar (.ics)**: a recurring iCalendar event (`shared/src/reminders.ts`, RFC 5545: CRLF line ends, 75-octet folding that never splits a UTF-8 character,
+  escaped text, a stable `UID` so re-importing updates the same event, a display alarm at the start). The time is a *floating* local time ("19:30 wherever you are"), which
+  needs no VTIMEZONE rules and follows you when you travel. Rest days become `RRULE:FREQ=WEEKLY;BYDAY=...`. This is the reliable option: it works while the app is closed.
+- **Notify me when I open the app**: asks for the Notification permission from the toggle (never on load), and then shows **one** local notification when the app is opened
+  after that time with something due. At most one per day (`prefs.reminders.lastNotified`), never on a rest day, never after you practised, never when nothing is due, and the copy is
+  plain ("5 questions are ready to review"). There is no push server, so browsers generally cannot fire it while the app is closed, and the UI says so.
+
+"Turn reminders off" clears the time and the choice. The hosted single-file build cannot download files from its frame, so it replaces the calendar button with a note.
+Stored under `progress.prefs.reminders` (`{ time, notify, lastNotified }`); like other settings it stays local on import/merge.
+
 ## End-to-end tests
 
 ```bash
