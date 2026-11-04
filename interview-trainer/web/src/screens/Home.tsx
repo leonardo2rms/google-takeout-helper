@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  READINESS_TEXT, allQuestions, buildDailySession, dayKey, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
+  READINESS_TEXT, allQuestions, buildDailySession, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { OnboardingCard } from '../components/OnboardingCard';
@@ -9,6 +9,7 @@ import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
 import { cappedCount, plural } from '../lib/format';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
+import { useToday } from '../lib/today';
 
 interface Props {
   course: Course;
@@ -22,7 +23,7 @@ const stars = (accuracy: number) => (accuracy >= 0.9 ? 3 : accuracy >= 0.7 ? 2 :
 type SheetName = 'streak' | 'goal' | 'settings' | null;
 
 export function Home({ course, progress, health, update, onReset }: Props) {
-  const today = dayKey(new Date());
+  const today = useToday();
   const [sheet, setSheet] = useState<SheetName>(null);
   const [iosTip, setIosTip] = useState(shouldShowIosTip);
 

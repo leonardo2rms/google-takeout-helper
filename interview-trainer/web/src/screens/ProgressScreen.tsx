@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { READINESS_TEXT, dayKey, readiness, topicStats, type Course, type Progress } from '@trainer/shared';
+import { READINESS_TEXT, readiness, topicStats, type Course, type Progress } from '@trainer/shared';
+import { useToday } from '../lib/today';
 
 interface Props {
   course: Course;
@@ -9,7 +10,7 @@ interface Props {
 const pct = (x: number) => Math.round(x * 100);
 
 export function ProgressScreen({ course, progress }: Props) {
-  const today = dayKey(new Date());
+  const today = useToday();
   const ready = useMemo(() => readiness(course, progress, today), [course, progress, today]);
   const topics = useMemo(() => topicStats(course, progress, today), [course, progress, today]);
   const colorOf = (id: string) => course.units.find((u) => u.id === id)?.color ?? 'var(--blue)';
