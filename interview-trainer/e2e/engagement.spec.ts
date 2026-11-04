@@ -29,7 +29,7 @@ test.describe('upgrading from v1', () => {
     await expect(chip(page)).toContainText('🧊 1'); // one-time welcome freeze
     await expect(page.locator('.stat[aria-label="320 XP"]')).toBeVisible();
     await expect(page.getByTestId('rank')).toContainText('Engineer');
-    await expect(page.locator('.overall')).toContainText('3/16 lessons completed');
+    await expect(page.locator('.overall')).toContainText(`3/${lessons.length} lessons completed`);
     // the v1 questions that were missed are due straight away; the rest are spread over the week
     await expect(dueCount(page)).toContainText('ready to review');
     await expectNoOverflow(page);
