@@ -94,6 +94,27 @@ lessons:
             keywords: ["thread-safe", "thread safe", "synchronized", "val", "immutable"]
           - point: "lateinit fits values assigned externally later (DI, tests, lifecycle) and throws if read too early"
             keywords: ["injection", "di", "setup", "lifecycle", "assigned later", "uninitialized", "externally", "test"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "What are the thread-safety modes of `by lazy`, and when would you pick a non-default one?"
+            modelAnswer: "The default, SYNCHRONIZED, uses a lock so the initializer runs at most once even with many threads. PUBLICATION lets several threads run the initializer concurrently but only the first result is kept, which suits cheap, idempotent initializers where you want to avoid locking. NONE uses no synchronisation and is only safe when the value is accessed from a single thread, as in a confined component or a test, because it avoids the lock overhead."
+            keyPoints:
+              - point: "SYNCHRONIZED (the default) uses a lock, so the initializer runs at most once"
+                keywords: ["synchronized", "lock", "once", "default"]
+              - point: "PUBLICATION: the initializer may run concurrently and the first result wins; fine for idempotent initializers"
+                keywords: ["publication", "concurrent", "first", "idempotent"]
+              - point: "NONE: no synchronisation, only for single-threaded access"
+                keywords: ["none", "single thread", "single-thread", "no synchron"]
+          - when: covered
+            point: 1
+            prompt: "What happens if the `lazy` initializer throws an exception?"
+            modelAnswer: "The exception propagates to the caller and the value is not marked as initialised, so the next access runs the initializer again (for the default and publication modes). Nothing is cached for a failure, so a transient error can succeed on retry, but the initializer must be safe to run more than once."
+            keyPoints:
+              - point: "The exception propagates to the caller"
+                keywords: ["propagat", "thrown", "rethrow", "caller"]
+              - point: "The value stays uninitialised, so the next access runs the initializer again"
+                keywords: ["again", "retry", "re-run", "rerun", "uninitialized", "uninitialised", "not cached", "next access"]
 
   - id: kotlin-idioms
     title: Idiomatic Kotlin
@@ -178,6 +199,29 @@ lessons:
           - { left: "`let`", right: "Receiver is `it`; returns the lambda result" }
           - { left: "`run`", right: "Receiver is `this`; returns the lambda result" }
         explanation: "Two questions sort them: is the object `this` or `it`, and do you get the object back or the lambda's result? `apply`/`also` return the object (builders, side effects like logging); `let`/`run` return the result (transformations, null-checks with `?.let`)."
+
+      - type: code
+        prompt: "Write `groupByLength(words)`: return an object that maps each word length to the array of words with that length, in their original order (like Kotlin's `groupBy { it.length }`)."
+        starter: |
+          function groupByLength(words) {
+            // your code
+          }
+        entry: groupByLength
+        tests:
+          - { args: [["a", "bb", "c", "dd", "eee"]], expect: { "1": ["a", "c"], "2": ["bb", "dd"], "3": ["eee"] } }
+          - { args: [[]], expect: {} }
+          - { args: [["hi", "hi"]], expect: { "2": ["hi", "hi"] } }
+          - { args: [["abc", "d", "efg"]], expect: { "1": ["d"], "3": ["abc", "efg"] }, hidden: true }
+        solution: |
+          function groupByLength(words) {
+            const groups = {};
+            for (const w of words) (groups[w.length] ??= []).push(w);
+            return groups;
+          }
+        kotlin: |
+          fun groupByLength(words: List<String>): Map<Int, List<String>> =
+              words.groupBy { it.length }
+        explanation: "Grouping is a single pass: look up (or create) the bucket for the key and append. Kotlin's `groupBy` does exactly this and keeps the original order inside each group."
 
       - type: open
         prompt: How are Kotlin extension functions resolved, and what's one pitfall of that?

@@ -2,10 +2,13 @@ import { PASS_SCORE, scoreFromCoverage, spotLines, verdictFor, type OpenVerdict,
 import { isPass, type Outcome } from '../lib/evaluate';
 import { CodeBlock } from './CodeBlock';
 import { Inline } from './Inline';
+import { TestResults } from './TestResults';
 
 interface Props {
   q: Question;
   outcome: Outcome;
+  /** Set on an interviewer follow-up: the combined result of the main answer and this one. */
+  overall?: { score: number; pass: boolean };
   onCoveredChange: (covered: boolean[]) => void;
 }
 
@@ -14,11 +17,11 @@ function solution(q: Question): { text: string; lang: string } | null {
     const text = q.template.replace(/\[\[(\d+)\]\]/g, (_m, n: string) => q.answers[Number(n) - 1] ?? '?');
     return { text, lang: q.lang };
   }
-  if (q.type === 'order') return { text: q.lines.join('\n'), lang: q.lang };
+  if (q.type === 'order' && q.kind === 'code') return { text: q.lines.join('\n'), lang: q.lang };
   return null;
 }
 
-export function Feedback({ q, outcome, onCoveredChange }: Props) {
+export function Feedback({ q, outcome, overall, onCoveredChange }: Props) {
   const pass = isPass(outcome);
   const open = outcome.open;
   const oq = q.type === 'open' ? q : null;
@@ -27,11 +30,14 @@ export function Feedback({ q, outcome, onCoveredChange }: Props) {
 
   const title = headline(outcome, verdict, q.id);
 
+  // On a follow-up the card shows this answer, the bar shows the combined result: when they disagree, say so with amber.
+  const own = pass ? 'good' : verdict === 'partial' ? 'meh' : 'bad';
+  const tone = overall && (overall.pass ? 'good' : 'bad') !== own ? 'meh' : own;
   const sol = !pass ? solution(q) : null;
   const answerLine = q.type === 'estimate' ? estimateLine(q) : null;
 
   return (
-    <div className={`feedback ${pass ? 'good' : verdict === 'partial' ? 'meh' : 'bad'}`} role="status" aria-live="polite">
+    <div className={`feedback ${tone}`} role="status" aria-live="polite">
       <h2>{title}</h2>
 
       {open && oq && (
@@ -72,6 +78,27 @@ export function Feedback({ q, outcome, onCoveredChange }: Props) {
         </>
       )}
 
+      {overall && (
+        <p className="overall">
+          Interview result: <b>{Math.round(overall.score * 100)}%</b> across both answers, which {overall.pass ? 'counts as correct' : 'is not enough yet'}.
+        </p>
+      )}
+
+      {q.type === 'code' && outcome.code && !outcome.skipped && <TestResults result={outcome.code} />}
+
+      {q.type === 'code' && (
+        <details open={!pass}>
+          <summary>Reference solution</summary>
+          <CodeBlock source={q.solution} lang="javascript" />
+          {q.kotlin && (
+            <>
+              <p className="hint">The same idea in Kotlin:</p>
+              <CodeBlock source={q.kotlin} lang="kotlin" />
+            </>
+          )}
+        </details>
+      )}
+
       {q.explanation && (
         <p className="explanation"><Inline text={q.explanation} /></p>
       )}
@@ -84,6 +111,15 @@ export function Feedback({ q, outcome, onCoveredChange }: Props) {
             <li key={p.left}><b><Inline text={p.left} /></b> → <Inline text={p.right} /></li>
           ))}
         </ul>
+      )}
+
+      {q.type === 'order' && q.kind === 'steps' && !pass && (
+        <>
+          <p className="hint">Correct order</p>
+          <ol className="steps-solution">
+            {q.lines.map((l) => <li key={l}>{l}</li>)}
+          </ol>
+        </>
       )}
 
       {q.type === 'spot' && !pass && (

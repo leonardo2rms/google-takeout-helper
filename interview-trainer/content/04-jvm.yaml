@@ -92,6 +92,22 @@ lessons:
           - { left: "ZGC", right: "Mostly concurrent; pauses stay short as the heap grows" }
         explanation: "Pick by what you optimise: throughput (Parallel), a balanced default (G1), or consistently low pauses on big heaps (ZGC). Serial is mainly for very small or single-core environments."
 
+      - type: single
+        prompt: What does this GC log tell you?
+        code:
+          lang: text
+          source: |
+            [2.115s][info][gc] GC(21) Pause Full (G1 Compaction Pause) 3968M->3951M(4096M) 2310.4ms
+            [4.502s][info][gc] GC(22) Pause Full (G1 Compaction Pause) 3955M->3949M(4096M) 2287.9ms
+            [6.871s][info][gc] GC(23) Pause Full (G1 Compaction Pause) 3951M->3950M(4096M) 2301.2ms
+        options:
+          - { id: a, text: "The live data fills the heap: full GCs reclaim almost nothing, so it is a leak or an undersized heap, not a tuning problem" }
+          - { id: b, text: "It is healthy: the pauses are short" }
+          - { id: c, text: "The young generation is too small, so increase `-Xmn`" }
+          - { id: d, text: "GC threads are starved by a CPU limit" }
+        answer: a
+        explanation: "Read the `before->after(total)` figures: 3,968M -> 3,951M of 4,096M means a 2.3-second full GC freed about 17 MB. Back-to-back full collections with almost nothing reclaimed mean the objects are still reachable. Take a heap dump; don't tune flags."
+
       - type: open
         prompt: A Spring service's heap usage grows over hours and GC pauses get longer. How do you investigate?
         modelAnswer: "First confirm and characterise the problem with GC logs (-Xlog:gc*) and metrics: does old-gen usage keep rising after full collections, which suggests a leak rather than just load? Then capture a class histogram or a heap dump (jcmd <pid> GC.class_histogram / GC.heap_dump) and open it in Eclipse MAT or VisualVM: look at the dominator tree and the paths to GC roots of the biggest retained sets. Typical culprits are static collections, unbounded caches, listeners and ThreadLocals. Fix the retention, and verify with a soak test and the same metrics."
@@ -104,6 +120,29 @@ lessons:
             keywords: ["static", "cache", "listener", "threadlocal", "unbounded", "leak"]
           - point: "Verify the fix (soak/load test, compare metrics)"
             keywords: ["verify", "soak", "load test", "re-test", "compare", "regression"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "You have a heap dump open in Eclipse MAT. What do you actually look at?"
+            modelAnswer: "Start with the leak suspects report and the dominator tree sorted by retained heap: which objects keep the most memory alive. Then follow the path to GC roots from a suspicious instance, ignoring weak and soft references, to see who holds on to it, which is often a static field, a cache or a thread-local. Comparing two dumps taken some time apart shows which classes are growing."
+            keyPoints:
+              - point: "Dominator tree, retained heap and the leak suspects report"
+                keywords: ["dominator", "retained", "leak suspect"]
+              - point: "Path to GC roots (excluding weak/soft references) to see who holds the object"
+                keywords: ["gc root", "path to", "weak", "soft"]
+              - point: "Compare two dumps to see what grows"
+                keywords: ["compare", "two dumps", "histogram", "growing"]
+          - when: covered
+            point: 3
+            prompt: "How can a ThreadLocal cause a memory leak in a web application?"
+            modelAnswer: "Servlet containers reuse threads from a pool, so a ThreadLocal value stays attached to its thread long after the request ends unless it is removed. If that value, or its class, references a large object graph or the web application's classloader, it can never be collected, which is the classic redeploy leak. Always call `remove()` in a `finally` block, and keep thread-locals small."
+            keyPoints:
+              - point: "Pooled threads outlive requests, so the value stays attached to the thread"
+                keywords: ["pool", "outlive", "reuse", "long-lived", "thread"]
+              - point: "It can pin a large object graph or a classloader"
+                keywords: ["classloader", "retain", "large", "graph"]
+              - point: "Call remove() in a finally block"
+                keywords: ["remove", "finally"]
 
   - id: jvm-runtime
     title: JIT, memory model & threads
@@ -188,6 +227,25 @@ lessons:
           }
         answers: [5, 6]
         explanation: "Check-then-act without synchronisation: both threads can see `null` on line 5 before either assigns on line 6. There is also no happens-before edge, so a thread may see a stale or half-published value. Use `by lazy` (thread-safe by default), `synchronized`, or a holder/`@Volatile` double-checked pattern."
+
+      - type: single
+        prompt: What is going on in this thread dump?
+        code:
+          lang: text
+          source: |
+            "worker-1" #31 prio=5 BLOCKED
+                waiting to lock <0x000000076b2a1f10> (a java.lang.Object)
+                which is held by "worker-2"
+            "worker-2" #32 prio=5 BLOCKED
+                waiting to lock <0x000000076b2a1f30> (a java.lang.Object)
+                which is held by "worker-1"
+        options:
+          - { id: a, text: "A deadlock: each thread waits for a lock the other holds. Fix it with a consistent lock order or `tryLock` with a timeout" }
+          - { id: b, text: "Thread pool starvation: add more worker threads" }
+          - { id: c, text: "A long GC pause: increase the heap" }
+          - { id: d, text: "Normal contention: both threads will proceed shortly" }
+        answer: a
+        explanation: "worker-1 waits for worker-2's lock and worker-2 waits for worker-1's: a cycle, so neither can ever proceed. `jstack` and `jcmd Thread.print` report deadlocks explicitly. Acquire locks in one global order, or use `tryLock` with a timeout and back off."
 
       - type: open
         prompt: "Explain \"happens-before\" in the Java Memory Model and give two ways to safely publish an object to another thread."

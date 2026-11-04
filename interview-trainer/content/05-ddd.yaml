@@ -100,6 +100,34 @@ lessons:
         answers: [4, 5]
         explanation: "The service edits the aggregate's state directly, so nothing stops cancelling a shipped order. The aggregate root should expose `order.cancel()` and enforce its invariants itself; callers shouldn't be able to touch `items` or `status`."
 
+      - type: code
+        prompt: "Model `Money` as a value object: write `addMoney(a, b)` for `{ amount, currency }` values (amount in cents). Return a NEW object with the summed amount, and throw an error mentioning \"currency\" if the currencies differ. Don't change the arguments."
+        starter: |
+          function addMoney(a, b) {
+            // your code
+          }
+        entry: addMoney
+        tests:
+          - { args: [{ amount: 500, currency: EUR }, { amount: 700, currency: EUR }], expect: { amount: 1200, currency: EUR } }
+          - { args: [{ amount: 0, currency: USD }, { amount: 99, currency: USD }], expect: { amount: 99, currency: USD } }
+          - { args: [{ amount: 100, currency: EUR }, { amount: 100, currency: USD }], throws: currency }
+          - { args: { js: "[Object.freeze({ amount: 5, currency: 'EUR' }), Object.freeze({ amount: 7, currency: 'EUR' })]" }, expect: { amount: 12, currency: EUR }, hidden: true }
+        solution: |
+          function addMoney(a, b) {
+            if (a.currency !== b.currency) {
+              throw new Error(`currency mismatch: ${a.currency} vs ${b.currency}`);
+            }
+            return { amount: a.amount + b.amount, currency: a.currency };
+          }
+        kotlin: |
+          data class Money(val cents: Long, val currency: String) {
+              operator fun plus(other: Money): Money {
+                  require(currency == other.currency) { "currency mismatch: $currency vs ${other.currency}" }
+                  return Money(cents + other.cents, currency)
+              }
+          }
+        explanation: "A value object is immutable, compares by value and protects its own invariant (you can't add euros to dollars). Returning a new object instead of mutating `a` is what makes it safe to share; the hidden test passes frozen inputs to catch mutation. Keep money in integer cents to avoid floating-point drift."
+
       - type: open
         prompt: "What is a Value Object, and why model `Email` or `Money` as one instead of using `String` or `BigDecimal`?"
         modelAnswer: "A Value Object has no identity and is defined purely by its attributes; it's immutable and compared by value. Modelling Email or Money as one lets the type enforce its invariants at construction (a valid email, a non-negative amount with a currency), so an invalid instance can't exist anywhere in the system. It also removes primitive obsession (you can't pass an Email where a UserName is expected), documents domain language in signatures, and gives a natural home for behaviour such as Money.plus rejecting mixed currencies."
@@ -198,3 +226,26 @@ lessons:
             keywords: ["aggregate", "consistency boundary", "transaction"]
           - point: "Favour cohesion, autonomy and team ownership; start coarse and split with evidence"
             keywords: ["cohesion", "autonomy", "team", "ownership", "start coarse", "monolith first", "split later", "evolve"]
+        followUps:
+          - when: covered
+            point: 2
+            prompt: "Sales and Shipping are separate services. How do you keep their data consistent when an order is paid?"
+            modelAnswer: "Not with a distributed transaction. Sales commits the order locally and publishes an OrderPaid integration event, using a transactional outbox so the event is never lost. Shipping consumes it idempotently and creates its own shipment, so the system is eventually consistent. If a later step fails, a compensating action (a saga) undoes the earlier one, such as cancelling the order."
+            keyPoints:
+              - point: "Avoid distributed transactions: commit locally and publish an integration event"
+                keywords: ["event", "local", "avoid", "no distributed"]
+              - point: "Use an outbox so the event is not lost, and consume idempotently"
+                keywords: ["outbox", "idempotent"]
+              - point: "Eventual consistency, with compensating actions (a saga) on failure"
+                keywords: ["eventual", "saga", "compensat"]
+          - when: missed
+            point: 3
+            prompt: "How big should an aggregate be, and why?"
+            modelAnswer: "As small as the invariants allow: an aggregate is the boundary inside which rules must hold within one transaction, so include only what has to be consistent together. Large aggregates cause contention and slow loads, so reference other aggregates by id and let them become consistent eventually through events. A good test: if two things can be briefly out of sync without breaking a rule, they belong in different aggregates."
+            keyPoints:
+              - point: "As small as the invariants allow; the transactional consistency boundary"
+                keywords: ["small", "invariant", "consistency boundary", "transaction"]
+              - point: "Reference other aggregates by id; they become consistent eventually via events"
+                keywords: ["by id", "identity", "eventual", "event"]
+              - point: "Large aggregates cause contention and slow loading"
+                keywords: ["contention", "large", "big", "slow"]

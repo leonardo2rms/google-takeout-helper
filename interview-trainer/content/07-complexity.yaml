@@ -147,6 +147,49 @@ lessons:
         unit: million
         explanation: "log2(1,000,000) is about 19.9, so n log n is about 19.9 million. Compare that with the 500,000 million (5 x 10^11) comparisons an O(n²) approach would need: that is the whole point of an n log n sort."
 
+      - type: code
+        prompt: "Write `isBalanced(s)`: true if every `()`, `[]` and `{}` in the string is closed in the right order (other characters are ignored). The hidden tests include 400,000 characters, so aim for O(n)."
+        starter: |
+          function isBalanced(s) {
+            // your code
+          }
+        entry: isBalanced
+        tests:
+          - { args: ["([]{})"], expect: true }
+          - { args: ["([)]"], expect: false }
+          - { args: [""], expect: true }
+          - { args: ["(("], expect: false }
+          - { args: ["}"], expect: false }
+          - { args: ["a(b)c"], expect: true }
+          - { args: { js: "['('.repeat(200000) + ')'.repeat(200000)]" }, expect: true, hidden: true }
+          - { args: { js: "['('.repeat(200000) + ']'.repeat(200000)]" }, expect: false, hidden: true }
+        timeoutMs: 3000
+        solution: |
+          function isBalanced(s) {
+            const pairs = { ')': '(', ']': '[', '}': '{' };
+            const stack = [];
+            for (const c of s) {
+              if (c === '(' || c === '[' || c === '{') stack.push(c);
+              else if (c in pairs) {
+                if (stack.pop() !== pairs[c]) return false;
+              }
+            }
+            return stack.length === 0;
+          }
+        kotlin: |
+          fun isBalanced(s: String): Boolean {
+              val pairs = mapOf(')' to '(', ']' to '[', '}' to '{')
+              val stack = ArrayDeque<Char>()
+              for (c in s) {
+                  when (c) {
+                      '(', '[', '{' -> stack.addLast(c)
+                      ')', ']', '}' -> if (stack.removeLastOrNull() != pairs[c]) return false
+                  }
+              }
+              return stack.isEmpty()
+          }
+        explanation: "A stack matches each closer with the most recent opener in O(n). The tempting alternative, repeatedly deleting `()`, `[]` and `{}` pairs from the string, is O(n²): on 400,000 characters it runs out of time, which is what the hidden tests are for."
+
       - type: open
         format: code
         prompt: "Write `fun <T> List<T>.firstDuplicate(): T?` that returns the first element that has already appeared earlier in the list, or null. Aim for O(n)."

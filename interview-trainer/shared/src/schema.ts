@@ -52,6 +52,8 @@ export const OrderQuestion = z.object({
   type: z.literal('order'),
   ...common,
   lang: z.string().default('kotlin'),
+  /** `code` renders monospace lines; `steps` renders plain sentences (e.g. "put the saga steps in order"). */
+  kind: z.enum(['code', 'steps']).default('code'),
   lines: z.array(z.string()).min(3).max(10),
 });
 
@@ -84,6 +86,58 @@ export const MatchQuestion = z.object({
   pairs: z.array(z.object({ left: z.string().min(1), right: z.string().min(1) })).min(3).max(6),
 });
 
+const KeyPoint = z.object({ point: z.string().min(1), keywords: z.array(z.string().min(1)).min(1) });
+
+/**
+ * An interviewer's follow-up to an open question. After the main answer, the app picks the first
+ * follow-up that applies: `missed` ones probe a rubric point the learner did not cover, `covered`
+ * ones push deeper on a point they did. Each is graded like an open question of its own.
+ */
+export const FollowUp = z.object({
+  when: z.enum(['missed', 'covered']),
+  /** 1-based index of the main question's key point this follow-up is about. */
+  point: z.number().int().positive(),
+  prompt: z.string().min(1),
+  modelAnswer: z.string().min(1),
+  keyPoints: z.array(KeyPoint).min(2).max(4),
+  maxChars: z.number().int().positive().default(1000),
+});
+
+/** A value in a code test: JSON data, or `{ js: "expression" }` evaluated in the sandbox (for big inputs). */
+const CodeArgs = z.union([z.array(z.unknown()), z.object({ js: z.string().min(1) })]);
+
+export const CodeTest = z
+  .object({
+    args: CodeArgs,
+    /** Expected return value (deep-equal). Omit when `throws` is set. */
+    expect: z.unknown().optional(),
+    /** The call must throw; the message must contain this text ("" accepts any error). */
+    throws: z.string().optional(),
+    /** Hidden tests only report pass/fail (use them for performance and edge cases). */
+    hidden: z.boolean().default(false),
+  })
+  .refine((t) => t.throws !== undefined || t.expect !== undefined, { message: 'a test needs `expect` or `throws`' });
+
+/**
+ * Write a short function and run it against tests. The code runs in a sandboxed Web Worker in the
+ * browser, so it works offline and on a phone. Challenges are JavaScript; `kotlin` shows the same
+ * solution in the interview language afterwards.
+ */
+export const CodeQuestion = z.object({
+  type: z.literal('code'),
+  ...common,
+  lang: z.literal('javascript').default('javascript'),
+  starter: z.string().min(1),
+  /** Name of the function the tests call. */
+  entry: z.string().regex(/^[A-Za-z_$][\w$]*$/),
+  tests: z.array(CodeTest).min(2).max(12),
+  /** Reference solution: shown after the question and verified by the content tests. */
+  solution: z.string().min(1),
+  kotlin: z.string().optional(),
+  /** Wall-clock budget for the whole run; exceeding it fails the attempt (infinite loop or too slow). */
+  timeoutMs: z.number().int().min(300).max(10000).default(3000),
+});
+
 /** Free-text (or free-code) answer graded by AI against a rubric of key points. */
 export const OpenQuestion = z.object({
   type: z.literal('open'),
@@ -96,11 +150,10 @@ export const OpenQuestion = z.object({
    * The rubric. `keywords` are any-of synonyms used by the offline heuristic
    * (the AI grader ignores them and judges meaning).
    */
-  keyPoints: z
-    .array(z.object({ point: z.string().min(1), keywords: z.array(z.string().min(1)).min(1) }))
-    .min(2)
-    .max(6),
+  keyPoints: z.array(KeyPoint).min(2).max(6),
   maxChars: z.number().int().positive().default(1200),
+  /** Optional interviewer follow-ups, chosen by what the learner covered. See {@link FollowUp}. */
+  followUps: z.array(FollowUp).max(4).default([]),
 });
 
 const RawQuestion = z.discriminatedUnion('type', [
@@ -111,6 +164,7 @@ const RawQuestion = z.discriminatedUnion('type', [
   SpotQuestion,
   EstimateQuestion,
   MatchQuestion,
+  CodeQuestion,
   OpenQuestion,
 ]);
 
@@ -146,6 +200,8 @@ export type OrderQ = Extract<Question, { type: 'order' }>;
 export type SpotQ = Extract<Question, { type: 'spot' }>;
 export type EstimateQ = Extract<Question, { type: 'estimate' }>;
 export type MatchQ = Extract<Question, { type: 'match' }>;
+export type CodeQ = Extract<Question, { type: 'code' }>;
+export type FollowUp = z.output<typeof FollowUp>;
 export type OpenQ = Extract<Question, { type: 'open' }>;
 export type Lesson = z.output<typeof Lesson>;
 export type Unit = z.output<typeof Unit>;
@@ -228,7 +284,15 @@ export function validateCourse(course: Course): string[] {
             if (new Set(q.pairs.map((p) => p.right)).size !== q.pairs.length) problems.push(`${at}: duplicate right items (matches would be ambiguous)`);
             break;
           }
+          case 'code':
+            if (!q.tests.some((t) => !t.hidden)) problems.push(`${at}: needs at least one visible test`);
+            for (const src of [q.starter, q.solution])
+              if (!new RegExp(`(function\\s+${q.entry.replace(/\$/g, '\\$')}\\b|(const|let|var)\\s+${q.entry.replace(/\$/g, '\\$')}\\b)`).test(src))
+                problems.push(`${at}: starter and solution must define \`${q.entry}\``);
+            break;
           case 'open':
+            for (const [i, f] of q.followUps.entries())
+              if (f.point > q.keyPoints.length) problems.push(`${at}: follow-up ${i + 1} refers to key point ${f.point}, but there are ${q.keyPoints.length}`);
             break;
         }
       }

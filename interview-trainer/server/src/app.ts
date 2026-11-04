@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { GradeRequest, allQuestions, type Course, type HealthResponse, type OpenQ } from '@trainer/shared';
+import { GradeRequest, allQuestions, openParts, type Course, type HealthResponse, type OpenQ } from '@trainer/shared';
 import type { Grader } from './grader';
 
 export interface AppOptions {
@@ -35,7 +35,8 @@ function rateLimiter(limit: number) {
 
 export function createApp({ course, grader, staticDir, rateLimitPerMinute = 30 }: AppOptions) {
   const openQuestions = new Map<string, OpenQ>();
-  for (const q of allQuestions(course)) if (q.type === 'open') openQuestions.set(q.id, q);
+  // Follow-ups are graded like standalone open questions, under their own ids (`<id>~f1`, ...).
+  for (const q of allQuestions(course)) if (q.type === 'open') for (const part of openParts(q)) openQuestions.set(part.id, part);
 
   const app = express();
   app.disable('x-powered-by');

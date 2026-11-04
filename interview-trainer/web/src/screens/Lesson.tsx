@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  createSession, currentQuestion, progress as sessionProgress, submit, summarize,
-  type Question, type SessionSummary,
+  PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize,
+  type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
-import { Feedback } from '../components/Feedback';
-import { Inline } from '../components/Inline';
-import { FillQuestion } from '../components/FillQuestion';
-import { OpenQuestion } from '../components/OpenQuestion';
+import { CodeQuestion } from '../components/CodeQuestion';
 import { EstimateQuestion } from '../components/EstimateQuestion';
+import { Feedback } from '../components/Feedback';
+import { FillQuestion } from '../components/FillQuestion';
+import { Inline } from '../components/Inline';
 import { MatchQuestion } from '../components/MatchQuestion';
+import { OpenQuestion } from '../components/OpenQuestion';
 import { OrderQuestion } from '../components/OrderQuestion';
 import { SpotQuestion } from '../components/SpotQuestion';
-import { evaluate, isPass, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
+import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
+import { runCodeInWorker } from '../lib/run-code';
 
 interface Props {
   title: string;
@@ -31,12 +33,19 @@ const LABEL: Record<Question['type'], string> = {
   single: 'Choose the best answer',
   multi: 'Select all that apply',
   fill: 'Complete the code',
-  order: 'Put the code in order',
+  order: 'Put in the right order',
   spot: 'Find the bug',
   estimate: 'Estimate the number',
   match: 'Match the pairs',
+  code: 'Write the code',
   open: 'Answer in your own words',
 };
+
+/** The interviewer's follow-up, plus how the learner did on the main question it follows. */
+interface FollowUpStage {
+  q: OpenQ;
+  main: Outcome;
+}
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -50,35 +59,53 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [phase, setPhase] = useState<Phase>('answer');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [followUp, setFollowUp] = useState<FollowUpStage | null>(null);
 
   const feedbackRef = useRef<HTMLDivElement>(null);
   const q = currentQuestion(session);
+  /** What is on screen: the lesson's question, or the interviewer's follow-up to it. */
+  const view: Question | undefined = followUp ? followUp.q : q;
   const attempt = q ? (session.attempts[q.id] ?? 0) : 0;
   const seed = q ? hash(q.id) + attempt * 977 : 0;
 
+  // A follow-up applies after a (non-skipped) open answer, chosen by which rubric points were covered.
+  const pending =
+    !followUp && q?.type === 'open' && outcome?.open && !outcome.skipped ? pickFollowUp(q, outcome.open.covered) : null;
+
+  // With a follow-up, the question counts as passed on the average of both answers.
+  const overallScore = followUp && outcome ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 : null;
+  const passed = outcome ? (overallScore !== null ? overallScore >= PASS_SCORE : isPass(outcome)) : false;
+
   const check = useCallback(async () => {
-    if (!q || !answer || phase !== 'answer') return;
+    if (!view || !answer || phase !== 'answer') return;
     setPhase('grading');
-    const result = await evaluate(q, answer, grade);
+    const result = await evaluate(view, answer, grade, runCodeInWorker);
     setOutcome(result);
     setPhase('feedback');
-  }, [q, answer, phase, grade]);
+  }, [view, answer, phase, grade]);
 
   const skip = useCallback(() => {
-    if (!q || phase !== 'answer') return;
-    setOutcome(skipOutcome(q));
+    if (!view || phase !== 'answer') return;
+    setOutcome(skipOutcome(view));
     setPhase('feedback');
-  }, [q, phase]);
+  }, [view, phase]);
 
   const next = useCallback(() => {
-    if (!outcome || phase !== 'feedback') return;
-    const s = submit(session, isPass(outcome));
+    if (!outcome || !q || phase !== 'feedback') return;
     setAnswer(null);
     setOutcome(null);
     setPhase('answer');
+
+    if (pending && q.type === 'open') {
+      setFollowUp({ q: followUpAsOpen(q, pending.index), main: outcome });
+      return;
+    }
+    const pass = followUp ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 >= PASS_SCORE : isPass(outcome);
+    setFollowUp(null);
+    const s = submit(session, pass);
     if (currentQuestion(s) === undefined) onFinish(summarize(s));
     else setSession(s);
-  }, [outcome, phase, session, onFinish]);
+  }, [outcome, q, phase, pending, followUp, session, onFinish]);
 
   // Bring the feedback into view above the fixed bottom bar; on phones it starts below the fold.
   useEffect(() => {
@@ -100,9 +127,9 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
     return () => window.removeEventListener('keydown', onKey);
   }, [phase, check, next]);
 
-  if (!q) return null;
+  if (!q || !view) return null;
   const checked = phase !== 'answer';
-  const key = `${q.id}#${attempt}`;
+  const key = `${view.id}#${attempt}`;
 
   return (
     <div className="lesson" style={{ ['--accent' as string]: color }}>
@@ -124,35 +151,45 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
       </header>
 
       <main className="lesson-body">
-        <p className="kicker">{attempt > 0 ? '↻ Try again · ' : ''}{LABEL[q.type]}</p>
-        <h1 className="prompt"><Inline text={q.prompt} /></h1>
-        {q.code && <CodeBlock source={q.code.source} lang={q.code.lang} />}
+        <p className="kicker">
+          {attempt > 0 ? '↻ Try again · ' : ''}
+          {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
+        </p>
+        <h1 className="prompt"><Inline text={view.prompt} /></h1>
+        {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
 
         <div key={key} className="answer-area">
-          {(q.type === 'single' || q.type === 'multi') && <ChoiceQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
-          {q.type === 'fill' && <FillQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
-          {q.type === 'order' && <OrderQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
-          {q.type === 'spot' && <SpotQuestion q={q} checked={checked} onAnswer={setAnswer} />}
-          {q.type === 'estimate' && <EstimateQuestion q={q} checked={checked} onAnswer={setAnswer} />}
-          {q.type === 'match' && <MatchQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
-          {q.type === 'open' && <OpenQuestion q={q} checked={checked} aiAvailable={aiAvailable} onAnswer={setAnswer} />}
+          {(view.type === 'single' || view.type === 'multi') && <ChoiceQuestion q={view} seed={seed} checked={checked} onAnswer={setAnswer} />}
+          {view.type === 'fill' && <FillQuestion q={view} seed={seed} checked={checked} onAnswer={setAnswer} />}
+          {view.type === 'order' && <OrderQuestion q={view} seed={seed} checked={checked} onAnswer={setAnswer} />}
+          {view.type === 'spot' && <SpotQuestion q={view} checked={checked} onAnswer={setAnswer} />}
+          {view.type === 'estimate' && <EstimateQuestion q={view} checked={checked} onAnswer={setAnswer} />}
+          {view.type === 'match' && <MatchQuestion q={view} seed={seed} checked={checked} onAnswer={setAnswer} />}
+          {view.type === 'code' && <CodeQuestion q={view} checked={checked} run={runCodeInWorker} onAnswer={setAnswer} />}
+          {view.type === 'open' && <OpenQuestion q={view} checked={checked} aiAvailable={aiAvailable} onAnswer={setAnswer} />}
         </div>
 
         {phase === 'feedback' && outcome && (
           <div ref={feedbackRef} className="feedback-anchor">
-            <Feedback q={q} outcome={outcome} onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })} />
+            <Feedback
+              q={view}
+              outcome={outcome}
+              overall={overallScore === null ? undefined : { score: overallScore, pass: passed }}
+              onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
+            />
+            {pending && <p className="interviewer-note">🎤 The interviewer has a follow-up question for you.</p>}
           </div>
         )}
       </main>
 
-      <footer className={`lesson-bar ${phase === 'feedback' ? (isPass(outcome!) ? 'good' : 'bad') : ''}`}>
+      <footer className={`lesson-bar ${phase === 'feedback' && !pending ? (passed ? 'good' : 'bad') : ''}`}>
         {phase === 'feedback' ? (
           <button type="button" className="btn primary wide" onClick={next} autoFocus>Continue</button>
         ) : (
           <>
             <button type="button" className="btn ghost" onClick={skip} disabled={phase === 'grading'}>I don't know</button>
             <button type="button" className="btn primary" onClick={() => void check()} disabled={!answer || phase === 'grading'}>
-              {phase === 'grading' ? 'Grading…' : 'Check'}
+              {phase === 'grading' ? (view.type === 'code' ? 'Running…' : 'Grading…') : 'Check'}
             </button>
           </>
         )}
