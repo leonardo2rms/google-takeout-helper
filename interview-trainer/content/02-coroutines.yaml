@@ -121,6 +121,29 @@ lessons:
             keywords: ["coroutineScope", "supervisorScope", "suspend fun", "caller", "parent"]
           - point: "For bean-owned background work, a dedicated scope cancelled on shutdown (e.g. @PreDestroy), ideally with an injected dispatcher"
             keywords: ["predestroy", "own scope", "dedicated scope", "supervisorjob", "injected dispatcher", "inject", "shutdown", "close"]
+        followUps:
+          - when: missed
+            point: 3
+            prompt: "How would you give a Spring bean its own coroutine scope, and make sure its work stops on shutdown?"
+            modelAnswer: "Create the scope as a field: `CoroutineScope(SupervisorJob() + dispatcher)`, with the dispatcher injected so tests can replace it. Cancel it when the bean is destroyed, via `@PreDestroy` or `DisposableBean`, so running coroutines get a CancellationException instead of being killed with the JVM. SupervisorJob makes sure one failing child doesn't cancel its siblings, and a CoroutineExceptionHandler makes sure failures are logged rather than lost."
+            keyPoints:
+              - point: "Own scope built from a SupervisorJob and an injected dispatcher"
+                keywords: ["supervisorjob", "injected", "dispatcher"]
+              - point: "Cancel it when the bean is destroyed (@PreDestroy / DisposableBean)"
+                keywords: ["predestroy", "disposablebean", "cancel", "destroy"]
+              - point: "Handle child failures (exception handler, logging) so they are not silently lost"
+                keywords: ["exceptionhandler", "exception handler", "log", "handler"]
+          - when: covered
+            point: 2
+            prompt: "When would you choose `supervisorScope` over `coroutineScope`?"
+            modelAnswer: "Use `coroutineScope` when the children form one unit of work: one failure should cancel the rest and fail the caller. Use `supervisorScope` when the children are independent, for example loading optional widgets or notifying several subscribers, and a failure of one should not cancel its siblings. You then handle each child's failure yourself, with a try/catch inside it or a CoroutineExceptionHandler."
+            keyPoints:
+              - point: "coroutineScope: one failure cancels the siblings and fails the caller (one unit of work)"
+                keywords: ["cancel", "one failure", "unit of work", "fails"]
+              - point: "supervisorScope: independent children whose failures don't cancel siblings"
+                keywords: ["independent", "siblings", "supervisor"]
+              - point: "With supervisorScope you handle each child's failure yourself"
+                keywords: ["try/catch", "handler", "handle"]
 
   - id: coroutines-flow
     title: Flow & failure handling

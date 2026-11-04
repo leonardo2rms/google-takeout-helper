@@ -9,6 +9,8 @@ import {
   gradeSpot,
   heuristicCoverage,
   scoreFromCoverage,
+  type CodeQ,
+  type CodeRunResult,
   type GradeResponse,
   type OpenQ,
   type Question,
@@ -22,6 +24,7 @@ export type Answer =
   | { type: 'spot'; selected: number[] }
   | { type: 'estimate'; value: number }
   | { type: 'match'; chosen: (string | null)[] }
+  | { type: 'code'; source: string }
   | { type: 'open'; text: string };
 
 export interface OpenOutcome {
@@ -37,13 +40,22 @@ export interface Outcome {
   correct: boolean;
   skipped?: boolean;
   open?: OpenOutcome;
+  /** Test results for `code` questions. */
+  code?: CodeRunResult;
+}
+
+export type RunCodeFn = (q: CodeQ, source: string) => Promise<CodeRunResult>;
+
+/** 0..1: share of rubric points covered (open) or all-or-nothing for everything else. */
+export function outcomeScore(outcome: Outcome): number {
+  return outcome.open ? scoreFromCoverage(outcome.open.covered) : outcome.correct ? 1 : 0;
 }
 
 export type GradeFn = (questionId: string, answer: string) => Promise<GradeResponse>;
 
 /** Whether the outcome counts as a pass, reading the (possibly edited) checklist for open questions. */
 export function isPass(outcome: Outcome): boolean {
-  return outcome.open ? scoreFromCoverage(outcome.open.covered) >= PASS_SCORE : outcome.correct;
+  return outcome.open ? outcomeScore(outcome) >= PASS_SCORE : outcome.correct;
 }
 
 export const skipOutcome = (q: Question): Outcome =>
@@ -56,7 +68,7 @@ export const skipOutcome = (q: Question): Outcome =>
  * `grade` (the AI endpoint) when provided, and fall back to a keyword-prefilled self-assessment
  * checklist if it is missing or fails, so the app stays useful offline.
  */
-export async function evaluate(q: Question, a: Answer, grade?: GradeFn): Promise<Outcome> {
+export async function evaluate(q: Question, a: Answer, grade?: GradeFn, runCode?: RunCodeFn): Promise<Outcome> {
   switch (q.type) {
     case 'single':
       return { correct: a.type === 'single' && gradeSingle(q, a.selected) };
@@ -72,6 +84,11 @@ export async function evaluate(q: Question, a: Answer, grade?: GradeFn): Promise
       return { correct: a.type === 'estimate' && gradeEstimate(q, a.value) };
     case 'match':
       return { correct: a.type === 'match' && gradeMatch(q, a.chosen) };
+    case 'code': {
+      if (a.type !== 'code' || !runCode) return { correct: false };
+      const code = await runCode(q, a.source);
+      return { correct: code.ok, code };
+    }
     case 'open':
       return a.type === 'open' ? evaluateOpen(q, a.text, grade) : { correct: false };
   }

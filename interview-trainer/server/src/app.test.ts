@@ -10,7 +10,11 @@ const course = Course.parse({
     lessons: [{
       id: 'l', title: 'L',
       questions: [
-        { type: 'open', prompt: 'Explain X', explanation: 'e', modelAnswer: 'X is Y', keyPoints: [{ point: 'Y', keywords: ['y'] }, { point: 'Z', keywords: ['z'] }] },
+        {
+          type: 'open', prompt: 'Explain X', explanation: 'e', modelAnswer: 'X is Y',
+          keyPoints: [{ point: 'Y', keywords: ['y'] }, { point: 'Z', keywords: ['z'] }],
+          followUps: [{ when: 'missed', point: 2, prompt: 'And Z?', modelAnswer: 'Z is W', keyPoints: [{ point: 'W', keywords: ['w'] }, { point: 'V', keywords: ['v'] }] }],
+        },
         { type: 'single', prompt: 'p', explanation: 'e', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], answer: 'a' },
         { type: 'single', prompt: 'p', explanation: 'e', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], answer: 'a' },
       ],
@@ -48,6 +52,18 @@ describe('API', () => {
     const res = await on.post({ questionId: 'l/1', answer: 'it is y' });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ score: 0.5, graded_by: 'ai' });
+  });
+  it('grades an interviewer follow-up under its own id, with the follow-up rubric', async () => {
+    const seen: OpenQ[] = [];
+    const spy: Grader = { model: 'spy', async grade(q) { seen.push(q); return { score: 1, covered: q.keyPoints.map(() => true), feedback: 'ok', graded_by: 'ai' }; } };
+    const s = serve(spy);
+    try {
+      expect((await s.post({ questionId: 'l/1~f1', answer: 'W and V' })).status).toBe(200);
+      expect(seen[0]).toMatchObject({ id: 'l/1~f1', prompt: 'And Z?' });
+      expect((await s.post({ questionId: 'l/1~f2', answer: 'abc' })).status).toBe(404);
+    } finally {
+      s.server.close();
+    }
   });
   it('503s without credentials so the client can fall back', async () => {
     expect((await off.post({ questionId: 'l/1', answer: 'it is y' })).status).toBe(503);

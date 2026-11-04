@@ -11,8 +11,8 @@ comfortable on a phone.
 
 | | |
 |---|---|
-| **134 questions / 8 units / 16 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & resilience · Algorithms & complexity · AI-assisted engineering |
-| **Question types** | `single`, `multi`, `fill` (tap tokens into blanks), `order` (tap lines into order), `spot` (tap the buggy line), `estimate` (type a number, tolerance-graded), `match` (connect pairs), `open` (AI-graded) |
+| **146 questions / 8 units / 16 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & resilience · Algorithms & complexity · AI-assisted engineering |
+| **Question types** | `single`, `multi`, `fill` (tap tokens into blanks), `order` (tap lines into order), `spot` (tap the buggy line), `estimate` (type a number, tolerance-graded), `match` (connect pairs), `code` (write a function, run against tests), `open` (AI-graded, with interviewer follow-ups) |
 | **Lesson mechanics** | Check → feedback with explanation → continue. Misses return at the end of the lesson (max 2 retries). Perfect-lesson bonus. |
 | **Progress** | XP, day streak, stars per lesson, "Review mistakes" queue, "Mixed practice". Stored in `localStorage`. |
 | **Offline** | PWA: the whole course ships in the JS bundle and an app-shell service worker caches it. Works with no network. |
@@ -152,6 +152,32 @@ validate the structure and cross-field rules (answers exist, blanks match, rubri
     - { left: "Idempotency key", right: "Makes a retried write safe to repeat" }
   explanation: "..."
 
+# code: write a function; tests run in a sandboxed Web Worker (JavaScript), so it works offline
+- type: code
+  prompt: "Write `isBalanced(s)` ..."
+  starter: |
+    function isBalanced(s) {
+      // your code
+    }
+  entry: isBalanced
+  tests:
+    - { args: ["([]{})"], expect: true }
+    - { args: ["([)]"], expect: false }
+    - { args: [""], throws: "" }                        # `throws: text` expects an error mentioning text
+    - { args: { js: "['('.repeat(200000)]" }, expect: false, hidden: true }   # big inputs via a JS expression
+  solution: |             # verified against the tests by `npm test`, and shown after the question
+    function isBalanced(s) { ... }
+  kotlin: |               # the same solution in Kotlin, shown for transfer to the real interview
+    fun isBalanced(s: String): Boolean { ... }
+  explanation: "..."
+
+# order of plain sentences instead of code: add `kind: steps`
+- type: order
+  kind: steps
+  prompt: "Put the steps in the right order."
+  lines: ["First...", "Then...", "Finally..."]
+  explanation: "..."
+
 # open: AI-graded against the rubric (format: code gives a monospace box)
 - type: open
   prompt: "Explain X"
@@ -159,6 +185,13 @@ validate the structure and cross-field rules (answers exist, blanks match, rubri
   keyPoints:                                  # 2-6 rubric points
     - point: "Mentions Y"
       keywords: ["y", "why"]                  # any-of; ONLY used by the offline fallback
+  followUps:                                  # optional: the "interviewer" asks one of these next
+    - when: missed                            # missed = probe a rubric point the learner did NOT cover
+      point: 2                                # (1-based index into keyPoints)
+      prompt: "..."
+      modelAnswer: "..."
+      keyPoints: [{ point: "...", keywords: ["..."] }, { point: "...", keywords: ["..."] }]
+    - when: covered                           # covered = go deeper on a point they DID cover
 ```
 
 Authoring rules of thumb (enforced where possible by tests):
@@ -166,6 +199,24 @@ Authoring rules of thumb (enforced where possible by tests):
 - Every lesson should mix at least 3 question types and include one `open` question.
 - A model answer must satisfy its own `keywords` rubric (a test checks this), otherwise offline users would be told
   the perfect answer is incomplete.
+
+## Code questions and the sandbox
+
+`code` questions run the learner's function against the tests in a **Web Worker** (`web/src/lib/code-runner.worker.ts`):
+no DOM, no `localStorage`, no cookies, a hard wall-clock timeout (the page terminates the worker, so an infinite loop
+can't freeze the app) and `fetch`/`XMLHttpRequest`/`WebSocket`/`indexedDB` removed before the code runs. It is
+best-effort isolation for the learner's *own* code on their *own* device, not a defence against a hostile
+multi-tenant workload. That is also why there is no server-side runner: executing arbitrary Kotlin or Java on a
+server needs real container isolation, and I did not want to ship a remote-code-execution endpoint. The challenges are
+therefore JavaScript, with the Kotlin equivalent shown afterwards. A real Kotlin runner would plug in behind the same
+`RunCodeFn` interface (`web/src/lib/evaluate.ts`).
+
+## Interviewer follow-ups
+
+An `open` question can list `followUps`. After the main answer, the app picks one by what the learner covered: first a
+`missed` follow-up probing a gap, otherwise a `covered` one pushing deeper. The follow-up is graded like any open
+question (AI or self-check), and the question passes on the average of both answers. The selection is authored, not
+generated, so it works offline and is deterministic; the AI only grades.
 
 ## Design notes
 

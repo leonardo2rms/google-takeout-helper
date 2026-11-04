@@ -72,6 +72,49 @@ lessons:
         unit: "%"
         explanation: "The chance that all 20 are fast is 0.99^20 = 0.818, so at least one is slow with probability 1 - 0.818 = 18.2%. A 1% tail per call becomes an almost-1-in-5 experience for users: tail latency amplifies with fan-out."
 
+      - type: single
+        prompt: What is this log telling you, and what do you do first?
+        code:
+          lang: text
+          source: |
+            HikariPool-1 - Connection is not available, request timed out after 30000ms
+            (total=10, active=10, idle=0, waiting=187)
+        options:
+          - { id: a, text: "The pool is exhausted: all 10 connections are busy and 187 requests are queued. Find out why connections are held so long before enlarging the pool" }
+          - { id: b, text: "The database is down and needs a restart" }
+          - { id: c, text: "A network partition between app and database" }
+          - { id: d, text: "The JDBC driver version is wrong" }
+        answer: a
+        explanation: "`active=10, idle=0, waiting=187` is saturation, not an outage: the database answered, but every connection is in use. Look for slow queries, and for transactions that stay open across remote calls. A bigger pool only helps if the database has spare capacity."
+
+      - type: code
+        prompt: "Write `percentile(values, p)` using the nearest-rank method: sort ascending (`values` may be unsorted) and return the value at rank `ceil(p * n / 100)`, with `0 < p <= 100`."
+        starter: |
+          function percentile(values, p) {
+            // your code
+          }
+        entry: percentile
+        tests:
+          - { args: [[15, 20, 35, 40, 50], 30], expect: 20 }
+          - { args: [[15, 20, 35, 40, 50], 50], expect: 35 }
+          - { args: [[50, 15, 40, 20, 35], 100], expect: 50 }
+          - { args: [[7], 99], expect: 7 }
+          - { args: [[10, 9, 100, 1], 50], expect: 9, hidden: true }
+          - { args: [[3, 1, 2], 99], expect: 3, hidden: true }
+        solution: |
+          function percentile(values, p) {
+            const sorted = [...values].sort((a, b) => a - b);
+            const rank = Math.ceil((p * sorted.length) / 100);
+            return sorted[rank - 1];
+          }
+        kotlin: |
+          fun percentile(values: List<Int>, p: Int): Int {
+              val sorted = values.sorted()
+              val rank = (p * sorted.size + 99) / 100   // ceil(p * n / 100) in integer maths
+              return sorted[rank - 1]
+          }
+        explanation: "Two traps: `Array.prototype.sort()` sorts as strings by default (10 < 9), so pass a numeric comparator; and compute `p * n / 100` with the multiplication first, because `p / 100 * n` can land on 98999.99999 instead of 99000 in floating point."
+
       - type: open
         prompt: "A downstream microservice suddenly gets 10x its normal traffic during a flash sale. Describe your plan to keep the system up."
         modelAnswer: "Combine capacity with protection. Make the service stateless and autoscale it, serve what you can from caches/CDN, and put a queue in front of non-urgent work to absorb the spike (asynchronous processing with backpressure). Protect dependencies with rate limiting and load shedding at the edge, timeouts, bulkheads and circuit breakers, so a slow dependency can't exhaust threads. Degrade gracefully (disable non-critical features, serve stale data) and prepare ahead with load tests, capacity planning and observability/alerts on saturation."
@@ -192,6 +235,39 @@ lessons:
           - { left: "Backpressure", right: "Tells a fast producer to slow down for a slow consumer" }
         explanation: "Each pattern guards one failure mode, and they compose: timeouts and bulkheads limit the blast radius, breakers stop hammering a sick dependency, idempotency keys make retries safe, the outbox keeps data and events consistent."
 
+      - type: order
+        kind: steps
+        prompt: Put the steps of the transactional outbox in the right order.
+        lines:
+          - "The service writes the business row and an outbox row in one local transaction"
+          - "The transaction commits, so both rows exist or neither does"
+          - "A relay reads the unsent outbox rows"
+          - "The relay publishes each event to the broker"
+          - "The relay marks the outbox row as sent"
+        explanation: "The row is marked as sent only after publishing. If the relay crashes in between, the event is published again on restart: at-least-once delivery, which is why consumers must be idempotent."
+
+      - type: code
+        prompt: "Write `backoffDelays(attempts, baseMs, capMs)`: the wait before each retry, doubling every time (`baseMs`, `2 x baseMs`, `4 x baseMs`, ...) but never more than `capMs`."
+        starter: |
+          function backoffDelays(attempts, baseMs, capMs) {
+            // your code
+          }
+        entry: backoffDelays
+        tests:
+          - { args: [4, 100, 10000], expect: [100, 200, 400, 800] }
+          - { args: [5, 100, 500], expect: [100, 200, 400, 500, 500] }
+          - { args: [0, 100, 500], expect: [] }
+          - { args: [1, 250, 1000], expect: [250] }
+          - { args: [3, 1000, 1500], expect: [1000, 1500, 1500], hidden: true }
+        solution: |
+          function backoffDelays(attempts, baseMs, capMs) {
+            return Array.from({ length: attempts }, (_, i) => Math.min(baseMs * 2 ** i, capMs));
+          }
+        kotlin: |
+          fun backoffDelays(attempts: Int, baseMs: Long, capMs: Long): List<Long> =
+              (0 until attempts).map { i -> minOf(baseMs * (1L shl minOf(i, 30)), capMs) }
+        explanation: "Exponential backoff gives a struggling dependency room to recover; the cap keeps waits bounded. In production add random jitter so many clients don't retry in lockstep. Note the `minOf(i, 30)` in the Kotlin version: an unbounded shift would overflow."
+
       - type: open
         prompt: Explain the transactional outbox pattern. What problem does it solve and how does it work?
         modelAnswer: "It solves the dual-write problem: updating your database and publishing a message to a broker can't be made atomic, so a crash between the two leaves them inconsistent. With an outbox, the service writes the event to an outbox table in the same local DB transaction as the business change. A separate relay (a polling publisher or change-data-capture such as Debezium) reads the outbox and publishes to the broker, marking rows as sent. Delivery is at-least-once, so consumers must be idempotent (deduplicate by event id)."
@@ -204,3 +280,26 @@ lessons:
             keywords: ["relay", "cdc", "debezium", "polling", "publisher", "change data capture"]
           - point: "At-least-once delivery means consumers must be idempotent"
             keywords: ["at-least-once", "at least once", "idempoten", "dedup", "duplicate"]
+        followUps:
+          - when: covered
+            point: 4
+            prompt: "How does a consumer protect itself from receiving the same event twice?"
+            modelAnswer: "By being idempotent. Give each event a unique id and record the processed ids in an inbox table (or behind a unique constraint) in the same transaction as the side effect, so a repeat becomes a no-op. Where possible make the operation itself idempotent, such as an upsert or 'set status to X', instead of 'add 1'."
+            keyPoints:
+              - point: "Events carry a unique id, and the consumer records the processed ids (inbox table or unique constraint)"
+                keywords: ["unique id", "inbox", "unique constraint", "processed"]
+              - point: "Record it in the same transaction as the side effect"
+                keywords: ["same transaction"]
+              - point: "Prefer naturally idempotent operations (upsert, set) over increments"
+                keywords: ["upsert", "idempotent", "set"]
+          - when: missed
+            point: 3
+            prompt: "Polling publisher or change data capture: how do you choose?"
+            modelAnswer: "A polling publisher is simple: a scheduled job reads unsent outbox rows and publishes them, at the cost of extra database load, the latency of the polling interval, and care with ordering and multiple instances (use `SKIP LOCKED`). CDC tools such as Debezium read the database's transaction log, which gives low latency and preserves commit order, but add infrastructure to operate. Start with polling unless latency or volume demands CDC."
+            keyPoints:
+              - point: "Polling: simple, but adds DB load and latency and needs locking for multiple instances"
+                keywords: ["polling", "load", "latency", "skip locked"]
+              - point: "CDC (Debezium): reads the transaction log, low latency, preserves order"
+                keywords: ["debezium", "log", "order"]
+              - point: "Trade-off: operational complexity, so start simple"
+                keywords: ["infrastructure", "complexity", "simple", "operate"]

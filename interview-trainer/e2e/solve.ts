@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test';
-import type { Question } from '../shared/src';
+import { pickFollowUp, type CodeQ, type OpenQ, type Question } from '../shared/src';
 
 /** Text as the learner sees it: inline-code backticks are rendered, not shown. */
 export const visible = (s: string) => s.replace(/`/g, '').trim();
@@ -9,10 +9,11 @@ export const KICKER: Record<Question['type'], string> = {
   single: 'Choose the best answer',
   multi: 'Select all that apply',
   fill: 'Complete the code',
-  order: 'Put the code in order',
+  order: 'Put in the right order',
   spot: 'Find the bug',
   estimate: 'Estimate the number',
   match: 'Match the pairs',
+  code: 'Write the code',
   open: 'Answer in your own words',
 };
 
@@ -53,10 +54,23 @@ export async function answerCorrectly(page: Page, q: Question): Promise<void> {
         await clickByText(page, '[data-side="right"]:not(.paired)', visible(p.right), false);
       }
       break;
+    case 'code':
+      await writeCode(page, q.solution);
+      await runTests(page);
+      await expect(page.locator('.tests .score')).toHaveText(`${q.tests.length}/${q.tests.length} tests passed`);
+      break;
     case 'open':
       await page.getByRole('textbox', { name: 'Your answer' }).fill(q.modelAnswer);
       break;
   }
+}
+
+export const writeCode = (page: Page, source: string) => page.getByRole('textbox', { name: 'Your code' }).fill(source);
+
+/** Clicks "Run tests" and waits for the runner to answer (results, or a fatal message). */
+export async function runTests(page: Page): Promise<void> {
+  await page.getByRole('button', { name: /Run tests/ }).click();
+  await page.locator('.tests, .test-fatal').first().waitFor({ timeout: 10_000 });
 }
 
 /** A deliberately wrong answer for the types where that is easy to express. */
@@ -110,7 +124,23 @@ export async function check(page: Page): Promise<void> {
 
 export const next = (page: Page) => page.getByRole('button', { name: 'Continue', exact: true }).click();
 
-/** Solve and confirm the current question correctly, then move on. */
+/** If a perfect answer to `q` earns an interviewer follow-up, answer it perfectly too. Returns whether there was one. */
+export async function answerFollowUpIfAny(page: Page, q: Question): Promise<boolean> {
+  if (q.type !== 'open') return false;
+  const pick = pickFollowUp(q, q.keyPoints.map(() => true));
+  if (!pick) return false;
+  await expect(page.locator('.kicker')).toContainText('Interviewer follow-up');
+  await expect(page.locator('.prompt')).toContainText(visible(pick.followUp.prompt).slice(0, 25));
+  await page.getByRole('textbox', { name: 'Your answer' }).fill(pick.followUp.modelAnswer);
+  await expectNoHorizontalOverflow(page);
+  await check(page);
+  await expect(page.locator('.feedback')).toHaveClass(/good/);
+  await expect(page.locator('.overall')).toContainText('100%');
+  await expect(page.locator('.lesson-bar')).toHaveClass(/good/);
+  return true;
+}
+
+/** Solve and confirm the current question correctly (and its interviewer follow-up, if any), then move on. */
 export async function solveAndContinue(page: Page, q: Question): Promise<void> {
   await expect(page.locator('.kicker')).toContainText(KICKER[q.type]);
   await answerCorrectly(page, q);
@@ -119,4 +149,10 @@ export async function solveAndContinue(page: Page, q: Question): Promise<void> {
   await expectNoHorizontalOverflow(page);
   await expect(page.locator('.feedback')).toHaveClass(/good/);
   await next(page);
+  if (await answerFollowUpIfAny(page, q)) await next(page);
 }
+
+export const openWithFollowUps = (questions: Question[]): OpenQ[] =>
+  questions.filter((q): q is OpenQ => q.type === 'open' && q.followUps.length > 0);
+
+export type { CodeQ };

@@ -1,4 +1,4 @@
-import { allQuestions, buildPlainPrompt, type Course, type GradeResponse, type OpenQ } from '@trainer/shared';
+import { allQuestions, buildPlainPrompt, openParts, type Course, type GradeResponse, type OpenQ } from '@trainer/shared';
 import type { GradeFn } from './evaluate';
 
 /**
@@ -31,7 +31,7 @@ interface Verdict {
 
 export function createSampleGrader(course: Course, sample: Sample): GradeFn {
   const open = new Map<string, OpenQ>();
-  for (const q of allQuestions(course)) if (q.type === 'open') open.set(q.id, q);
+  for (const q of allQuestions(course)) if (q.type === 'open') for (const part of openParts(q)) open.set(part.id, part);
 
   return async (questionId, answer): Promise<GradeResponse> => {
     const q = open.get(questionId);

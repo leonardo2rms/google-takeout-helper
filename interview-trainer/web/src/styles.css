@@ -184,6 +184,8 @@ button:disabled { cursor: default; }
   font-size: 14px; line-height: 1.6; overflow-x: auto; white-space: pre; tab-size: 4; max-width: 100%;
 }
 .code code { font: inherit; }
+/* Logs and stack traces: wrap so the numbers that matter are never off-screen. */
+.code.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
 .tok-keyword { color: var(--tok-keyword); font-weight: 600; }
 .tok-string { color: var(--tok-string); }
 .tok-comment { color: var(--tok-comment); font-style: italic; }
@@ -295,3 +297,25 @@ button:disabled { cursor: default; }
 .match-item.wrong { border-color: var(--red); background: var(--red-bg); color: var(--red-text); }
 .match-solution, .spot-solution { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
 .answer-line { font-weight: 700; }
+
+/* ---------- code questions ---------- */
+.code-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.answer-box.editor { overflow: auto; line-height: 1.5; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px; }
+.key { min-width: 38px; height: 38px; padding: 0 8px; font: 600 15px var(--mono); background: var(--surface); border: 2px solid var(--border); border-bottom-width: 3px; border-radius: 10px; }
+.key.wide { padding: 0 12px; font-family: var(--sans); }
+.run-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.btn.small { min-height: 40px; padding: 0 16px; font-size: 13px; }
+.tests ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+.tests li.pass b { color: var(--green-dark); }
+.tests li.fail b { color: var(--red-dark); }
+.tests code { font-size: .88em; word-break: break-all; }
+.test-fatal { color: var(--red-text); background: var(--red-bg); border-radius: 12px; padding: 10px 12px; overflow-wrap: anywhere; }
+
+/* ---------- interviewer follow-up ---------- */
+.interviewer-note { margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: var(--blue-bg); color: var(--blue-dark); font-weight: 700; }
+.overall { padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,.07); }
+
+/* ---------- ordering plain-text steps ---------- */
+.order-slot.steps .code-line, .order-pool.steps .code-line { font-family: var(--sans); font-size: 15px; white-space: normal; line-height: 1.35; }
+.steps-solution { margin: 0; padding-left: 22px; display: grid; gap: 4px; }

@@ -106,6 +106,18 @@ lessons:
           - { left: "`@ControllerAdvice`", right: "Shared exception handling across controllers" }
         explanation: "`@Repository`'s exception translation turns vendor errors into Spring's `DataAccessException` hierarchy. `@Configuration` classes are CGLIB-proxied so calling one `@Bean` method from another returns the singleton instead of creating a second instance."
 
+      - type: order
+        kind: steps
+        prompt: Put the life of a Spring singleton bean in the right order.
+        lines:
+          - "The container instantiates the bean through its constructor"
+          - "Dependencies are injected"
+          - "Initialisation callbacks run (@PostConstruct, afterPropertiesSet)"
+          - "Post-processors may wrap the bean in an AOP proxy (e.g. for @Transactional)"
+          - "The bean serves requests"
+          - "On shutdown, @PreDestroy callbacks run"
+        explanation: "The proxy is created after initialisation, which is why `@PostConstruct` runs on the raw bean (so a `@Transactional` method called from it is not transactional) and why other beans receive the proxy, not the original."
+
       - type: open
         prompt: How does Spring Boot auto-configuration work, and how would you find out why a bean wasn't created?
         modelAnswer: "@SpringBootApplication enables auto-configuration, which loads the candidate configuration classes listed in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. Each is guarded by conditions such as @ConditionalOnClass, @ConditionalOnProperty and @ConditionalOnMissingBean, so it only applies if the classpath and properties match and your own beans haven't already defined the same thing (user config backs off the default). To debug, start with --debug (or debug=true) to print the conditions evaluation report, or use the Actuator conditions endpoint."
@@ -116,6 +128,29 @@ lessons:
             keywords: ["conditionalonclass", "conditionalonmissingbean", "conditionalonproperty", "conditional", "back off", "backs off"]
           - point: "Debug using the conditions report (--debug) or the Actuator conditions endpoint"
             keywords: ["--debug", "debug", "conditions report", "condition evaluation", "actuator", "conditions endpoint"]
+        followUps:
+          - when: covered
+            point: 2
+            prompt: "How do you replace an auto-configured bean with your own, and what do you check if your version isn't used?"
+            modelAnswer: "Declare your own `@Bean` of the same type. Auto-configurations are guarded by `@ConditionalOnMissingBean`, so they back off when yours exists. If yours isn't used, check that it is component-scanned (right package, or imported), that no other bean is marked `@Primary`, and read the conditions report. You can also exclude the whole auto-configuration with `@SpringBootApplication(exclude = ...)` or `spring.autoconfigure.exclude`."
+            keyPoints:
+              - point: "Define your own @Bean; the auto-configuration backs off via @ConditionalOnMissingBean"
+                keywords: ["conditionalonmissingbean", "backs off", "back off", "own bean", "@bean"]
+              - point: "Check it is actually scanned or imported and not shadowed (for example by @Primary)"
+                keywords: ["scanned", "component scan", "package", "primary", "imported"]
+              - point: "Exclude the auto-configuration, or read the conditions report"
+                keywords: ["exclude", "conditions report", "--debug"]
+          - when: missed
+            point: 3
+            prompt: "What does the conditions evaluation report tell you, and how do you read it?"
+            modelAnswer: "Started with `--debug` or `debug=true`, it prints 'Positive matches' (auto-configurations that applied), 'Negative matches' (the ones that did not, with the failing condition, for example a missing class or an existing bean) and 'Unconditional classes'. For a missing bean, find its auto-configuration under Negative matches and read which condition failed. The Actuator `conditions` endpoint shows the same information at runtime."
+            keyPoints:
+              - point: "Positive and negative matches, with the condition that failed"
+                keywords: ["positive", "negative", "match", "condition"]
+              - point: "Enabled with --debug or debug=true"
+                keywords: ["--debug", "debug"]
+              - point: "The Actuator conditions endpoint shows the same at runtime"
+                keywords: ["actuator", "endpoint", "runtime"]
 
   - id: spring-data-web
     title: Data, web & performance
@@ -211,6 +246,24 @@ lessons:
         unit: queries
         explanation: "One query loads the orders, then Hibernate initialises the collections in batches of 10 using `IN (...)`: 100 / 10 = 10 more. 1 + 10 = 11, instead of 101 without batching."
 
+      - type: single
+        prompt: What does this log tell you?
+        code:
+          lang: text
+          source: |
+            select o.* from orders o
+            select i.* from order_item i where i.order_id=?   -- 1
+            select i.* from order_item i where i.order_id=?   -- 2
+            select i.* from order_item i where i.order_id=?   -- 3
+            ... (97 more identical statements)
+        options:
+          - { id: a, text: "N+1: the items are lazy-loaded one order at a time; fetch them with a join fetch, an entity graph or batch fetching" }
+          - { id: b, text: "A missing index on `order_item.order_id`" }
+          - { id: c, text: "A connection leak" }
+          - { id: d, text: "A cache stampede" }
+        answer: a
+        explanation: "One statement for the parent rows followed by the same child query once per row is the signature of N+1. An index would make each statement faster, but you'd still run 100 of them."
+
       - type: open
         prompt: An endpoint got slow under load and the database CPU is high. Walk through how you'd diagnose and fix it at the Spring/JPA level.
         modelAnswer: "Measure first: look at p95/p99 latency and traces to confirm which endpoint and which queries, using metrics/APM and the DB's slow-query log. Enable SQL logging or a tool like Hibernate statistics to spot N+1 and unbounded queries, and run EXPLAIN on the heavy ones to find missing indexes. Fix with fetch joins/entity graphs or batch fetching, DTO projections instead of full entities, pagination, and the right indexes. Then reduce repeated reads with caching, check the Hikari pool size, and re-run a load test to verify the improvement."
@@ -223,3 +276,26 @@ lessons:
             keywords: ["fetch join", "entitygraph", "entity graph", "batch", "projection", "dto", "pagina"]
           - point: "Add caching / tune the connection pool and verify with a load test"
             keywords: ["cache", "caching", "hikari", "pool", "load test", "verify"]
+        followUps:
+          - when: missed
+            point: 4
+            prompt: "How do you size a HikariCP connection pool, and what happens if it is too big?"
+            modelAnswer: "Start from the work the database can really do in parallel (its cores and I/O), not from the number of web threads: pools are usually small, tens of connections. Use Little's Law (throughput times the time a request holds a connection) to estimate the need, then measure pending threads and connection wait time. A pool that is too big makes the database context-switch and can turn a slow endpoint into a database outage; one that is too small makes requests queue for a connection."
+            keyPoints:
+              - point: "Size from what the DB can do in parallel and Little's Law, not from the web threads"
+                keywords: ["little", "parallel", "cores", "not from"]
+              - point: "Measure pending threads and connection wait time"
+                keywords: ["pending", "wait", "acquire", "metric"]
+              - point: "Too big overloads the database; too small makes requests queue"
+                keywords: ["context", "overload", "queue"]
+          - when: covered
+            point: 1
+            prompt: "You fixed the N+1 and the database is quiet now, but p99 is still high. What do you look at next?"
+            modelAnswer: "Go back to the trace: where does the time go now? Look for time waiting for a connection from the pool, slow downstream HTTP calls, serialisation of large responses, GC pauses, a saturated thread pool and lock contention. Look at percentiles per endpoint rather than averages, and compare a slow trace with a fast one."
+            keyPoints:
+              - point: "Use traces to find where the time goes now instead of guessing"
+                keywords: ["trace", "where the time", "profil"]
+              - point: "Candidates: pool wait, downstream calls, serialisation, GC, thread pool, locks"
+                keywords: ["pool", "downstream", "serializ", "serialis", "gc", "thread pool", "lock"]
+              - point: "Compare slow and fast requests; look at percentiles, not averages"
+                keywords: ["percentile", "p99", "compare", "average"]
