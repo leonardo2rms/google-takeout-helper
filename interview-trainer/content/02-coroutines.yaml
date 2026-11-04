@@ -232,3 +232,153 @@ lessons:
             keywords: ["supervisorscope", "partial", "failure", "cancel", "fallback", "error handling"]
           - point: "Add timeouts and bound concurrency to protect downstream services"
             keywords: ["timeout", "semaphore", "limit", "bound", "rate", "backpressure"]
+
+  - id: coroutines-advanced
+    title: Flow operators & cancellation
+    questions:
+      - type: match
+        prompt: Match each Flow operator to its behaviour.
+        pairs:
+          - { left: "`flatMapConcat`", right: "Collects the inner flows one after another, preserving order" }
+          - { left: "`flatMapMerge`", right: "Collects inner flows concurrently, so items interleave as they arrive" }
+          - { left: "`flatMapLatest`", right: "Cancels the previous inner flow as soon as a new upstream value arrives" }
+          - { left: "`conflate()`", right: "Drops intermediate values so a slow collector only sees the most recent one" }
+          - { left: "`buffer()`", right: "Runs the producer in its own coroutine, connected by a channel, so producer and collector overlap" }
+        explanation: "The three `flatMap` variants differ only in how they treat overlapping inner flows: queue them, run them together, or cancel the stale one. `flatMapLatest` is the search-as-you-type operator. `buffer` and `conflate` are about speed mismatch between producer and collector: buffer keeps everything (up to its capacity), conflate keeps only the latest."
+
+      - type: estimate
+        prompt: "Ignoring overhead, how long does this take in total? (Without `buffer()` it would take 1,200 ms.)"
+        code:
+          source: |
+            flow {
+                for (i in 1..3) {
+                    delay(100)   // producer: 100 ms per item
+                    emit(i)
+                }
+            }
+                .buffer()
+                .collect { delay(300) }   // collector: 300 ms per item
+        answer: 1000
+        tolerance: 0.05
+        unit: ms
+        explanation: "The producer emits at 100, 200 and 300 ms into the buffer without waiting for the collector. The collector starts the first item at 100 ms and then works through the three items back to back: 100 + 3 x 300 = 1,000 ms. Unbuffered, producer and collector alternate: 3 x (100 + 300) = 1,200 ms. Buffering overlaps the two, but the slower side (the collector) still sets the pace."
+
+      - type: fill
+        prompt: "Search-as-you-type: wait for a pause in typing, cancel a search that a newer query makes obsolete, and expose the latest result as state."
+        template: |
+          val results: StateFlow<List<Hit>> = query
+              .debounce(300)
+              .[[1]] { q -> repo.search(q) }
+              .[[2]](viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        bank: ["flatMapLatest", "flatMapConcat", "stateIn", "shareIn", "collect", "conflate"]
+        answers: ["flatMapLatest", "stateIn"]
+        explanation: "`flatMapLatest` cancels the running search when a new query arrives, whereas `flatMapConcat` would queue the stale searches. `stateIn` turns the cold flow into a hot `StateFlow` with an initial value; `WhileSubscribed(5_000)` keeps the upstream alive for 5 seconds after the last collector leaves, so a quick re-subscription (for example a screen rotation) does not restart it. `shareIn` would give a `SharedFlow` and needs a replay count instead of an initial value."
+
+      - type: multi
+        prompt: Select ALL true statements about Channels and Flows.
+        options:
+          - { id: a, text: "Each element sent to a Channel is received by exactly one receiver, so several consumers share the work" }
+          - { id: b, text: "A cold Flow runs its producer block again for every collector" }
+          - { id: c, text: "A consumer looping with `for (x in channel)` only ends when the channel is closed or cancelled" }
+          - { id: d, text: "`Channel<T>()` created with no arguments buffers 64 elements by default" }
+          - { id: e, text: "Collecting a `StateFlow` ends when its producer stops updating it" }
+        answers: [a, b, c]
+        explanation: "A channel is a hot hand-off between coroutines, so it needs an explicit `close()` to signal completion. The default capacity of `Channel()` is rendezvous (0): `send` suspends until a receiver is there; `Channel.BUFFERED` (64 by default) is opt-in. A `StateFlow` never completes: collection only ends when the collector is cancelled."
+
+      - type: multi
+        prompt: "This CPU-bound loop ignores `cancel()`. Select ALL changes that make it respond to cancellation."
+        code:
+          source: |
+            suspend fun crunch(items: List<Item>) = withContext(Dispatchers.Default) {
+                for (item in items) {
+                    heavyCpuWork(item)   // plain function, no suspension points
+                }
+            }
+        options:
+          - { id: a, text: "Call `ensureActive()` at the top of each iteration" }
+          - { id: b, text: "Check `isActive` on each iteration and stop when it is false" }
+          - { id: c, text: "Call `yield()` on each iteration" }
+          - { id: d, text: "Wrap the loop body in `try { ... } catch (e: CancellationException) { }`" }
+          - { id: e, text: "Run it on `Dispatchers.IO` instead of `Dispatchers.Default`" }
+        answers: [a, b, c]
+        explanation: "Cancellation is cooperative: a coroutine only notices it at a suspension point or when it checks. A loop with no suspension points runs to completion even after `cancel()`. `ensureActive()` throws if the job was cancelled, `isActive` lets you exit manually, and `yield()` is a suspension point that also checks for cancellation. Catching the exception only hides it, and the dispatcher has no influence on cooperation."
+
+      - type: single
+        prompt: "A test written with `runTest` takes a real 10 seconds, although the code under test only calls `delay(10_000)`. What is the most likely cause?"
+        options:
+          - { id: a, text: "The code runs on a hard-coded dispatcher such as `Dispatchers.Default` or `Dispatchers.IO`, so its `delay` uses real time instead of the test scheduler's virtual time" }
+          - { id: b, text: "`runTest` skips delays inside `launch` but never inside `async`" }
+          - { id: c, text: "Virtual time only works for delays shorter than a few seconds" }
+          - { id: d, text: "`runTest` can skip `Thread.sleep`, but not `delay`" }
+        answer: a
+        explanation: "`runTest` runs the test body on a `TestScheduler` that advances virtual time whenever all coroutines are idle, so `delay(10_000)` costs nothing. A dispatcher the code creates or hard-codes bypasses that scheduler. Inject the `CoroutineDispatcher` (production: `Dispatchers.IO`; test: `StandardTestDispatcher(testScheduler)`) so the test controls time."
+
+      - type: single
+        prompt: What happens when `load()` is called?
+        code:
+          source: |
+            suspend fun load(): Int = coroutineScope {
+                val a = async { error("boom") }
+                try {
+                    a.await()
+                } catch (e: IllegalStateException) {
+                    println("caught")
+                }
+                42
+            }
+        options:
+          - { id: a, text: "It prints \"caught\", and then `load()` still throws IllegalStateException(\"boom\")" }
+          - { id: b, text: "It prints \"caught\" and returns 42" }
+          - { id: c, text: "It prints \"caught\" and then suspends forever" }
+          - { id: d, text: "It returns 42, and the exception goes to the default exception handler" }
+        answer: a
+        explanation: "A failing `async` child cancels its parent scope as soon as it fails, whether or not anyone awaits it. The `try/catch` handles the exception at `await()` but cannot undo that cancellation, so `coroutineScope` rethrows the child's failure when it completes. Fix: use `supervisorScope { }` and handle each `await()` yourself, or catch inside the `async` block and return a result type."
+
+      - type: spot
+        prompt: "This loop is meant to run `handle` for all items inside the scope. Tap the line that breaks structured concurrency."
+        source: |
+          suspend fun processAll(items: List<Item>) = coroutineScope {
+              for (item in items) {
+                  launch(SupervisorJob()) {
+                      handle(item)
+                  }
+              }
+          }
+        answers: [3]
+        explanation: "A `Job` passed to a coroutine builder becomes the parent of the new coroutine, replacing the scope's own job. The launched coroutines are no longer children of `coroutineScope`: it returns without waiting for them, cancelling the scope does not cancel them, and their failures do not reach the caller. To get 'siblings fail independently' use `supervisorScope { launch { } }` instead of passing a job."
+
+      - type: open
+        prompt: "A service consumes events from a stream as a `Flow` and enriches each one with a 50 ms remote call. It falls behind. How do you raise throughput without losing control of memory or ordering?"
+        modelAnswer: "By default a Flow is sequential: each element finishes the whole pipeline before the next starts, so a 50 ms call caps one collector at roughly 20 events per second. To go faster, process several elements at once, for example with `flatMapMerge(concurrency = N)` or by launching the calls from a `channelFlow` with a limited number of workers, and use `buffer()` so the producer is not blocked while the collector is busy. Keep everything bounded: choose a buffer capacity and an overflow policy (suspend for backpressure, or drop if losing items is acceptable) instead of letting a queue grow without limit, and cap concurrency so the downstream service is not flooded. Concurrency changes ordering: `flatMapMerge` emits results as they finish, so if order matters you must partition by key, or start each call as a `Deferred`, buffer them and await them in order. Finally handle errors with retries and backoff, and make the processing idempotent, because failures and restarts cause redelivery."
+        keyPoints:
+          - point: "Flow is sequential by default, so latency caps throughput; add bounded concurrency (flatMapMerge with a limit, channelFlow with workers)"
+            keywords: ["sequential", "flatMapMerge", "channelFlow", "concurren"]
+          - point: "Decouple producer and collector with buffer(), but keep it bounded: capacity and overflow policy give backpressure"
+            keywords: ["buffer", "bounded", "overflow", "backpressure"]
+          - point: "Concurrency affects ordering: partition by key or await results in order when order matters"
+            keywords: ["ordering", "partition", "deferred"]
+          - point: "Handle failures: retries with backoff, idempotent processing"
+            keywords: ["retries", "idempoten", "backoff", "dead-letter"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "What overflow strategies does a buffered flow or channel offer, and when is dropping acceptable?"
+            modelAnswer: "`BufferOverflow.SUSPEND` is the default: the producer suspends when the buffer is full, which is real backpressure and loses nothing. `DROP_OLDEST` and `DROP_LATEST` never suspend the producer but discard items, and `conflate()` is a buffer of size one that keeps only the latest value. Dropping is acceptable when only the newest state matters, such as UI state or a sensor reading, and wrong for events that must all be processed, such as payments."
+            keyPoints:
+              - point: "SUSPEND is the default and gives backpressure without losing items"
+                keywords: ["suspend", "backpressure"]
+              - point: "DROP_OLDEST, DROP_LATEST and conflate discard items"
+                keywords: ["drop_oldest", "drop_latest", "conflate", "discard"]
+              - point: "Dropping is acceptable only when the latest state is what matters"
+                keywords: ["latest", "newest", "state"]
+          - when: covered
+            point: 3
+            prompt: "How could you run the enrichment 8 at a time but still emit the results in the original order?"
+            modelAnswer: "Start each call as a `Deferred` with `async`, inside a scope that outlives the pipeline, send the deferreds through `buffer(8)` so up to eight calls are running while the collector waits on the oldest, and `await()` them one by one in the next `map`. The awaiting is sequential, so the order is preserved, while the work itself overlaps. `flatMapMerge` would deliver faster but unordered."
+            keyPoints:
+              - point: "Start each call as a Deferred (async)"
+                keywords: ["async", "deferred"]
+              - point: "buffer(8) keeps up to eight in flight"
+                keywords: ["buffer"]
+              - point: "await them in order, so ordering is preserved"
+                keywords: ["await", "in order", "preserved"]
