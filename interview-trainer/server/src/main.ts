@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { loadCourse } from '@trainer/shared/node';
 import { createApp } from './app';
 import { AnthropicGrader } from './grader';
+import { AnthropicTutor } from './tutor';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const course = loadCourse(resolve(root, 'content'));
@@ -11,8 +12,10 @@ const hasCredentials = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTH
 const effort = process.env.GRADER_EFFORT as 'low' | 'medium' | 'high' | undefined;
 const grader = hasCredentials ? new AnthropicGrader({ model: process.env.GRADER_MODEL, effort }) : undefined;
 
+const tutor = hasCredentials ? new AnthropicTutor({ model: process.env.EXPLAIN_MODEL ?? process.env.GRADER_MODEL, effort }) : undefined;
+
 const port = Number(process.env.PORT ?? 8787);
-createApp({ course, grader, staticDir: resolve(root, 'web/dist') }).listen(port, () => {
+createApp({ course, grader, tutor, staticDir: resolve(root, 'web/dist') }).listen(port, () => {
   const questions = course.units.reduce((n, u) => n + u.lessons.reduce((m, l) => m + l.questions.length, 0), 0);
   console.log(`Interview Trainer API on http://localhost:${port}  (${questions} questions)`);
   console.log(

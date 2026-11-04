@@ -6,6 +6,7 @@ import {
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { fetchHealth, gradeOpen } from './lib/api';
+import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
 import { inDays } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
@@ -42,6 +43,7 @@ export function App() {
   const [finished, setFinished] = useState<Finished | null>(null);
 
   const [sampleGrade, setSampleGrade] = useState<GradeFn | undefined>();
+  const [sampleExplain, setSampleExplain] = useState<ExplainFn | undefined>();
 
   useEffect(() => {
     if (!isStandalone) {
@@ -52,6 +54,7 @@ export function App() {
     void loadSample().then((sample) => {
       if (!sample) return;
       setSampleGrade(() => createSampleGrader(course, sample));
+      setSampleExplain(() => createSampleExplainer(course, sample));
       setHealth({ ok: true, ai: true, model: 'your Claude account' });
     });
   }, []);
@@ -93,6 +96,8 @@ export function App() {
 
   const grade = useMemo<GradeFn | undefined>(() => (isStandalone ? sampleGrade : health?.ai ? gradeOpen : undefined), [sampleGrade, health]);
 
+  const explain = useMemo<ExplainFn | undefined>(() => (isStandalone ? sampleExplain : health?.explain ? explainOnline : undefined), [sampleExplain, health]);
+
   // "You'll see this again tomorrow": computed from the progress as it was when the lesson started.
   const reviewHint = useCallback(
     (q: Question, outcome: 'first' | 'retry' | 'failed') => {
@@ -113,6 +118,7 @@ export function App() {
         color={found.unit.color}
         questions={found.lesson.questions}
         grade={grade}
+        explain={explain}
         reviewHint={reviewHint}
         haptics={progress.settings.haptics}
         onExit={() => go('/')}
@@ -122,7 +128,7 @@ export function App() {
   }
 
   const practice = (kind: PracticeKind, title: string, unitId?: string) => (
-    <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} reviewHint={reviewHint} onFinish={finish} />
+    <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} explain={explain} reviewHint={reviewHint} onFinish={finish} />
   );
   if (route === '/mix') return practice('mix', 'Mixed practice');
   if (route === '/review') return practice('review', 'Review due');
@@ -171,12 +177,13 @@ function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string):
   }
 }
 
-function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }: {
+function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, onFinish }: {
   kind: PracticeKind;
   title: string;
   unitId?: string;
   progress: Progress;
   grade?: GradeFn;
+  explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   onFinish: (title: string, s: SessionSummary) => void;
 }) {
@@ -198,6 +205,7 @@ function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }
       color={COLORS[kind]}
       questions={questions}
       grade={grade}
+      explain={explain}
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}

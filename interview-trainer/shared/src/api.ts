@@ -22,4 +22,6 @@ export interface HealthResponse {
   /** True when the server has credentials and can grade open questions with AI. */
   ai: boolean;
   model?: string;
+  /** True when the "Ask why" tutor endpoint (POST /api/explain) is available. */
+  explain?: boolean;
 }

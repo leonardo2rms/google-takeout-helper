@@ -424,3 +424,21 @@ details summary { min-height: 44px; display: flex; align-items: center; cursor: 
 .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; text-align: left; font-size: 15px; }
 .srs-note { color: inherit; opacity: .85; font-size: 14px; margin-top: 8px; }
 .confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 60; }
+
+/* ===== features-b: Ask why (tutor chat) ===== */
+.ask-why { display: grid; gap: 4px; justify-items: start; margin-top: 4px; }
+.ask-why .btn.small { min-height: 44px; }
+.ask-why .btn:disabled { opacity: .7; }
+.chat { display: grid; gap: 8px; max-height: 45dvh; overflow-y: auto; }
+.chat:empty { display: none; }
+.bubble { margin: 0; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; max-width: 92%; }
+.bubble.user { justify-self: end; background: var(--blue-bg); color: var(--text); }
+.bubble.assistant { justify-self: start; background: var(--surface); border: 1px solid var(--border); }
+.bubble.pending { color: var(--muted); }
+.ask-note { font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips .chip { min-height: 44px; }
+.chat-form { display: grid; gap: 8px; }
+.chat-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.chat-actions .btn { min-height: 44px; }
+/* ===== end features-b: Ask why ===== */

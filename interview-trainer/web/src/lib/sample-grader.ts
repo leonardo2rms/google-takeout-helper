@@ -5,7 +5,8 @@ import type { GradeFn } from './evaluate';
  * Hosted single-file build: the page has no server, so grading goes through the viewer's own Claude
  * account via the artifact `sample` capability. `window.claude` only exists inside that viewer.
  */
-interface Sample {
+export interface Sample {
+  (input: string, options?: { modelTier?: 'quick' | 'default' | 'complex'; cache?: boolean }): Promise<{ text: string }>;
   json<T>(input: string, options?: { modelTier?: 'quick' | 'default' | 'complex'; cache?: boolean }): Promise<T>;
 }
 interface ClaudeHost {

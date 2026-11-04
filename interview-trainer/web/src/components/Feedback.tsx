@@ -1,4 +1,5 @@
 import { PASS_SCORE, scoreFromCoverage, spotLines, verdictFor, type OpenVerdict, type Question } from '@trainer/shared';
+import type { ReactNode } from 'react';
 import { isPass, type Outcome } from '../lib/evaluate';
 import { CodeBlock } from './CodeBlock';
 import { Inline } from './Inline';
@@ -10,6 +11,8 @@ interface Props {
   /** Set on an interviewer follow-up: the combined result of the main answer and this one. */
   overall?: { score: number; pass: boolean };
   onCoveredChange: (covered: boolean[]) => void;
+  /** Extra actions at the bottom of the panel (e.g. "Ask why"). */
+  actions?: ReactNode;
 }
 
 function solution(q: Question): { text: string; lang: string } | null {
@@ -21,7 +24,7 @@ function solution(q: Question): { text: string; lang: string } | null {
   return null;
 }
 
-export function Feedback({ q, outcome, overall, onCoveredChange }: Props) {
+export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Props) {
   const pass = isPass(outcome);
   const open = outcome.open;
   const oq = q.type === 'open' ? q : null;
@@ -136,6 +139,8 @@ export function Feedback({ q, outcome, overall, onCoveredChange }: Props) {
           <CodeBlock source={sol.text} lang={sol.lang} />
         </>
       )}
+
+      {actions}
     </div>
   );
 }

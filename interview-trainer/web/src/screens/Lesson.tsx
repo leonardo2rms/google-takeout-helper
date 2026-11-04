@@ -3,6 +3,7 @@ import {
   PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize,
   type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
+import { AskWhy } from '../components/AskWhy';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
@@ -14,6 +15,8 @@ import { MatchQuestion } from '../components/MatchQuestion';
 import { OpenQuestion } from '../components/OpenQuestion';
 import { OrderQuestion } from '../components/OrderQuestion';
 import { SpotQuestion } from '../components/SpotQuestion';
+import type { ExplainFn } from '../lib/explain';
+import { describeLearnerAnswer } from '../lib/explain';
 import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 import { runCodeInWorker } from '../lib/run-code';
 
@@ -23,6 +26,8 @@ interface Props {
   questions: Question[];
   /** Grades open answers with AI; undefined means offline (self-assessment). */
   grade?: GradeFn;
+  /** "Ask why" tutor chat; undefined means unavailable (the button is shown disabled). */
+  explain?: ExplainFn;
   /** Optional: when a question will come back ("tomorrow", "in 3 days"), shown under the feedback. */
   reviewHint?: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   /** Short vibration on a correct answer (where supported). */
@@ -57,7 +62,7 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, color, questions, grade, reviewHint, haptics, onExit, onFinish }: Props) {
+export function LessonScreen({ title, color, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -124,6 +129,7 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat) return;
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return; // a sheet (Ask why) owns its keys
       const inText = e.target instanceof HTMLTextAreaElement;
       if (inText && !(e.ctrlKey || e.metaKey)) return;
       if (e.target instanceof HTMLButtonElement) return; // keep native activation
@@ -185,6 +191,15 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
               outcome={outcome}
               overall={overallScore === null ? undefined : { score: overallScore, pass: passed }}
               onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
+              actions={
+                <AskWhy
+                  key={`${view.id}#${attempt}`}
+                  questionId={view.id}
+                  answer={describeLearnerAnswer(view, answer, Boolean(outcome.skipped))}
+                  correct={passed}
+                  explain={explain}
+                />
+              }
             />
             {pending && <p className="interviewer-note">🎤 The interviewer has a follow-up question for you.</p>}
             {!pending && !followUp && reviewHint && (() => {

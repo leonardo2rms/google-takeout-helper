@@ -60,6 +60,22 @@ How the grader is built (`server/src/grader.ts`):
   trainer.)
 - Rate-limited (30/min/IP by default), 32 kB body limit, and upstream errors are never leaked to the client.
 
+### Ask why (AI tutor)
+
+On the feedback card, **Ask why** opens a short chat about *that* question ("why is B wrong?", "give me an example"). With no AI available
+(offline, no key) the button is shown disabled with a one-line reason; nothing else changes.
+
+- `POST /api/explain` (`server/src/app.ts`, `server/src/tutor.ts`): body `{ questionId, answer, correct, messages[] }`, zod-validated
+  (`shared/src/explain.ts`): at most 6 learner messages of 500 characters each, strictly alternating turns, answer text up to 600 characters.
+  Rate-limited separately from grading (20/min/IP by default). Same Anthropic client setup as the grader; `EXPLAIN_MODEL` overrides `GRADER_MODEL` for the tutor only.
+- **The question, correct answer and explanation are looked up server-side by `questionId`** (follow-up ids such as `lesson/3~f1` work too). The client only
+  supplies the learner's own answer text and chat, and all of that is untrusted: fenced in `<learner_answer>` / `<conversation>` tags, with any attempt to close or
+  spoof a tag stripped (forged "assistant" turns are flattened into the fenced transcript, so they cannot act as instructions). The system prompt tells the model to
+  stay on the question and to politely decline anything else.
+- Plain-text reply, capped at about 150 words; upstream errors are never leaked (the client shows "could not answer just now").
+- The hosted single-file build uses the `sample` capability with the same prompt builder (`buildExplainPlainPrompt`), exactly like grading does.
+- The UI says plainly that an AI answers and can be wrong, and that the card's explanation is the reference.
+
 ### Single-file build (no server, no install)
 
 ```bash
