@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  allQuestions, dayKey, findLesson, liveStreak, recordResult, seededShuffle,
-  type HealthResponse, type Question, type SessionSummary,
+  allQuestions, applySession, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
+  reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
+  type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { fetchHealth, gradeOpen } from './lib/api';
 import type { GradeFn } from './lib/evaluate';
+import { inDays } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
-import { useProgress } from './lib/store';
+import { getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
 import { LessonScreen } from './screens/Lesson';
+import { ProgressScreen } from './screens/ProgressScreen';
 import { Summary, type Finished } from './screens/Summary';
 
 function useHashRoute(): string {
@@ -29,6 +32,8 @@ const go = (route: string) => {
 
 const MIX_SIZE = 8;
 const REVIEW_SIZE = 10;
+
+type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic';
 
 export function App() {
   const route = useHashRoute();
@@ -51,19 +56,52 @@ export function App() {
     });
   }, []);
 
-  const finish = useCallback(
-    (title: string, summary: SessionSummary, lessonId?: string) => {
-      const today = dayKey(new Date());
-      const next = recordResult(progress, { lessonId, accuracy: summary.accuracy, xp: summary.xp, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct }, today);
-      update(() => next);
-      const nextLesson = course.units.flatMap((u) => u.lessons).find((l) => !next.lessons[l.id] && l.id !== lessonId);
-      setFinished({ title, summary, streak: liveStreak(next, today), nextLessonId: nextLesson?.id });
-      go('/done');
-    },
-    [progress, update],
-  );
+  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string) => {
+    const today = dayKey(new Date());
+    const outcomes = outcomesOf(summary);
+    let before: Progress = getProgress();
+    let events: SessionEvent[] = [];
+    updateProgress((p) => {
+      before = p;
+      const res = applySession(
+        p,
+        { lessonId, accuracy: summary.accuracy, xp: summary.xp, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes },
+        { today, course },
+      );
+      events = res.events;
+      return res.progress;
+    });
+    const after = getProgress();
+    if (before.stats.sessions === 0) requestPersistence(); // ask the browser to keep our storage once there is something worth keeping
+
+    const tipEvent = events.find((e): e is Extract<SessionEvent, { type: 'tip' }> => e.type === 'tip');
+    const tipQuestion = tipEvent ? allQuestions(course).find((q) => q.id === tipEvent.questionId) : undefined;
+    const nextLesson = course.units.flatMap((u) => u.lessons).find((l) => !after.lessons[l.id] && l.id !== lessonId);
+    setFinished({
+      title,
+      summary,
+      streak: streakStatus(after, today).streak,
+      nextLessonId: nextLesson?.id,
+      events,
+      goalBefore: goalToday(before, today),
+      goalAfter: goalToday(after, today),
+      forecast: reviewForecast(after.cards, Object.keys(outcomes), today),
+      tip: tipEvent && tipQuestion ? { text: explanationOf(tipQuestion), bonusXp: tipEvent.bonusXp } : null,
+    });
+    go('/done');
+  }, []);
 
   const grade = useMemo<GradeFn | undefined>(() => (isStandalone ? sampleGrade : health?.ai ? gradeOpen : undefined), [sampleGrade, health]);
+
+  // "You'll see this again tomorrow": computed from the progress as it was when the lesson started.
+  const reviewHint = useCallback(
+    (q: Question, outcome: 'first' | 'retry' | 'failed') => {
+      if (outcome === 'failed') return null; // it comes straight back in this session
+      const days = previewInterval(getProgress(), q, outcome, dayKey(new Date()));
+      return days >= 1 ? `You'll see this again ${inDays(days)}.` : null;
+    },
+    [],
+  );
 
   if (route.startsWith('/lesson/')) {
     const found = findLesson(course, route.slice('/lesson/'.length));
@@ -75,46 +113,81 @@ export function App() {
         color={found.unit.color}
         questions={found.lesson.questions}
         grade={grade}
+        reviewHint={reviewHint}
+        haptics={progress.settings.haptics}
         onExit={() => go('/')}
         onFinish={(s) => finish(found.lesson.title, s, found.lesson.id)}
       />
     );
   }
 
-  if (route === '/mix') return <Practice key="mix" kind="mix" title="Mixed practice" grade={grade} missed={progress.missed} onFinish={finish} />;
-  if (route === '/review') return <Practice key="review" kind="review" title="Review mistakes" grade={grade} missed={progress.missed} onFinish={finish} />;
+  const practice = (kind: PracticeKind, title: string, unitId?: string) => (
+    <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} reviewHint={reviewHint} onFinish={finish} />
+  );
+  if (route === '/mix') return practice('mix', 'Mixed practice');
+  if (route === '/review') return practice('review', 'Review due');
+  if (route === '/daily') return practice('daily', 'Today');
+  if (route === '/warmup') return practice('warmup', 'Warm-up');
+  if (route.startsWith('/topic/')) {
+    const unitId = route.slice('/topic/'.length);
+    const unit = course.units.find((u) => u.id === unitId);
+    if (!unit) return <NotFound />;
+    return practice('topic', `Practise: ${unit.title}`, unit.id);
+  }
+  if (route === '/progress') return <ProgressScreen course={course} progress={progress} />;
 
   if (route === '/done') {
     if (!finished) {
       go('/');
       return null;
     }
-    return <Summary finished={finished} onHome={() => go('/')} />;
+    return <Summary finished={finished} settings={progress.settings} onHome={() => go('/')} />;
   }
 
-  return <Home course={course} progress={progress} health={health} onReset={reset} />;
+  return <Home course={course} progress={progress} health={health} update={update} onReset={reset} />;
 }
 
-/** Mixed / review sessions: the question list is picked once, when the screen mounts. */
-function Practice({ kind, title, grade, missed, onFinish }: {
-  kind: 'mix' | 'review';
+const COLORS: Record<PracticeKind, string> = { mix: '#1cb0f6', review: '#ff9600', daily: '#58cc02', warmup: '#58cc02', topic: '#ce82ff' };
+
+/** Picks the questions for a session once, when the screen mounts, so answering does not reshuffle it. */
+function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string): Question[] {
+  const today = dayKey(new Date());
+  const seed = dayNumber(today) * 131 + progress.stats.sessions;
+  switch (kind) {
+    case 'review':
+      return reviewQueue(progress, allQuestions(course), today, unitOfFor(course)).all.slice(0, REVIEW_SIZE);
+    case 'daily':
+      return buildDailySession(course, progress, today).questions;
+    case 'warmup':
+      return buildDailySession(course, progress, today, { size: 3 }).questions;
+    case 'topic': {
+      const weak = weakSpots(course, progress, today, MIX_SIZE, seed, unitId);
+      const ids = new Set(weak.map((q) => q.id));
+      const unseen = course.units.find((u) => u.id === unitId)?.lessons.flatMap((l) => l.questions).filter((q) => !ids.has(q.id) && !progress.cards[q.id]) ?? [];
+      return [...weak, ...seededShuffle(unseen, seed)].slice(0, MIX_SIZE);
+    }
+    default:
+      return pickMix(course, progress, today, MIX_SIZE, seed);
+  }
+}
+
+function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }: {
+  kind: PracticeKind;
   title: string;
+  unitId?: string;
+  progress: Progress;
   grade?: GradeFn;
-  missed: string[];
+  reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   onFinish: (title: string, s: SessionSummary) => void;
 }) {
-  const [questions] = useState<Question[]>(() => {
-    const all = allQuestions(course);
-    const pool = kind === 'review' ? all.filter((q) => missed.includes(q.id)) : all;
-    return seededShuffle(pool, Math.floor(Math.random() * 2 ** 31)).slice(0, kind === 'review' ? REVIEW_SIZE : MIX_SIZE);
-  });
+  const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
 
   if (questions.length === 0) {
     return (
       <div className="summary">
         <div className="trophy" aria-hidden="true">✨</div>
         <h1>All clear!</h1>
-        <p className="muted">No mistakes to review right now.</p>
+        <p className="muted">Nothing to review right now. New reviews appear as they come due.</p>
         <a className="btn primary" href="#/">Back</a>
       </div>
     );
@@ -122,9 +195,11 @@ function Practice({ kind, title, grade, missed, onFinish }: {
   return (
     <LessonScreen
       title={title}
-      color={kind === 'mix' ? '#1cb0f6' : '#ff9600'}
+      color={COLORS[kind]}
       questions={questions}
       grade={grade}
+      reviewHint={reviewHint}
+      haptics={progress.settings.haptics}
       onExit={() => go('/')}
       onFinish={(s) => onFinish(title, s)}
     />
