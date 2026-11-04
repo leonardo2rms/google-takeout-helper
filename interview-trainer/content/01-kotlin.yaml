@@ -233,3 +233,168 @@ lessons:
             keywords: ["static method", "first parameter", "private", "utility"]
           - point: "A member function with the same signature always wins over an extension"
             keywords: ["member wins", "members win", "member always", "shadow", "takes precedence", "member function"]
+
+  - id: kotlin-advanced
+    title: Generics, inline & DSLs
+    questions:
+      - type: spot
+        prompt: One of these assignments does not compile. Tap that line.
+        source: |
+          val strings: List<String> = listOf("a", "b")
+          val anys: List<Any> = strings
+          val names: MutableList<String> = mutableListOf("a")
+          val things: MutableList<Any> = names
+        answers: [4]
+        explanation: "`List<out E>` is declared covariant: it only hands out elements, so a `List<String>` is a `List<Any>`. `MutableList<E>` is invariant because it also accepts elements: if `MutableList<String>` were a `MutableList<Any>`, you could add an `Int` through the `Any` view and corrupt the list of strings."
+
+      - type: match
+        prompt: Match each generics concept to what it means.
+        pairs:
+          - { left: "`out T`", right: "T only appears in output positions, so `Box<Dog>` can be used as a `Box<Animal>`" }
+          - { left: "`in T`", right: "T only appears in input positions, so a handler of `Animal` can stand in for a handler of `Dog`" }
+          - { left: "`Foo<*>` (star projection)", right: "Unknown type argument: reading is possible as the upper bound, writing is effectively impossible" }
+          - { left: "`reified T`", right: "The type argument is available at runtime inside an inline function" }
+        explanation: "Declaration-site variance (`out`/`in` on the class) is Kotlin's answer to Java's use-site wildcards (`? extends` / `? super`). Remember it as producer = `out`, consumer = `in`. A star projection is the safe choice when you don't care about the element type, for example `fun count(xs: List<*>)`."
+
+      - type: single
+        prompt: "Why must a function with a `reified` type parameter be declared `inline`?"
+        code:
+          source: |
+            inline fun <reified T> Any?.isA(): Boolean = this is T
+        options:
+          - { id: a, text: "An inline body is copied into each call site, where the compiler knows the actual type argument and can emit a real type check" }
+          - { id: b, text: "`reified` tells the JVM to keep generic type information for every class in the program" }
+          - { id: c, text: "Non-inline generic functions cannot contain `is` checks of any kind" }
+          - { id: d, text: "`reified` values are stored in a registry that only inline functions can read" }
+        answer: a
+        explanation: "On the JVM, type arguments of a normal generic function are erased, so `this is T` cannot be checked. Because an inline function's body is substituted at the call site, the compiler can replace `T` with the concrete type there. That is also why a reified function can't be called with a type argument that is itself a non-reified type parameter."
+
+      - type: multi
+        prompt: Select ALL true statements about `inline` functions.
+        options:
+          - { id: a, text: "A lambda passed to an inline function can use a non-local `return` that returns from the calling function" }
+          - { id: b, text: "`noinline` marks a lambda parameter that must stay a real object, for example because you store it or pass it on" }
+          - { id: c, text: "`crossinline` forbids non-local `return` in the lambda so it can safely be called from another context, such as a nested object or lambda" }
+          - { id: d, text: "`reified` can be put on the type parameter of a class" }
+          - { id: e, text: "Marking a function `inline` always makes the program faster" }
+        answers: [a, b, c]
+        explanation: "Inlining removes the lambda allocation and call, but it duplicates the body at every call site (code bloat), so it is a trade-off, not a free win; it pays off mostly for small functions that take lambdas. `reified` works only on type parameters of inline functions (and inline property accessors), never on classes."
+
+      - type: single
+        prompt: What does this print?
+        code:
+          source: |
+            interface Greeter {
+                fun name(): String
+                fun greet(): String
+            }
+
+            class Base : Greeter {
+                override fun name() = "base"
+                override fun greet() = "hello " + name()
+            }
+
+            class Loud(g: Greeter) : Greeter by g {
+                override fun name() = "loud"
+            }
+
+            fun main() = println(Loud(Base()).greet())
+        options:
+          - { id: a, text: "hello base" }
+          - { id: b, text: "hello loud" }
+          - { id: c, text: "It does not compile: `Loud` must also override `greet()`" }
+          - { id: d, text: "It overflows the stack, because `name()` calls itself through the delegate" }
+        answer: a
+        explanation: "Class delegation forwards the non-overridden members (`greet`) to the wrapped object, and inside `Base.greet()` the call `name()` is `this.name()` on the `Base` instance, which knows nothing about `Loud`. Delegation is not inheritance: there is no virtual dispatch back into the wrapper. With inheritance (an `open` Base whose `open fun name()` is overridden in a subclass) the answer would be \"hello loud\"."
+
+      - type: fill
+        prompt: Complete a small type-safe builder DSL, where nested blocks cannot silently call the outer builder.
+        template: |
+          @[[1]]
+          annotation class HtmlDsl
+
+          @HtmlDsl
+          class Row { fun cell(text: String) { /* ... */ } }
+
+          @HtmlDsl
+          class Table {
+              val rows = mutableListOf<Row>()
+              fun row(init: Row.() -> Unit) { rows += Row().apply(init) }
+          }
+
+          fun table(init: [[2]].() -> Unit): Table = Table().[[3]](init)
+        bank: ["DslMarker", "Table", "apply", "Row", "let", "Deprecated"]
+        answers: ["DslMarker", "Table", "apply"]
+        explanation: "`@DslMarker` is a meta-annotation. Once your annotation carries it and is applied to the builder classes, a nested lambda can no longer call members of an outer builder implicitly. `init` must be a lambda with a `Table` receiver so the block can call `row { }` directly, and `apply` runs the block on the new builder and returns the builder itself (`let` would return the lambda's result, here `Unit`)."
+
+      - type: single
+        prompt: "Which problem does this code have in a coroutine-based service?"
+        code:
+          source: |
+            suspend fun loadUser(id: Long): User? =
+                runCatching { api.fetchUser(id) }   // fetchUser is a suspend function
+                    .getOrNull()
+        options:
+          - { id: a, text: "`runCatching` catches every Throwable, including CancellationException, so cancellation is swallowed and real failures are silently turned into null" }
+          - { id: b, text: "`runCatching` cannot wrap a suspend call, so it does not compile" }
+          - { id: c, text: "`getOrNull` blocks the calling thread until the result is ready" }
+          - { id: d, text: "`Result` cannot be used as a return value in Kotlin, only as a parameter" }
+        answer: a
+        explanation: "`runCatching` is `try { Result.success(block()) } catch (e: Throwable) { Result.failure(e) }`; since the lambda is inline it may call suspend functions, but it also catches the CancellationException that a cancelled coroutine uses to unwind. Catch specific exceptions, or rethrow cancellation (`.onFailure { if (it is CancellationException) throw it }`), and model expected failures explicitly (a sealed result type) instead of collapsing them all into null."
+
+      - type: single
+        prompt: "With a current Kotlin compiler (1.7 or newer), what happens to this code?"
+        code:
+          source: |
+            sealed interface Cmd
+            data class Add(val n: Int) : Cmd
+            data class Remove(val n: Int) : Cmd
+            object Clear : Cmd
+
+            fun handle(c: Cmd) {
+                when (c) {
+                    is Add -> println("add ${c.n}")
+                    is Remove -> println("remove ${c.n}")
+                }
+            }
+        options:
+          - { id: a, text: "Compile error: a `when` on a sealed subject must be exhaustive, even when used as a statement" }
+          - { id: b, text: "It compiles, and `Clear` is silently ignored at runtime" }
+          - { id: c, text: "It compiles with a warning only, and `Clear` throws at runtime" }
+          - { id: d, text: "It compiles only if `Clear` is changed to a `data class`" }
+        answer: a
+        explanation: "Since Kotlin 1.7, non-exhaustive `when` statements over sealed, enum and Boolean subjects are errors rather than warnings. That is what makes sealed hierarchies a safety net: adding `Clear` breaks every handler that forgot it. Adding an `else` branch silences the compiler and throws that safety away, so avoid `else` on sealed `when`s."
+
+      - type: open
+        prompt: "Explain how a type-safe builder DSL (like `html { body { p { +\"hi\" } } }` or Gradle's Kotlin DSL) works in Kotlin, and what `@DslMarker` is for."
+        modelAnswer: "A builder DSL is built from higher-order functions whose last parameter is a lambda with receiver, such as `fun table(init: Table.() -> Unit): Table`. Inside the lambda `this` is the builder, so you call its members without qualification; the function creates the builder, runs the block on it (typically with `apply`) and returns the result, and nested blocks create nested builders. The catch is scope leakage: in a nested lambda the outer receivers are still implicitly available, so you could call `row` inside `row` by mistake and it would silently resolve to the outer builder. Annotating the builder classes with an annotation marked `@DslMarker` makes such implicit access to an outer receiver a compile error (you can still write `this@table` explicitly). Keep the DSL small and let the builders produce immutable results; the cost is harder debugging and weaker tooling than plain constructors."
+        keyPoints:
+          - point: "Lambda with receiver (`T.() -> Unit`): the block runs with the builder as `this`; the builder function creates it, applies the block and returns it"
+            keywords: ["lambda with receiver", "receiver", "apply"]
+          - point: "`@DslMarker` turns implicit access to an outer receiver from a nested lambda into a compile error"
+            keywords: ["dslmarker", "outer receiver", "scope leak"]
+          - point: "Design guidance: small surface, immutable results; costs are harder debugging and tooling"
+            keywords: ["immutable", "debug", "tooling", "small"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "Without `@DslMarker`, what goes wrong in `table { row { row { cell(\"x\") } } }`, and how does the annotation change it?"
+            modelAnswer: "Without the marker, the innermost lambda has two receivers in scope, the Row and the outer Table, and `row` is not a member of Row, so the call silently resolves to the outer Table. The row ends up as a sibling in the table instead of inside the first row, and the compiler says nothing. With `@DslMarker` on both classes, the compiler rejects implicit calls to a member of an outer receiver from inside the nested lambda. If you really want the outer builder you must say so explicitly, for example `this@table.row { }`."
+            keyPoints:
+              - point: "Both receivers are in scope, so the call silently resolves to the outer builder"
+                keywords: ["outer", "both receivers", "silently"]
+              - point: "With the marker, the implicit call to the outer receiver is a compile error"
+                keywords: ["compile error", "rejects", "error"]
+              - point: "An explicit label such as this@table is still allowed"
+                keywords: ["this@", "explicit", "label"]
+          - when: covered
+            point: 1
+            prompt: "What is the difference for the caller between a parameter of type `Row.() -> Unit` and one of type `(Row) -> Unit`?"
+            modelAnswer: "With `Row.() -> Unit` the lambda body sees the row as `this`, so members are called unqualified, like `cell(\"x\")`. With `(Row) -> Unit` the body receives the row as a parameter, by default called `it`, and has to qualify every call, like `it.cell(\"x\")`. Under the hood both are the same kind of function object that takes the row as its first parameter; the receiver form is simply nicer syntax for builders."
+            keyPoints:
+              - point: "Receiver form: members are called unqualified through this"
+                keywords: ["this", "unqualified", "without qualif"]
+              - point: "Parameter form needs it or a named parameter"
+                keywords: ["it.", "parameter", "named"]
+              - point: "Same underlying representation; the receiver form is syntax for readability"
+                keywords: ["same", "first parameter", "readab", "syntax"]
