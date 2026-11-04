@@ -28,6 +28,8 @@ export interface Card {
   seen: number;
   firstTry: number;
   last: Day;
+  /** Hypercorrection: last answered wrong while "sure". Reviewed first and with a bigger ease penalty; cleared by the next success. */
+  hc?: true;
 }
 
 export interface DayLog {

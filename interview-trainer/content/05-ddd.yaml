@@ -8,6 +8,7 @@ lessons:
     title: Tactical design
     questions:
       - type: single
+        hint: "Ask whether two instances with equal fields are interchangeable."
         prompt: "Which of these is best modelled as a Value Object?"
         options:
           - { id: a, text: "Money(amount, currency)" }
@@ -18,6 +19,7 @@ lessons:
         explanation: "Value objects have no identity: two Money(10, EUR) are interchangeable, they're immutable, and equality is by attributes. Entities (customer, order, account) are tracked by identity across changes."
 
       - type: multi
+        hint: "Think about transaction boundaries and how one aggregate refers to another."
         prompt: Select ALL rules that good aggregate design follows.
         options:
           - { id: a, text: "Reference other aggregates by identity (id), not by object reference" }
@@ -29,6 +31,7 @@ lessons:
         explanation: "An aggregate is a consistency boundary. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events. Repositories exist per aggregate root, not per entity."
 
       - type: single
+        hint: "Where do the business rules live, and what do the entities themselves do?"
         prompt: What design smell does this show?
         code:
           source: |
@@ -67,6 +70,7 @@ lessons:
         explanation: "`require` validates arguments (IllegalArgumentException); `check` validates object state (IllegalStateException), which is what a state-machine guard is. `assert` is disabled unless the JVM runs with `-ea`."
 
       - type: single
+        hint: "Which layer coordinates the steps and the transaction without containing business rules?"
         prompt: "Where should \"load the order, call `order.pay()`, save it, then publish `OrderPaid`\" live?"
         options:
           - { id: a, text: "An application service (use case), which orchestrates and owns the transaction" }
@@ -77,6 +81,7 @@ lessons:
         explanation: "Domain logic belongs to entities/value objects/domain services; orchestration, transactions and I/O belong to application services. Controllers only translate HTTP to a use-case call."
 
       - type: single
+        hint: "Think about dependency direction: who is allowed to know about whom?"
         prompt: "In a hexagonal/DDD layout, where does the `OrderRepository` *interface* belong?"
         options:
           - { id: a, text: "The domain layer; the JPA implementation lives in infrastructure" }
@@ -87,6 +92,7 @@ lessons:
         explanation: "The domain declares what it needs in domain terms (`save(order)`, `findById(id)`), and infrastructure implements it. That's the dependency inversion that keeps the domain free of Spring/JPA."
 
       - type: spot
+        hint: "Look for lines that change something the aggregate owns from the outside."
         prompt: The Order aggregate's rules can be bypassed here. Tap the two lines that reach into its internals.
         source: |
           class OrderService(private val orders: OrderRepository) {
@@ -101,6 +107,7 @@ lessons:
         explanation: "The service edits the aggregate's state directly, so nothing stops cancelling a shipped order. The aggregate root should expose `order.cancel()` and enforce its invariants itself; callers shouldn't be able to touch `items` or `status`."
 
       - type: code
+        hint: "Return a new object rather than changing either input, and think about what must match before you add."
         prompt: "Model `Money` as a value object: write `addMoney(a, b)` for `{ amount, currency }` values (amount in cents). Return a NEW object with the summed amount, and throw an error mentioning \"currency\" if the currencies differ. Don't change the arguments."
         starter: |
           function addMoney(a, b) {
@@ -129,6 +136,7 @@ lessons:
         explanation: "A value object is immutable, compares by value and protects its own invariant (you can't add euros to dollars). Returning a new object instead of mutating `a` is what makes it safe to share; the hidden test passes frozen inputs to catch mutation. Keep money in integer cents to avoid floating-point drift."
 
       - type: open
+        hint: "Think about identity versus equality by value, and what validating at construction buys you."
         prompt: "What is a Value Object, and why model `Email` or `Money` as one instead of using `String` or `BigDecimal`?"
         modelAnswer: "A Value Object has no identity and is defined purely by its attributes; it's immutable and compared by value. Modelling Email or Money as one lets the type enforce its invariants at construction (a valid email, a non-negative amount with a currency), so an invalid instance can't exist anywhere in the system. It also removes primitive obsession (you can't pass an Email where a UserName is expected), documents domain language in signatures, and gives a natural home for behaviour such as Money.plus rejecting mixed currencies."
         keyPoints:
@@ -145,6 +153,7 @@ lessons:
     title: Strategic design
     questions:
       - type: single
+        hint: "Does the same word need to mean exactly the same thing in both teams' language?"
         prompt: "In Sales, a \"Customer\" has credit limits and discounts. In Shipping, a \"Customer\" is just a delivery address and phone number. What does DDD recommend?"
         options:
           - { id: a, text: "Separate bounded contexts, each with its own model of Customer, linked by an identifier" }
@@ -155,6 +164,7 @@ lessons:
         explanation: "A model is only valid within a boundary. Trying to build one canonical model forces every team to couple to every other team's concerns."
 
       - type: single
+        hint: "Picture a legacy model whose concepts you do not want leaking into yours."
         prompt: What problem does an Anti-Corruption Layer (ACL) solve?
         options:
           - { id: a, text: "It translates between an external/legacy model and your own so the foreign concepts don't leak into your domain" }
@@ -186,6 +196,7 @@ lessons:
         explanation: "Domain events are internal facts and may change freely. An integration event is a published contract: design it deliberately, version it, and don't leak your internal model through it."
 
       - type: single
+        hint: "Make the two writes one write: what can share a single database transaction?"
         prompt: "A service saves an order to its DB and then publishes `OrderPlaced` to Kafka. The process crashes between the two steps. Which pattern fixes the inconsistency?"
         options:
           - { id: a, text: "Transactional outbox: write the event to an outbox table in the same DB transaction, and relay it afterwards" }
@@ -215,6 +226,7 @@ lessons:
         explanation: "They differ in how much you control: ACL protects your model at the cost of a translation layer; Conformist accepts the upstream's model when you have no leverage; Shared Kernel needs close coordination; Open Host Service scales to many consumers."
 
       - type: open
+        hint: "Table boundaries and transaction boundaries are rarely the same thing. What should each service own?"
         prompt: "Your team proposes one microservice per database table. What do you say, and what do you propose instead?"
         modelAnswer: "That boundary follows the data schema rather than the business, so almost every use case would need several services: chatty synchronous calls, distributed transactions or sagas, and a 'distributed monolith' where services must be deployed together. Instead identify subdomains and bounded contexts, for example with Event Storming, and size services around business capabilities and aggregates: an aggregate is the unit of transactional consistency and should never be split across services. Aim for high cohesion, loose coupling and clear team ownership, and start with fewer, larger services that you split when there's evidence."
         keyPoints:

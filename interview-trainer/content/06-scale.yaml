@@ -8,6 +8,7 @@ lessons:
     title: Load & latency
     questions:
       - type: estimate
+        hint: "Little's Law links concurrency, throughput and latency by a simple multiplication."
         prompt: "By Little's Law (L = λ x W), a service handles 200 requests/second with an average latency of 0.25 s. How many requests are in flight on average?"
         answer: 50
         tolerance: 0
@@ -15,6 +16,7 @@ lessons:
         explanation: "L = 200 x 0.25 = 50. This is how you size thread/connection pools: if each in-flight request holds a DB connection for its full duration, you need about 50 connections at that load (more for headroom)."
 
       - type: single
+        hint: "CPU is idle, so what are the request threads waiting for?"
         prompt: "Latency climbs sharply under load, yet CPU on both the app and the database is nearly idle. The app has 200 request threads and a HikariCP pool of 10. What is the most likely cause?"
         options:
           - { id: a, text: "Threads are queuing for a database connection (pool saturation)" }
@@ -36,6 +38,7 @@ lessons:
         explanation: "Option D makes the database spend more time context-switching, and E is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
 
       - type: single
+        hint: "Many callers reload the same value at once. How could one caller do the work for all of them?"
         prompt: A very popular cache key expires and 5,000 concurrent requests all miss and hit the database. What is this called, and what's a good mitigation?
         options:
           - { id: a, text: "Cache stampede; coalesce loads (single-flight / lock per key), add TTL jitter or refresh ahead of expiry" }
@@ -46,6 +49,7 @@ lessons:
         explanation: "Also called thundering herd. Let one request recompute while others wait or serve slightly stale data, and spread expiry times so keys don't all expire together."
 
       - type: single
+        hint: "Think about what an average does to a rare, very slow response."
         prompt: Why do SREs track p99 latency instead of just the average?
         options:
           - { id: a, text: "Averages hide the slow tail; with fan-out (one request calling many services) most users experience the tail" }
@@ -66,6 +70,7 @@ lessons:
         explanation: "Stateless services scale horizontally. Put session/state in Redis, a database, or a signed token (e.g. JWT) so that any instance can serve any request."
 
       - type: estimate
+        hint: "Work out the chance that all 20 calls are fast, then take the opposite."
         prompt: "A page makes 20 independent backend calls, and each call is slow 1% of the time. What percentage of page loads hit at least one slow call? (A rough figure is fine.)"
         answer: 18.2
         tolerance: 0.05
@@ -88,6 +93,7 @@ lessons:
         explanation: "`active=10, idle=0, waiting=187` is saturation, not an outage: the database answered, but every connection is in use. Look for slow queries, and for transactions that stay open across remote calls. A bigger pool only helps if the database has spare capacity."
 
       - type: code
+        hint: "Compute the rank first, convert it to a 0-based index, and do not mutate the input."
         prompt: "Write `percentile(values, p)` using the nearest-rank method: sort ascending (`values` may be unsorted) and return the value at rank `ceil(p * n / 100)`, with `0 < p <= 100`."
         starter: |
           function percentile(values, p) {
@@ -132,6 +138,7 @@ lessons:
     title: Resilience patterns
     questions:
       - type: single
+        hint: "After the wait it does not simply close again: it tests the water first."
         prompt: A circuit breaker has been OPEN and its wait time elapses. What does it do next?
         options:
           - { id: a, text: "Moves to HALF-OPEN and lets a limited number of trial calls through to test whether the dependency recovered" }
@@ -142,6 +149,7 @@ lessons:
         explanation: "CLOSED (normal) → OPEN (fail fast) → HALF-OPEN (probe) → CLOSED if the probes succeed, else back to OPEN. Failing fast gives the struggling dependency room to recover."
 
       - type: single
+        hint: "The server needs a way to recognise the same request when it arrives twice."
         prompt: "A client retries `POST /payments` after a timeout and the customer is charged twice. What is the standard fix?"
         options:
           - { id: a, text: "Require an idempotency key so the server returns the original result for a repeated request" }
@@ -163,6 +171,7 @@ lessons:
         explanation: "Retrying at every layer multiplies traffic (3 layers × 3 attempts = 27 calls to the bottom service). Retry at one layer, with a budget, and jitter so clients don't synchronise."
 
       - type: single
+        hint: "What puts an upper bound on how much a queue can hold?"
         prompt: "A consumer is slower than the producer feeding it through an unbounded in-memory queue. What happens, and what's the right design?"
         options:
           - { id: a, text: "Memory grows until OOM; use a bounded queue/backpressure so the producer slows down or work is rejected" }
@@ -173,6 +182,7 @@ lessons:
         explanation: "Backpressure propagates 'slow down' upstream: bounded queues, `Flow` operators with buffers, reactive streams demand, or consumer lag-based autoscaling for Kafka."
 
       - type: single
+        hint: "Think about limiting how much of a shared resource any one dependency may use."
         prompt: "One slow dependency (e.g. a reports API) uses up all your servlet threads, so unrelated endpoints also time out. Which pattern prevents this?"
         options:
           - { id: a, text: "Bulkhead: isolate resources (thread/semaphore pools) per dependency" }
@@ -183,6 +193,7 @@ lessons:
         explanation: "Named after ship compartments: a leak in one doesn't sink the vessel. Pair with timeouts, because without them even a bulkhead's pool eventually fills with stuck calls."
 
       - type: single
+        hint: "No distributed lock and no two-phase commit: what can you do about a failed step after earlier ones succeeded?"
         prompt: "An order spans three services, each with its own database. Which approach keeps data consistent without distributed locks?"
         options:
           - { id: a, text: "A saga: local transactions chained by events/commands, with compensating actions on failure" }
@@ -193,6 +204,7 @@ lessons:
         explanation: "Sagas trade atomicity for availability and give eventual consistency. Design compensations (refund, release stock) and make every step idempotent."
 
       - type: order
+        hint: "Which attempt must be allowed to throw to the caller, and where does that call sit relative to the loop?"
         prompt: Arrange the lines to build a retry helper with exponential backoff.
         lines:
           - "suspend fun <T> retry(times: Int, block: suspend () -> T): T {"
@@ -207,6 +219,7 @@ lessons:
         explanation: "The wait happens after a failed attempt and before doubling. The final attempt is outside the loop so its exception propagates to the caller. In production add jitter and a cap on `delayMs`, and don't swallow CancellationException."
 
       - type: spot
+        hint: "Which line has a side effect that is not safe to repeat when you cannot tell whether it succeeded?"
         prompt: A timeout here can charge the customer twice. Tap the line responsible.
         source: |
           fun charge(req: ChargeRequest): Receipt {
@@ -219,6 +232,7 @@ lessons:
         explanation: "A timeout doesn't tell you the charge failed, only that you didn't hear back. Retrying a non-idempotent write immediately, with no idempotency key and no backoff, can apply it again. Send the same key on every attempt and back off between them."
 
       - type: estimate
+        hint: "Retries multiply across layers rather than add."
         prompt: "Three layers of a call chain each retry a failed call up to 3 attempts. In the worst case, how many attempts reach the bottom service for ONE user request?"
         answer: 27
         tolerance: 0
@@ -226,6 +240,7 @@ lessons:
         explanation: "Retries multiply across layers: 3 x 3 x 3 = 27. Retry at one layer only, with a retry budget, so a struggling dependency isn't hit by a retry storm."
 
       - type: match
+        hint: "For each pattern, name the failure it is meant to contain."
         prompt: Match each pattern to the problem it solves.
         pairs:
           - { left: "Circuit breaker", right: "Fails fast while a dependency is unhealthy" }
@@ -236,6 +251,7 @@ lessons:
         explanation: "Each pattern guards one failure mode, and they compose: timeouts and bulkheads limit the blast radius, breakers stop hammering a sick dependency, idempotency keys make retries safe, the outbox keeps data and events consistent."
 
       - type: order
+        hint: "The relay can crash at any moment. When is it safe to mark something as sent?"
         kind: steps
         prompt: Put the steps of the transactional outbox in the right order.
         lines:
@@ -247,6 +263,7 @@ lessons:
         explanation: "The row is marked as sent only after publishing. If the relay crashes in between, the event is published again on restart: at-least-once delivery, which is why consumers must be idempotent."
 
       - type: code
+        hint: "Compute each delay from its index, then apply the cap last."
         prompt: "Write `backoffDelays(attempts, baseMs, capMs)`: the wait before each retry, doubling every time (`baseMs`, `2 x baseMs`, `4 x baseMs`, ...) but never more than `capMs`."
         starter: |
           function backoffDelays(attempts, baseMs, capMs) {
@@ -269,6 +286,7 @@ lessons:
         explanation: "Exponential backoff gives a struggling dependency room to recover; the cap keeps waits bounded. In production add random jitter so many clients don't retry in lockstep. Note the `minOf(i, 30)` in the Kotlin version: an unbounded shift would overflow."
 
       - type: open
+        hint: "What goes wrong if you write to the database and publish to a broker as two separate steps?"
         prompt: Explain the transactional outbox pattern. What problem does it solve and how does it work?
         modelAnswer: "It solves the dual-write problem: updating your database and publishing a message to a broker can't be made atomic, so a crash between the two leaves them inconsistent. With an outbox, the service writes the event to an outbox table in the same local DB transaction as the business change. A separate relay (a polling publisher or change-data-capture such as Debezium) reads the outbox and publishes to the broker, marking rows as sent. Delivery is at-least-once, so consumers must be idempotent (deduplicate by event id)."
         keyPoints:

@@ -8,6 +8,7 @@ import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
 import { EstimateQuestion } from '../components/EstimateQuestion';
 import { Feedback } from '../components/Feedback';
+import { Hint } from '../components/Hint';
 import { FillQuestion } from '../components/FillQuestion';
 import { Inline } from '../components/Inline';
 import { MatchQuestion } from '../components/MatchQuestion';
@@ -64,6 +65,8 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
   const [phase, setPhase] = useState<Phase>('answer');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [followUp, setFollowUp] = useState<FollowUpStage | null>(null);
+  /** Questions whose hint was revealed (kept across retries; one reveal per question). */
+  const [hinted, setHinted] = useState<ReadonlySet<string>>(() => new Set());
 
   const feedbackRef = useRef<HTMLDivElement>(null);
   const q = currentQuestion(session);
@@ -106,10 +109,10 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
     }
     const pass = followUp ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 >= PASS_SCORE : isPass(outcome);
     setFollowUp(null);
-    const s = submit(session, pass);
+    const s = submit(session, pass, { hinted: hinted.has(q.id) });
     if (currentQuestion(s) === undefined) onFinish(summarize(s));
     else setSession(s);
-  }, [outcome, q, phase, pending, followUp, session, onFinish]);
+  }, [outcome, q, phase, pending, followUp, session, hinted, onFinish]);
 
   // A tiny tick on a correct answer, if the learner allows it and the device can.
   useEffect(() => {
@@ -166,6 +169,14 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
         </p>
         <h1 className="prompt"><Inline text={view.prompt} /></h1>
         {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
+        {!followUp && view.hint && (
+          <Hint
+            text={view.hint}
+            revealed={hinted.has(view.id)}
+            canReveal={phase === 'answer'}
+            onReveal={() => setHinted((h) => new Set(h).add(view.id))}
+          />
+        )}
 
         <div key={key} className="answer-area">
           {(view.type === 'single' || view.type === 'multi') && <ChoiceQuestion q={view} seed={seed} checked={checked} onAnswer={setAnswer} />}

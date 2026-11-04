@@ -28,13 +28,19 @@ export function outcomesOf(s: OutcomeSource): Record<QuestionId, Outcome> {
   return out;
 }
 
-/** retry|failed -> again. A first-try answer is `good`; "certain" makes it `easy`, a "guess" makes it `hard`. */
-export function gradeFor(o: Outcome, c?: Confidence): Grade {
+/**
+ * retry|failed -> again. A first-try answer is `good`; "sure" makes it `easy`, a "guess" makes it `hard`.
+ * Needing a hint caps the quality at `hard`: it was not recalled unaided, whatever the rating.
+ */
+export function gradeFor(o: Outcome, c?: Confidence, hinted = false): Grade {
   if (o !== 'first') return 'again';
+  if (hinted || c === 1) return 'hard';
   if (c === 3) return 'easy';
-  if (c === 1) return 'hard';
   return 'good';
 }
+
+/** Wrong while "sure" (confidence 3): the surprise is what makes a correction stick, so the card comes back sooner and harder. */
+export const isHypercorrection = (o: Outcome, c?: Confidence): boolean => o !== 'first' && c === 3;
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const clampEase = (e: number) => Math.min(MAX_EASE, Math.max(MIN_EASE, round2(e)));
@@ -56,7 +62,7 @@ function freshCard(hash: string, today: Day): Card {
  * (1d, 3d, then interval x ease). A review that happens before the card is due does not grow the interval,
  * so replaying a lesson ten times cannot game the schedule.
  */
-export function scheduleCard(card: Card | undefined, grade: Grade, today: Day, opts: { hash: string; deadline?: Day | null }): Card {
+export function scheduleCard(card: Card | undefined, grade: Grade, today: Day, opts: { hash: string; deadline?: Day | null; hypercorrect?: boolean }): Card {
   const base = card && card.h === opts.hash ? card : undefined;
   // Clock moved backwards: behave as if it were still the day we last saw the card.
   const now = base && base.last > today ? base.last : today;
@@ -64,8 +70,11 @@ export function scheduleCard(card: Card | undefined, grade: Grade, today: Day, o
   const seen = cur.seen + 1;
   const firstTry = cur.firstTry + (grade === 'again' ? 0 : 1);
 
+  const { hc: _hc, ...plain } = cur; // any new outcome clears the hypercorrection flag; a fresh miss may set it again
   if (grade === 'again') {
-    return { ...cur, ease: clampEase(cur.ease - 0.2), interval: 1, due: addDays(now, 1), reps: 0, lapses: cur.lapses + 1, seen, firstTry, last: now };
+    // Wrong while sure: due again today (a second look hours later), and a bigger ease penalty.
+    if (opts.hypercorrect) return { ...plain, ease: clampEase(cur.ease - 0.35), interval: 1, due: now, reps: 0, lapses: cur.lapses + 1, seen, firstTry, last: now, hc: true };
+    return { ...plain, ease: clampEase(cur.ease - 0.2), interval: 1, due: addDays(now, 1), reps: 0, lapses: cur.lapses + 1, seen, firstTry, last: now };
   }
   if (base && base.interval > 0 && base.due > now) {
     return { ...base, seen, firstTry, last: now }; // early review: bookkeeping only
@@ -81,7 +90,7 @@ export function scheduleCard(card: Card | undefined, grade: Grade, today: Day, o
     ease = cur.ease + 0.1;
   }
   interval = Math.max(1, Math.min(interval, intervalCap(now, opts.deadline)));
-  return { ...cur, ease: clampEase(ease), interval, due: addDays(now, interval), reps: cur.reps + 1, seen, firstTry, last: now };
+  return { ...plain, ease: clampEase(ease), interval, due: addDays(now, interval), reps: cur.reps + 1, seen, firstTry, last: now };
 }
 
 /** How well the card is remembered today, 0.1..1: full until due, then halves every `interval` days overdue. */
@@ -133,7 +142,7 @@ export function dueQuestions(p: Progress, questions: readonly Question[], today:
     const c = cardFor(p, q);
     if (c && isDue(c, today)) due.push({ q, c });
   }
-  due.sort((a, b) => overdueRatio(b.c, today) - overdueRatio(a.c, today) || (a.c.due < b.c.due ? -1 : a.c.due > b.c.due ? 1 : 0) || (a.q.id < b.q.id ? -1 : 1));
+  due.sort((a, b) => Number(Boolean(b.c.hc)) - Number(Boolean(a.c.hc)) || overdueRatio(b.c, today) - overdueRatio(a.c, today) || (a.c.due < b.c.due ? -1 : a.c.due > b.c.due ? 1 : 0) || (a.q.id < b.q.id ? -1 : 1));
   return roundRobin(due.map((d) => d.q), unitOf);
 }
 
@@ -164,14 +173,19 @@ export function applyToCards(
   outcomes: Record<QuestionId, Outcome>,
   questions: readonly Question[],
   today: Day,
-  opts: { deadline?: Day | null; confidence?: Record<QuestionId, Confidence> } = {},
+  opts: { deadline?: Day | null; confidence?: Record<QuestionId, Confidence>; hinted?: readonly QuestionId[] } = {},
 ): Progress['cards'] {
   const byId = new Map(questions.map((q) => [q.id, q] as const));
   const next = { ...cards };
   for (const [id, outcome] of Object.entries(outcomes)) {
     const q = byId.get(id);
     if (!q) continue;
-    next[id] = scheduleCard(cards[id], gradeFor(outcome, opts.confidence?.[id]), today, { hash: questionHash(q), deadline: opts.deadline });
+    const conf = opts.confidence?.[id];
+    next[id] = scheduleCard(cards[id], gradeFor(outcome, conf, opts.hinted?.includes(id)), today, {
+      hash: questionHash(q),
+      deadline: opts.deadline,
+      hypercorrect: isHypercorrection(outcome, conf),
+    });
   }
   return next;
 }

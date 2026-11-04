@@ -63,6 +63,7 @@ function normalizeCards(raw: unknown, today: Day): Progress['cards'] {
       firstTry: int(c.firstTry, 0, BIG, 0),
       last: isDay(c.last) ? c.last : due,
     };
+    if (c.hc === true) card.hc = true;
     out[id] = card;
   }
   return out;

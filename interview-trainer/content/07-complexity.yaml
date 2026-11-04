@@ -85,6 +85,7 @@ lessons:
         explanation: "The outer loop runs n times and the inner loop halves j each time: log n steps. The product is n log n."
 
       - type: single
+        hint: "How many calls does each call fan out into, and how many distinct inputs are there?"
         prompt: "What is the time complexity of the naive recursive `fib`, and what does memoisation turn it into?"
         code:
           source: |
@@ -99,6 +100,7 @@ lessons:
         explanation: "The call tree roughly doubles at each level (tight bound ≈ 1.618ⁿ, commonly quoted as O(2ⁿ)). With a cache each value of n is computed once."
 
       - type: single
+        hint: "For each element of `a`, what does a lookup in `b` cost?"
         prompt: "`a` has n elements and `b` has m elements (both `List<Int>`). What is the time complexity, and how do you improve it?"
         code:
           source: |
@@ -141,6 +143,7 @@ lessons:
         explanation: "Look up the complement before inserting the current element, so an element is never paired with itself. One pass with expected O(1) map operations gives O(n) time and O(n) space, versus O(n²) for checking every pair."
 
       - type: estimate
+        hint: "Use n x log2(n), and remember that 2^10 is about 1,000."
         prompt: "Sorting n = 1,000,000 elements takes about n x log2(n) comparisons. Roughly how many million comparisons is that?"
         answer: 20
         tolerance: 0.1
@@ -148,6 +151,7 @@ lessons:
         explanation: "log2(1,000,000) is about 19.9, so n log n is about 19.9 million. Compare that with the 500,000 million (5 x 10^11) comparisons an O(n²) approach would need: that is the whole point of an n log n sort."
 
       - type: code
+        hint: "Use a stack, and decide what to do with a closer that does not match the top."
         prompt: "Write `isBalanced(s)`: true if every `()`, `[]` and `{}` in the string is closed in the right order (other characters are ignored). The hidden tests include 400,000 characters, so aim for O(n)."
         starter: |
           function isBalanced(s) {
@@ -224,6 +228,7 @@ lessons:
         explanation: "ArrayList is backed by an array. LinkedList.get(i) walks the nodes: O(n), and it is slower than ArrayList in practice for nearly everything because of pointer chasing. ArrayDeque has no index access."
 
       - type: single
+        hint: "What does Java 8 do when a bucket's chain grows long?"
         prompt: "A HashMap's keys all collide into one bucket. On Java 8+, what is the typical lookup cost for Comparable keys?"
         options:
           - { id: a, text: "O(log n): large buckets are converted to balanced trees" }
@@ -234,6 +239,7 @@ lessons:
         explanation: "Since Java 8, a bucket with 8+ entries (and table size >= 64) becomes a red-black tree. It defends against hash-collision attacks and bad hashCode implementations, but a good hash function is still what makes lookups O(1)."
 
       - type: single
+        hint: "Where do the other elements have to go when you insert at the front?"
         prompt: "What is the cost of `list.add(x)` on an `ArrayList` vs `list.add(0, x)`?"
         options:
           - { id: a, text: "Amortised O(1) at the end; O(n) at the front because all elements shift" }
@@ -270,6 +276,7 @@ lessons:
         explanation: "Each `removeAt(0)` shifts all remaining elements. If you just need to visit every element, `for (x in list)` is O(n). If it's a queue, use ArrayDeque."
 
       - type: fill
+        hint: "Count occurrences per word first, then sort by those counts."
         prompt: Find the 3 most frequent words.
         template: |
           val counts = words.groupingBy { it }.[[1]]()
@@ -281,6 +288,7 @@ lessons:
         explanation: "`groupingBy{}.eachCount()` builds Map<String, Int> in one O(n) pass. `sortedWith(comparator)` then sorts the entries in O(k log k) for k distinct words (`sortedBy` takes a selector, not a comparator). For a very large k and small top-N, a bounded min-heap does it in O(k log N)."
 
       - type: spot
+        hint: "Look for a call inside the loop that itself scans the collection."
         prompt: This function runs in O(n²). Tap the line that makes it quadratic.
         source: |
           fun dedupe(xs: List<String>): List<String> {

@@ -424,3 +424,7 @@ details summary { min-height: 44px; display: flex; align-items: center; cursor: 
 .notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; text-align: left; font-size: 15px; }
 .srs-note { color: inherit; opacity: .85; font-size: 14px; margin-top: 8px; }
 .confetti { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 60; }
+
+/* ===== features-a: hints, confidence, library, challenge, achievements, mock (structure only) ===== */
+.btn.hint-btn { min-height: 44px; margin: 4px 0 12px; }
+.hint-box { margin: 4px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--amber-bg); color: var(--amber-text); overflow-wrap: anywhere; }

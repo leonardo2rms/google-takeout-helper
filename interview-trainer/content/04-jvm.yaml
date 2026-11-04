@@ -8,6 +8,7 @@ lessons:
     title: Memory & garbage collection
     questions:
       - type: single
+        hint: "Think about which memory areas are per-thread and which are shared."
         prompt: Which memory area is shared by all threads and managed by the garbage collector?
         options:
           - { id: a, text: "The heap" }
@@ -18,6 +19,7 @@ lessons:
         explanation: "Objects live on the heap. Each thread's stack holds frames with local primitives and references, and is freed automatically when frames pop (no GC involved)."
 
       - type: single
+        hint: "It moved out of the Java heap in Java 8. Where does non-heap memory live?"
         prompt: Since Java 8, where is class metadata (the PermGen replacement) stored?
         options:
           - { id: a, text: "Metaspace, in native memory" }
@@ -39,6 +41,7 @@ lessons:
         explanation: "Modern collectors (G1, ZGC, Shenandoah) do much of the old-gen work concurrently. G1 allocates humongous objects (>= half a region) directly into dedicated humongous regions in the old generation."
 
       - type: single
+        hint: "Think about collectors that do almost all of their work concurrently with the application."
         prompt: "Your latency SLO needs GC pauses well under a millisecond even with a multi-GB heap. Which collector is designed for that?"
         options:
           - { id: a, text: "ZGC" }
@@ -49,6 +52,7 @@ lessons:
         explanation: "ZGC does marking, relocation and reference processing concurrently, with pauses that don't grow with heap size. Parallel favours throughput; Serial is for tiny heaps; CMS was removed in Java 14. G1 (the default) targets pause *goals* in the tens to hundreds of ms."
 
       - type: single
+        hint: "Who still holds a reference to those listeners?"
         prompt: Why does the heap keep growing here?
         code:
           lang: kotlin
@@ -67,6 +71,7 @@ lessons:
         explanation: "The GC collects what is unreachable from GC roots (statics, thread stacks, JNI refs). A forgotten listener, ThreadLocal or unbounded cache keeps whole object graphs alive. Fix with explicit deregistration, weak references or a bounded cache."
 
       - type: single
+        hint: "`-Xmx` limits only one of the memory areas a JVM process uses."
         prompt: "A container is OOMKilled although heap usage was well below `-Xmx`. What is the most likely explanation?"
         options:
           - { id: a, text: "Non-heap memory (metaspace, thread stacks, direct buffers, code cache) pushed the process over the container limit" }
@@ -77,6 +82,7 @@ lessons:
         explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
 
       - type: estimate
+        hint: "MaxRAMPercentage is a share of the container's limit, not of the host's memory."
         prompt: "A container is limited to 2 GiB (2,048 MiB) and the JVM starts with `-XX:MaxRAMPercentage=75`. What is the maximum heap size, in MiB?"
         answer: 1536
         tolerance: 0
@@ -148,6 +154,7 @@ lessons:
     title: JIT, memory model & threads
     questions:
       - type: single
+        hint: "What does the JVM do with bytecode before it knows which methods are hot?"
         prompt: Why is the first call of a method often much slower than later calls on the JVM?
         options:
           - { id: a, text: "It starts interpreted; hot code is later compiled by the tiered JIT (C1, then C2) with profile-guided optimisations" }
@@ -158,6 +165,7 @@ lessons:
         explanation: "That's why microbenchmarks need warm-up (use JMH, not `System.nanoTime` loops) and why services show a latency bump right after deployment."
 
       - type: single
+        hint: "Is `counter++` one operation or several? And what does `volatile` actually promise?"
         prompt: Two threads run `counter++` 1,000,000 times each on this field. What is the likely final value?
         code:
           source: |
@@ -183,6 +191,7 @@ lessons:
         explanation: "With `ReentrantLock` you must `unlock()` in a `finally` block. Multiple conditions are a `Lock` feature (`newCondition()`); a monitor has a single wait set."
 
       - type: single
+        hint: "Virtual threads make waiting cheap. Which workloads mostly wait?"
         prompt: Virtual threads (Java 21) give the biggest win for which workload?
         options:
           - { id: a, text: "Many concurrent tasks that mostly block on I/O (HTTP calls, JDBC)" }
@@ -203,6 +212,7 @@ lessons:
         explanation: "Pinning limits scalability because the carrier is stuck. It's been largely addressed in later JDKs for `synchronized`, but on 21 it is a real tuning concern (`-Djdk.tracePinnedThreads`)."
 
       - type: single
+        hint: "Compile time and run time can see different classpaths."
         prompt: "At runtime you get `NoClassDefFoundError` for a class that was present at compile time. What does that usually mean?"
         options:
           - { id: a, text: "The class was on the compile classpath but is missing at runtime (or its static initialiser failed earlier)" }
@@ -213,6 +223,7 @@ lessons:
         explanation: "`ClassNotFoundException` is thrown by explicit reflective loading (`Class.forName`); `NoClassDefFoundError` is a linkage error when the JVM can't find or initialise a class it needs. Typical causes: `provided`/`compileOnly` dependency, version conflicts, or an `ExceptionInInitializerError` first."
 
       - type: spot
+        hint: "Look for a check followed by an action, with no lock around the pair."
         prompt: Two threads call `get()` at the same time and `init()` runs twice. Tap the two lines that form the race.
         source: |
           class Lazy<T : Any>(private val init: () -> T) {
@@ -248,6 +259,7 @@ lessons:
         explanation: "worker-1 waits for worker-2's lock and worker-2 waits for worker-1's: a cycle, so neither can ever proceed. `jstack` and `jcmd Thread.print` report deadlocks explicitly. Acquire locks in one global order, or use `tryLock` with a timeout and back off."
 
       - type: open
+        hint: "It is a guarantee about visibility between threads, not about wall-clock time. Then list ways to establish it."
         prompt: "Explain \"happens-before\" in the Java Memory Model and give two ways to safely publish an object to another thread."
         modelAnswer: "Happens-before is the JMM's guarantee that if action A happens-before action B, then A's effects (writes) are visible to B and ordered before it. Without such an edge, the compiler, CPU and caches may reorder or delay writes so another thread can see stale or partially constructed state. Edges come from volatile write/read, monitor unlock/lock, Thread.start/join, and final-field semantics. Safe publication means establishing that edge: for example store the object in a volatile field, publish via synchronized/locks, put it in a concurrent collection or queue, hand it over through a static initialiser, or make its fields final."
         keyPoints:

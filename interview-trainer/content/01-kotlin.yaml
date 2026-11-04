@@ -8,6 +8,7 @@ lessons:
     title: Null safety & types
     questions:
       - type: single
+        hint: "Follow the `?.` first: what does it produce when the receiver is null, and what does the operator after it do with that?"
         prompt: What does this print?
         code:
           source: |
@@ -22,6 +23,7 @@ lessons:
         explanation: "`?.` short-circuits to null when the receiver is null, and the Elvis operator `?:` supplies the fallback -1. No NPE is possible without `!!`."
 
       - type: multi
+        hint: "What would the JVM need in order to represent \"not assigned yet\" for a primitive? And which keyword allows reassignment?"
         prompt: Select ALL statements that are true about `lateinit`.
         options:
           - { id: a, text: "It can only be applied to `var` properties" }
@@ -33,6 +35,7 @@ lessons:
         explanation: "`lateinit` needs a mutable, non-null, non-primitive property. Primitives (Int, Boolean...) are not allowed because the JVM field would need a null sentinel. You can test with `::prop.isInitialized`."
 
       - type: fill
+        hint: "One token makes a call that gives up quietly on null instead of throwing; the other supplies a fallback value."
         prompt: Return the length of `name`, or 0 when it is null.
         template: "val len = name[[1]]length [[2]] 0"
         bank: ["?.", "?:", "!!", "?", "::"]
@@ -57,6 +60,7 @@ lessons:
         explanation: "`==` is structural equality (calls `equals`, which data classes generate from the primary-constructor properties). `===` is reference identity, and these are two different instances."
 
       - type: single
+        hint: "Between the null check and the use, could anything else change the property?"
         prompt: Why does this not compile?
         code:
           source: |
@@ -85,6 +89,7 @@ lessons:
         explanation: "Guard first, then index. The type parameter `T` belongs before the receiver type in the declaration."
 
       - type: open
+        hint: "Compare when each one is initialised, whether it can be a `val`, and what thread-safety you get for free."
         prompt: When would you use `by lazy` instead of `lateinit var`?
         modelAnswer: "`by lazy` is for a `val` whose value is computed from an initializer lambda the first time it is read; it is thread-safe by default (SYNCHRONIZED mode) and works for any type, including primitives and nullables. `lateinit` is for a `var` that something else assigns after construction (dependency injection, test setup, lifecycle callbacks); there's no initializer, and reading it too early throws. So: lazy for expensive, self-contained, immutable values; lateinit when initialisation is external."
         keyPoints:
@@ -120,6 +125,7 @@ lessons:
     title: Idiomatic Kotlin
     questions:
       - type: single
+        hint: "Think about what the compiler can prove when every subtype is declared in one place."
         prompt: What is the main benefit of a `sealed` hierarchy when used with `when`?
         options:
           - { id: a, text: "The compiler knows all subtypes, so `when` can be exhaustive without an `else` branch" }
@@ -143,6 +149,7 @@ lessons:
         explanation: "`apply` and `also` return the receiver; `let`, `run` and `with` return the lambda result. `apply` uses `this` inside the block, `also` uses `it`."
 
       - type: multi
+        hint: "Look at what the compiler generates from the primary-constructor properties, and what a `data class` is not allowed to be."
         prompt: Select ALL statements that are true about `data class`.
         options:
           - { id: a, text: "`equals`/`hashCode` only use properties from the primary constructor" }
@@ -171,6 +178,7 @@ lessons:
         explanation: "Sequences are lazy and process element by element. 1*2=2 and 2*2=4 fail the filter; 3*2=6 passes, and `first()` stops there. With a List, every operator would run over all 1,000,000 elements and allocate intermediate lists."
 
       - type: fill
+        hint: "Narrow the list first, then reshape each element, and only then put the result in order."
         prompt: Build a sorted list of the names of active users.
         template: |
           val names = users
@@ -182,6 +190,7 @@ lessons:
         explanation: "Narrow first (`filter`), then transform (`map`), then order the final, smaller list (`sorted`). Filtering early keeps the work small."
 
       - type: single
+        hint: "Weigh what you pay at runtime against what the type system gives you at compile time."
         prompt: "What is the main purpose of `@JvmInline value class UserId(val raw: Long)`?"
         options:
           - { id: a, text: "Compile-time type safety (UserId vs OrderId) with no wrapper allocation in most uses" }
@@ -192,6 +201,7 @@ lessons:
         explanation: "Value classes are erased to the underlying type where possible, avoiding allocation. They are boxed when used as a nullable, a generic type argument or through an interface, so it's not free everywhere."
 
       - type: match
+        hint: "Ask two questions of each: is the receiver `this` or `it`, and what does the block return?"
         prompt: Match each scope function to what it does.
         pairs:
           - { left: "`apply`", right: "Receiver is `this`; returns the receiver" }
@@ -201,6 +211,7 @@ lessons:
         explanation: "Two questions sort them: is the object `this` or `it`, and do you get the object back or the lambda's result? `apply`/`also` return the object (builders, side effects like logging); `let`/`run` return the result (transformations, null-checks with `?.let`)."
 
       - type: code
+        hint: "Walk the words once; the first time you see a length, create its bucket, then add the word to it."
         prompt: "Write `groupByLength(words)`: return an object that maps each word length to the array of words with that length, in their original order (like Kotlin's `groupBy { it.length }`)."
         starter: |
           function groupByLength(words) {
@@ -224,6 +235,7 @@ lessons:
         explanation: "Grouping is a single pass: look up (or create) the bucket for the key and append. Kotlin's `groupBy` does exactly this and keeps the original order inside each group."
 
       - type: open
+        hint: "Does the receiver's runtime type or its declared type choose the function? And what wins when a member has the same signature?"
         prompt: How are Kotlin extension functions resolved, and what's one pitfall of that?
         modelAnswer: "Extension functions are resolved statically, at compile time, based on the declared type of the receiver expression, not its runtime type. They compile to static methods taking the receiver as the first parameter, so they can't access private members and they aren't overridden polymorphically. If a class has a member with the same signature, the member always wins. A typical pitfall is expecting `animal.speak()` to dispatch on the runtime subclass when `speak` is an extension."
         keyPoints:

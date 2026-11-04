@@ -65,7 +65,7 @@ export function App() {
       before = p;
       const res = applySession(
         p,
-        { lessonId, accuracy: summary.accuracy, xp: summary.xp, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes },
+        { lessonId, accuracy: summary.accuracy, xp: summary.xp, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes, hinted: summary.hinted, confidence: summary.confidence },
         { today, course },
       );
       events = res.events;

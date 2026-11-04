@@ -20,6 +20,13 @@ export interface LessonResult {
   /** Per-question outcome; derived from missed / recovered / cleared when omitted. */
   outcomes?: Record<QuestionId, Outcome>;
   confidence?: Record<QuestionId, Confidence>;
+  /** Question ids whose hint was revealed: their review quality is capped. */
+  hinted?: string[];
+  /**
+   * `lesson` (default) is a normal session. `single` (one question: library practice, the daily challenge) and `mock`
+   * never count as a "perfect lesson" and never show a tip.
+   */
+  kind?: 'lesson' | 'single' | 'mock';
   /** Distinct questions resolved; defaults to the number of outcomes. */
   answered?: number;
 }
@@ -92,13 +99,14 @@ export function applySession(
   const beforeReady = readiness(course, p, today);
   const beforeTopics = topicStats(course, p, today);
 
-  const tipQ = tipFor(p, today).show ? tipQuestion(p, questions, today) : null;
+  const regular = (r.kind ?? 'lesson') === 'lesson';
+  const tipQ = regular && tipFor(p, today).show ? tipQuestion(p, questions, today) : null;
   const bonus = tipQ ? TIP_BONUS_XP : 0;
 
   const basics = applyBasics(p, r, today, r.xp + bonus);
   const streak = advanceStreak(p, today);
   const newDay = p.lastDay !== today && !p.days[today];
-  const perfect = r.accuracy >= 1 && answered > 0;
+  const perfect = regular && r.accuracy >= 1 && answered > 0;
 
   const next: Progress = {
     ...p,
@@ -107,7 +115,7 @@ export function applySession(
     longestStreak: streak.longestStreak,
     freezes: streak.freezes,
     lastDay: streak.lastDay,
-    cards: applyToCards(p.cards, outcomes, questions, today, { deadline: p.profile.interviewDate, confidence: r.confidence }),
+    cards: applyToCards(p.cards, outcomes, questions, today, { deadline: p.profile.interviewDate, confidence: r.confidence, hinted: r.hinted }),
     days: recordDay(p, today, { xp: r.xp + bonus, answered, firstTry }),
     stats: {
       sessions: p.stats.sessions + 1,
