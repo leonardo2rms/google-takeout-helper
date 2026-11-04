@@ -23,6 +23,10 @@ interface Props {
   questions: Question[];
   /** Grades open answers with AI; undefined means offline (self-assessment). */
   grade?: GradeFn;
+  /** Optional: when a question will come back ("tomorrow", "in 3 days"), shown under the feedback. */
+  reviewHint?: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
+  /** Short vibration on a correct answer (where supported). */
+  haptics?: boolean;
   onExit: () => void;
   onFinish: (summary: SessionSummary) => void;
 }
@@ -53,7 +57,7 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, color, questions, grade, onExit, onFinish }: Props) {
+export function LessonScreen({ title, color, questions, grade, reviewHint, haptics, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -106,6 +110,11 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
     if (currentQuestion(s) === undefined) onFinish(summarize(s));
     else setSession(s);
   }, [outcome, q, phase, pending, followUp, session, onFinish]);
+
+  // A tiny tick on a correct answer, if the learner allows it and the device can.
+  useEffect(() => {
+    if (phase === 'feedback' && passed && haptics) navigator.vibrate?.(10);
+  }, [phase, passed, haptics]);
 
   // Bring the feedback into view above the fixed bottom bar; on phones it starts below the fold.
   useEffect(() => {
@@ -178,6 +187,10 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
               onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
             />
             {pending && <p className="interviewer-note">🎤 The interviewer has a follow-up question for you.</p>}
+            {!pending && !followUp && reviewHint && (() => {
+              const hint = reviewHint(view, passed && attempt === 0 ? 'first' : passed ? 'retry' : 'failed');
+              return hint ? <p className="srs-note" data-testid="srs-note">{hint}</p> : null;
+            })()}
           </div>
         )}
       </main>

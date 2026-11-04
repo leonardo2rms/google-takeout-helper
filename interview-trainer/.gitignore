@@ -6,3 +6,4 @@ dist/
 dist-standalone/
 e2e/.results/
 playwright-report/
+coverage/
