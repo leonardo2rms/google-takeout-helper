@@ -1,4 +1,4 @@
-import { PASS_SCORE, scoreFromCoverage, verdictFor, type OpenVerdict, type Question } from '@trainer/shared';
+import { PASS_SCORE, scoreFromCoverage, spotLines, verdictFor, type OpenVerdict, type Question } from '@trainer/shared';
 import { isPass, type Outcome } from '../lib/evaluate';
 import { CodeBlock } from './CodeBlock';
 import { Inline } from './Inline';
@@ -28,6 +28,7 @@ export function Feedback({ q, outcome, onCoveredChange }: Props) {
   const title = headline(outcome, verdict, q.id);
 
   const sol = !pass ? solution(q) : null;
+  const answerLine = q.type === 'estimate' ? estimateLine(q) : null;
 
   return (
     <div className={`feedback ${pass ? 'good' : verdict === 'partial' ? 'meh' : 'bad'}`} role="status" aria-live="polite">
@@ -75,6 +76,24 @@ export function Feedback({ q, outcome, onCoveredChange }: Props) {
         <p className="explanation"><Inline text={q.explanation} /></p>
       )}
 
+      {answerLine && <p className="answer-line">{answerLine}</p>}
+
+      {q.type === 'match' && !pass && (
+        <ul className="match-solution">
+          {q.pairs.map((p) => (
+            <li key={p.left}><b><Inline text={p.left} /></b> → <Inline text={p.right} /></li>
+          ))}
+        </ul>
+      )}
+
+      {q.type === 'spot' && !pass && (
+        <ul className="spot-solution">
+          {q.answers.map((n) => (
+            <li key={n}>Line {n}: <code>{spotLines(q.source)[n - 1]?.trim()}</code></li>
+          ))}
+        </ul>
+      )}
+
       {sol && (
         <>
           <p className="hint">Correct solution</p>
@@ -90,6 +109,14 @@ function pick<T>(items: T[], seed: string): T {
   for (const c of seed) h = (h * 31 + c.charCodeAt(0)) | 0;
   return items[Math.abs(h) % items.length]!;
 }
+
+function estimateLine(q: Extract<Question, { type: 'estimate' }>): string {
+  const unit = q.unit ? ` ${q.unit}` : '';
+  const tol = q.tolerance === 0 ? 'exact' : `accepted: ${trim(q.answer * (1 - q.tolerance))} to ${trim(q.answer * (1 + q.tolerance))}${unit}`;
+  return `Answer: ${trim(q.answer)}${unit} (${tol})`;
+}
+
+const trim = (n: number) => String(Math.round(n * 100) / 100);
 
 function headline(outcome: Outcome, verdict: OpenVerdict, seed: string): string {
   if (outcome.skipped) return 'Here is the answer';

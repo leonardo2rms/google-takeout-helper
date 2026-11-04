@@ -86,6 +86,20 @@ lessons:
         answer: a
         explanation: "The domain declares what it needs in domain terms (`save(order)`, `findById(id)`), and infrastructure implements it. That's the dependency inversion that keeps the domain free of Spring/JPA."
 
+      - type: spot
+        prompt: The Order aggregate's rules can be bypassed here. Tap the two lines that reach into its internals.
+        source: |
+          class OrderService(private val orders: OrderRepository) {
+              fun cancel(id: OrderId) {
+                  val order = orders.get(id)
+                  order.items.clear()
+                  order.status = Status.CANCELLED
+                  orders.save(order)
+              }
+          }
+        answers: [4, 5]
+        explanation: "The service edits the aggregate's state directly, so nothing stops cancelling a shipped order. The aggregate root should expose `order.cancel()` and enforce its invariants itself; callers shouldn't be able to touch `items` or `status`."
+
       - type: open
         prompt: "What is a Value Object, and why model `Email` or `Money` as one instead of using `String` or `BigDecimal`?"
         modelAnswer: "A Value Object has no identity and is defined purely by its attributes; it's immutable and compared by value. Modelling Email or Money as one lets the type enforce its invariants at construction (a valid email, a non-negative amount with a currency), so an invalid instance can't exist anywhere in the system. It also removes primitive obsession (you can't pass an Email where a UserName is expected), documents domain language in signatures, and gives a natural home for behaviour such as Money.plus rejecting mixed currencies."
@@ -162,6 +176,15 @@ lessons:
           - { id: d, text: "One service per developer" }
         answer: a
         explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is cheaper than merging prematurely split services."
+
+      - type: match
+        prompt: Match each context-mapping pattern to what it means.
+        pairs:
+          - { left: "Anti-Corruption Layer", right: "Translates a foreign model so it doesn't leak into yours" }
+          - { left: "Shared Kernel", right: "A small model that two teams own and change together" }
+          - { left: "Conformist", right: "Adopts the upstream team's model as it is" }
+          - { left: "Open Host Service", right: "A published protocol many consumers can integrate with" }
+        explanation: "They differ in how much you control: ACL protects your model at the cost of a translation layer; Conformist accepts the upstream's model when you have no leverage; Shared Kernel needs close coordination; Open Host Service scales to many consumers."
 
       - type: open
         prompt: "Your team proposes one microservice per database table. What do you say, and what do you propose instead?"

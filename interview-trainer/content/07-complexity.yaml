@@ -140,6 +140,13 @@ lessons:
           - "}"
         explanation: "Look up the complement before inserting the current element, so an element is never paired with itself. One pass with expected O(1) map operations gives O(n) time and O(n) space, versus O(n²) for checking every pair."
 
+      - type: estimate
+        prompt: "Sorting n = 1,000,000 elements takes about n x log2(n) comparisons. Roughly how many million comparisons is that?"
+        answer: 20
+        tolerance: 0.1
+        unit: million
+        explanation: "log2(1,000,000) is about 19.9, so n log n is about 19.9 million. Compare that with the 500,000 million (5 x 10^11) comparisons an O(n²) approach would need: that is the whole point of an n log n sort."
+
       - type: open
         format: code
         prompt: "Write `fun <T> List<T>.firstDuplicate(): T?` that returns the first element that has already appeared earlier in the list, or null. Aim for O(n)."
@@ -229,6 +236,19 @@ lessons:
         bank: ["eachCount", "sortedWith", "sortedBy", "count", "groupBy", "maxOf"]
         answers: ["eachCount", "sortedWith"]
         explanation: "`groupingBy{}.eachCount()` builds Map<String, Int> in one O(n) pass. `sortedWith(comparator)` then sorts the entries in O(k log k) for k distinct words (`sortedBy` takes a selector, not a comparator). For a very large k and small top-N, a bounded min-heap does it in O(k log N)."
+
+      - type: spot
+        prompt: This function runs in O(n²). Tap the line that makes it quadratic.
+        source: |
+          fun dedupe(xs: List<String>): List<String> {
+              val out = mutableListOf<String>()
+              for (x in xs) {
+                  if (x !in out) out.add(x)
+              }
+              return out
+          }
+        answers: [4]
+        explanation: "`x !in out` scans the list on every iteration: O(n) inside an O(n) loop. Track what you've seen in a HashSet (or use `xs.distinct()`, which does exactly that) to make it O(n)."
 
       - type: open
         prompt: When would you choose HashMap, LinkedHashMap or TreeMap?

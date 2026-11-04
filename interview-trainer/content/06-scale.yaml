@@ -7,15 +7,12 @@ lessons:
   - id: scale-load
     title: Load & latency
     questions:
-      - type: single
-        prompt: "By Little's Law (L = λ × W), a service handles 200 requests/second with an average latency of 0.25 s. How many requests are in flight on average?"
-        options:
-          - { id: a, text: "50" }
-          - { id: b, text: "200" }
-          - { id: c, text: "800" }
-          - { id: d, text: "5" }
-        answer: a
-        explanation: "L = 200 × 0.25 = 50. This is how you size thread/connection pools: if each in-flight request holds a DB connection for its full duration, you need about 50 connections at that load (more for headroom)."
+      - type: estimate
+        prompt: "By Little's Law (L = λ x W), a service handles 200 requests/second with an average latency of 0.25 s. How many requests are in flight on average?"
+        answer: 50
+        tolerance: 0
+        unit: requests
+        explanation: "L = 200 x 0.25 = 50. This is how you size thread/connection pools: if each in-flight request holds a DB connection for its full duration, you need about 50 connections at that load (more for headroom)."
 
       - type: single
         prompt: "Latency climbs sharply under load, yet CPU on both the app and the database is nearly idle. The app has 200 request threads and a HikariCP pool of 10. What is the most likely cause?"
@@ -67,6 +64,13 @@ lessons:
           - { id: d, text: "The JVM shares sessions across processes automatically" }
         answer: a
         explanation: "Stateless services scale horizontally. Put session/state in Redis, a database, or a signed token (e.g. JWT) so that any instance can serve any request."
+
+      - type: estimate
+        prompt: "A page makes 20 independent backend calls, and each call is slow 1% of the time. What percentage of page loads hit at least one slow call? (A rough figure is fine.)"
+        answer: 18.2
+        tolerance: 0.05
+        unit: "%"
+        explanation: "The chance that all 20 are fast is 0.99^20 = 0.818, so at least one is slow with probability 1 - 0.818 = 18.2%. A 1% tail per call becomes an almost-1-in-5 experience for users: tail latency amplifies with fan-out."
 
       - type: open
         prompt: "A downstream microservice suddenly gets 10x its normal traffic during a flash sale. Describe your plan to keep the system up."
@@ -158,6 +162,35 @@ lessons:
           - "    return block()"
           - "}"
         explanation: "The wait happens after a failed attempt and before doubling. The final attempt is outside the loop so its exception propagates to the caller. In production add jitter and a cap on `delayMs`, and don't swallow CancellationException."
+
+      - type: spot
+        prompt: A timeout here can charge the customer twice. Tap the line responsible.
+        source: |
+          fun charge(req: ChargeRequest): Receipt {
+              repeat(3) {
+                  try { return client.charge(req) } catch (e: IOException) { }
+              }
+              throw PaymentFailed()
+          }
+        answers: [3]
+        explanation: "A timeout doesn't tell you the charge failed, only that you didn't hear back. Retrying a non-idempotent write immediately, with no idempotency key and no backoff, can apply it again. Send the same key on every attempt and back off between them."
+
+      - type: estimate
+        prompt: "Three layers of a call chain each retry a failed call up to 3 attempts. In the worst case, how many attempts reach the bottom service for ONE user request?"
+        answer: 27
+        tolerance: 0
+        unit: attempts
+        explanation: "Retries multiply across layers: 3 x 3 x 3 = 27. Retry at one layer only, with a retry budget, so a struggling dependency isn't hit by a retry storm."
+
+      - type: match
+        prompt: Match each pattern to the problem it solves.
+        pairs:
+          - { left: "Circuit breaker", right: "Fails fast while a dependency is unhealthy" }
+          - { left: "Bulkhead", right: "Separate pools so one slow dependency can't starve the rest" }
+          - { left: "Idempotency key", right: "Makes a retried write safe to repeat" }
+          - { left: "Transactional outbox", right: "Commits a DB change and its event atomically" }
+          - { left: "Backpressure", right: "Tells a fast producer to slow down for a slow consumer" }
+        explanation: "Each pattern guards one failure mode, and they compose: timeouts and bulkheads limit the blast radius, breakers stop hammering a sick dependency, idempotency keys make retries safe, the outbox keeps data and events consistent."
 
       - type: open
         prompt: Explain the transactional outbox pattern. What problem does it solve and how does it work?

@@ -55,6 +55,35 @@ export const OrderQuestion = z.object({
   lines: z.array(z.string()).min(3).max(10),
 });
 
+/** Find the bug: tap the line(s) of a short snippet that cause the problem. */
+export const SpotQuestion = z.object({
+  type: z.literal('spot'),
+  ...common,
+  lang: z.string().default('kotlin'),
+  /** The snippet, one line per row. Lines are numbered from 1. */
+  source: z.string().min(1),
+  /** 1-based numbers of the offending line(s); the learner must select exactly these. */
+  answers: z.array(z.number().int().positive()).min(1).max(4),
+});
+
+/** Back-of-the-envelope numbers: the learner types a number, accepted within a relative tolerance. */
+export const EstimateQuestion = z.object({
+  type: z.literal('estimate'),
+  ...common,
+  answer: z.number().finite(),
+  /** Relative tolerance as a fraction (0.05 = within 5%). Use 0 for an exact answer. */
+  tolerance: z.number().min(0).max(0.5).default(0.05),
+  /** Shown next to the input (e.g. "requests", "%", "MiB"). */
+  unit: z.string().optional(),
+});
+
+/** Connect each item on the left to its description on the right. */
+export const MatchQuestion = z.object({
+  type: z.literal('match'),
+  ...common,
+  pairs: z.array(z.object({ left: z.string().min(1), right: z.string().min(1) })).min(3).max(6),
+});
+
 /** Free-text (or free-code) answer graded by AI against a rubric of key points. */
 export const OpenQuestion = z.object({
   type: z.literal('open'),
@@ -79,6 +108,9 @@ const RawQuestion = z.discriminatedUnion('type', [
   MultiQuestion,
   FillQuestion,
   OrderQuestion,
+  SpotQuestion,
+  EstimateQuestion,
+  MatchQuestion,
   OpenQuestion,
 ]);
 
@@ -111,12 +143,18 @@ export type SingleQ = Extract<Question, { type: 'single' }>;
 export type MultiQ = Extract<Question, { type: 'multi' }>;
 export type FillQ = Extract<Question, { type: 'fill' }>;
 export type OrderQ = Extract<Question, { type: 'order' }>;
+export type SpotQ = Extract<Question, { type: 'spot' }>;
+export type EstimateQ = Extract<Question, { type: 'estimate' }>;
+export type MatchQ = Extract<Question, { type: 'match' }>;
 export type OpenQ = Extract<Question, { type: 'open' }>;
 export type Lesson = z.output<typeof Lesson>;
 export type Unit = z.output<typeof Unit>;
 export type Course = z.output<typeof Course>;
 
 export const BLANK = /\[\[(\d+)\]\]/g;
+
+/** The rows of a `spot` snippet (trailing newlines dropped). */
+export const spotLines = (source: string): string[] => source.replace(/\n+$/, '').split('\n');
 
 /** Number of blanks in a fill template, as the highest blank index. */
 export function blankIndexes(template: string): number[] {
@@ -170,6 +208,24 @@ export function validateCourse(course: Course): string[] {
           case 'order': {
             if (new Set(q.lines).size !== q.lines.length)
               problems.push(`${at}: lines must be unique including indentation (otherwise order is ambiguous)`);
+            break;
+          }
+          case 'spot': {
+            const lines = spotLines(q.source);
+            if (new Set(q.answers).size !== q.answers.length) problems.push(`${at}: duplicate answer lines`);
+            for (const n of q.answers) {
+              if (n > lines.length) problems.push(`${at}: answer line ${n} is past the end (${lines.length} lines)`);
+              else if (lines[n - 1]!.trim() === '') problems.push(`${at}: answer line ${n} is blank`);
+            }
+            if (lines.length < 3 || lines.length > 20) problems.push(`${at}: spot snippets need 3-20 lines`);
+            break;
+          }
+          case 'estimate':
+            if (q.answer === 0) problems.push(`${at}: estimate answer must be non-zero (tolerance is relative)`);
+            break;
+          case 'match': {
+            if (new Set(q.pairs.map((p) => p.left)).size !== q.pairs.length) problems.push(`${at}: duplicate left items`);
+            if (new Set(q.pairs.map((p) => p.right)).size !== q.pairs.length) problems.push(`${at}: duplicate right items (matches would be ambiguous)`);
             break;
           }
           case 'open':

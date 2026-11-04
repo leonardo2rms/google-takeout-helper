@@ -97,6 +97,15 @@ lessons:
         answers: ["GetMapping", "PathVariable", "RequestBody"]
         explanation: "`@PathVariable` binds `{id}` from the URL, `@RequestParam` binds query-string values, `@RequestBody` deserialises the JSON body (then `@Valid` triggers Bean Validation)."
 
+      - type: match
+        prompt: Match each annotation to what it does.
+        pairs:
+          - { left: "`@Repository`", right: "Marks a data-access bean and translates persistence exceptions" }
+          - { left: "`@Configuration`", right: "Declares `@Bean` methods; the class itself is proxied" }
+          - { left: "`@RestController`", right: "`@Controller` plus `@ResponseBody` on every handler" }
+          - { left: "`@ControllerAdvice`", right: "Shared exception handling across controllers" }
+        explanation: "`@Repository`'s exception translation turns vendor errors into Spring's `DataAccessException` hierarchy. `@Configuration` classes are CGLIB-proxied so calling one `@Bean` method from another returns the singleton instead of creating a second instance."
+
       - type: open
         prompt: How does Spring Boot auto-configuration work, and how would you find out why a bean wasn't created?
         modelAnswer: "@SpringBootApplication enables auto-configuration, which loads the candidate configuration classes listed in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. Each is guarded by conditions such as @ConditionalOnClass, @ConditionalOnProperty and @ConditionalOnMissingBean, so it only applies if the classpath and properties match and your own beans haven't already defined the same thing (user config backs off the default). To debug, start with --debug (or debug=true) to print the conditions evaluation report, or use the Actuator conditions endpoint."
@@ -181,6 +190,26 @@ lessons:
         bank: ["Cacheable", "CacheEvict", "CachePut", "Transactional", "Async"]
         answers: ["Cacheable", "CacheEvict"]
         explanation: "`@Cacheable` skips the method on a hit; `@CachePut` always runs and updates the cache; `@CacheEvict` removes entries. Remember the same proxy caveat as `@Transactional`: self-invocation bypasses caching."
+
+      - type: spot
+        prompt: This endpoint is fast with 10 orders and slow with 10,000. Tap the line that causes it.
+        source: |
+          @Transactional(readOnly = true)
+          fun report(): List<OrderRow> {
+              val orders = orderRepo.findAll()
+              return orders.map { o ->
+                  OrderRow(o.id, o.items.size, customerRepo.findById(o.customerId).get().name)
+              }
+          }
+        answers: [5]
+        explanation: "Per order, this line lazy-loads `items` and runs a customer lookup: two extra queries per row (N+1). Fetch what you need up front (join fetch / entity graph), load the customers with one `findAllById`, or use a DTO projection."
+
+      - type: estimate
+        prompt: "100 orders each have a lazy `items` collection, and `hibernate.default_batch_fetch_size` is 10. You touch `items` of every order. How many SQL queries run in total, including the one that loads the orders?"
+        answer: 11
+        tolerance: 0
+        unit: queries
+        explanation: "One query loads the orders, then Hibernate initialises the collections in batches of 10 using `IN (...)`: 100 / 10 = 10 more. 1 + 10 = 11, instead of 101 without batching."
 
       - type: open
         prompt: An endpoint got slow under load and the database CPU is high. Walk through how you'd diagnose and fix it at the Spring/JPA level.

@@ -9,7 +9,10 @@ import { Feedback } from '../components/Feedback';
 import { Inline } from '../components/Inline';
 import { FillQuestion } from '../components/FillQuestion';
 import { OpenQuestion } from '../components/OpenQuestion';
+import { EstimateQuestion } from '../components/EstimateQuestion';
+import { MatchQuestion } from '../components/MatchQuestion';
 import { OrderQuestion } from '../components/OrderQuestion';
+import { SpotQuestion } from '../components/SpotQuestion';
 import { evaluate, isPass, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 
 interface Props {
@@ -29,6 +32,9 @@ const LABEL: Record<Question['type'], string> = {
   multi: 'Select all that apply',
   fill: 'Complete the code',
   order: 'Put the code in order',
+  spot: 'Find the bug',
+  estimate: 'Estimate the number',
+  match: 'Match the pairs',
   open: 'Answer in your own words',
 };
 
@@ -84,7 +90,8 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
       if (e.key !== 'Enter' || e.repeat) return;
       const inText = e.target instanceof HTMLTextAreaElement;
       if (inText && !(e.ctrlKey || e.metaKey)) return;
-      if (e.target instanceof HTMLButtonElement || e.target instanceof HTMLInputElement) return; // keep native activation
+      if (e.target instanceof HTMLButtonElement) return; // keep native activation
+      if (e.target instanceof HTMLInputElement && e.target.type === 'checkbox') return;
       e.preventDefault();
       if (phase === 'answer') void check();
       else if (phase === 'feedback') next();
@@ -125,6 +132,9 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
           {(q.type === 'single' || q.type === 'multi') && <ChoiceQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
           {q.type === 'fill' && <FillQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
           {q.type === 'order' && <OrderQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
+          {q.type === 'spot' && <SpotQuestion q={q} checked={checked} onAnswer={setAnswer} />}
+          {q.type === 'estimate' && <EstimateQuestion q={q} checked={checked} onAnswer={setAnswer} />}
+          {q.type === 'match' && <MatchQuestion q={q} seed={seed} checked={checked} onAnswer={setAnswer} />}
           {q.type === 'open' && <OpenQuestion q={q} checked={checked} aiAvailable={aiAvailable} onAnswer={setAnswer} />}
         </div>
 

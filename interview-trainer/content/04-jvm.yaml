@@ -76,6 +76,22 @@ lessons:
         answer: a
         explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
 
+      - type: estimate
+        prompt: "A container is limited to 2 GiB (2,048 MiB) and the JVM starts with `-XX:MaxRAMPercentage=75`. What is the maximum heap size, in MiB?"
+        answer: 1536
+        tolerance: 0
+        unit: MiB
+        explanation: "2,048 x 0.75 = 1,536 MiB. The remaining 512 MiB is headroom for metaspace, thread stacks, direct buffers and the code cache; setting the heap to the whole limit is how containers get OOMKilled."
+
+      - type: match
+        prompt: Match each garbage collector to its character.
+        pairs:
+          - { left: "SerialGC", right: "Single-threaded; for tiny heaps and small containers" }
+          - { left: "ParallelGC", right: "Multi-threaded stop-the-world; favours throughput" }
+          - { left: "G1", right: "Region-based default; aims for a pause-time goal" }
+          - { left: "ZGC", right: "Mostly concurrent; pauses stay short as the heap grows" }
+        explanation: "Pick by what you optimise: throughput (Parallel), a balanced default (G1), or consistently low pauses on big heaps (ZGC). Serial is mainly for very small or single-core environments."
+
       - type: open
         prompt: A Spring service's heap usage grows over hours and GC pauses get longer. How do you investigate?
         modelAnswer: "First confirm and characterise the problem with GC logs (-Xlog:gc*) and metrics: does old-gen usage keep rising after full collections, which suggests a leak rather than just load? Then capture a class histogram or a heap dump (jcmd <pid> GC.class_histogram / GC.heap_dump) and open it in Eclipse MAT or VisualVM: look at the dominator tree and the paths to GC roots of the biggest retained sets. Typical culprits are static collections, unbounded caches, listeners and ThreadLocals. Fix the retention, and verify with a soak test and the same metrics."
@@ -156,6 +172,22 @@ lessons:
           - { id: d, text: "The class is deprecated" }
         answer: a
         explanation: "`ClassNotFoundException` is thrown by explicit reflective loading (`Class.forName`); `NoClassDefFoundError` is a linkage error when the JVM can't find or initialise a class it needs. Typical causes: `provided`/`compileOnly` dependency, version conflicts, or an `ExceptionInInitializerError` first."
+
+      - type: spot
+        prompt: Two threads call `get()` at the same time and `init()` runs twice. Tap the two lines that form the race.
+        source: |
+          class Lazy<T : Any>(private val init: () -> T) {
+              private var value: T? = null
+
+              fun get(): T {
+                  if (value == null) {
+                      value = init()
+                  }
+                  return value!!
+              }
+          }
+        answers: [5, 6]
+        explanation: "Check-then-act without synchronisation: both threads can see `null` on line 5 before either assigns on line 6. There is also no happens-before edge, so a thread may see a stale or half-published value. Use `by lazy` (thread-safe by default), `synchronized`, or a holder/`@Volatile` double-checked pattern."
 
       - type: open
         prompt: "Explain \"happens-before\" in the Java Memory Model and give two ways to safely publish an object to another thread."

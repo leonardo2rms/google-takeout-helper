@@ -11,8 +11,8 @@ comfortable on a phone.
 
 | | |
 |---|---|
-| **116 questions / 8 units / 16 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & resilience · Algorithms & complexity · AI-assisted engineering |
-| **Question types** | `single`, `multi`, `open` (AI-graded), `fill` (tap tokens into blanks), `order` (tap lines into order) |
+| **134 questions / 8 units / 16 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & resilience · Algorithms & complexity · AI-assisted engineering |
+| **Question types** | `single`, `multi`, `fill` (tap tokens into blanks), `order` (tap lines into order), `spot` (tap the buggy line), `estimate` (type a number, tolerance-graded), `match` (connect pairs), `open` (AI-graded) |
 | **Lesson mechanics** | Check → feedback with explanation → continue. Misses return at the end of the lesson (max 2 retries). Perfect-lesson bonus. |
 | **Progress** | XP, day streak, stars per lesson, "Review mistakes" queue, "Mixed practice". Stored in `localStorage`. |
 | **Offline** | PWA: the whole course ships in the JS bundle and an app-shell service worker caches it. Works with no network. |
@@ -34,6 +34,7 @@ To open it on your phone, `npm run dev` binds to the network (`vite --host`): us
 npm test                # unit tests: grading, sessions, streaks, API, prompt building, all content
 npm run typecheck
 npm run content:check   # validates every YAML file and prints counts
+npm run e2e             # Playwright: plays every question type (and every lesson) through the real UI
 ```
 
 ### AI grading (optional)
@@ -67,6 +68,19 @@ Everything (course, logic, styles) is inlined, with no service worker and no API
 a `sample` capability (a claude.ai artifact does) grade open questions through the viewer's own Claude account;
 anywhere else it falls back to self-assessment. Handy for trying the app from a phone with nothing installed.
 
+## End-to-end tests
+
+```bash
+npm run e2e        # builds the app, serves it with AI grading off, drives it in headless Chromium at phone size
+```
+
+`e2e/question-types.spec.ts` plays **every question type through the real UI** (reading the correct answers from the
+YAML, so it stays in sync with the content), and asserts the feedback, the XP awarded and that the page never
+scrolls sideways on a phone. It also checks that wrong answers are marked and come back, and that **every lesson in
+the course can be completed perfectly**. Screenshots of the passing runs are written to `e2e/screenshots/`
+(`<type>-1-answered.png`, `<type>-2-correct.png`, `<type>-3-wrong.png`) and are committed on purpose, as a visual record.
+First time on a machine: `npx playwright install chromium`.
+
 ## Layout
 
 ```
@@ -75,6 +89,7 @@ interview-trainer/
   shared/           schema (zod), grading, lesson-session engine, streak/progress logic. Pure TS, fully tested
   server/           Express API: /api/health, /api/grade (+ serves web/dist in production)
   web/              React + Vite PWA
+  e2e/              Playwright tests + screenshots
   scripts/          content:check, build-standalone
 ```
 
@@ -109,6 +124,32 @@ validate the structure and cross-field rules (answers exist, blanks match, rubri
 - type: order
   prompt: "Arrange the function"
   lines: ["fun f(): Int {", "    val x = 1", "    return x", "}"]
+  explanation: "..."
+
+# find the bug: tap the offending line(s) (1-based; the learner must pick exactly these)
+- type: spot
+  prompt: "Tap the line that causes the N+1 queries."
+  source: |
+    val orders = repo.findAll()
+    orders.forEach { println(it.items.size) }
+  answers: [2]
+  explanation: "..."
+
+# estimate: a number, accepted within a relative tolerance (0 = exact; default 0.05)
+- type: estimate
+  prompt: "200 req/s at 0.25 s average latency: how many requests are in flight?"
+  answer: 50
+  tolerance: 0
+  unit: requests            # optional, shown next to the input
+  explanation: "..."
+
+# match: connect each left item to its right item (3-6 pairs, all texts unique)
+- type: match
+  prompt: "Match each pattern to the problem it solves."
+  pairs:
+    - { left: "Bulkhead", right: "Separate pools so one slow dependency can't starve the rest" }
+    - { left: "Circuit breaker", right: "Fails fast while a dependency is unhealthy" }
+    - { left: "Idempotency key", right: "Makes a retried write safe to repeat" }
   explanation: "..."
 
 # open: AI-graded against the rubric (format: code gives a monospace box)

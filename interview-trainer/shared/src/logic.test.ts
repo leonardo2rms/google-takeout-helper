@@ -3,6 +3,7 @@ import {
   createSession, currentQuestion, emptyProgress, gradeFill, gradeMulti, gradeOrder, gradeSingle,
   heuristicCoverage, isFinished, liveStreak, MAX_RETRIES, nextStreak, recordResult, scoreFromCoverage,
   shuffleDifferent, submit, summarize, verdictFor, validateCourse, Course, blankIndexes,
+  gradeSpot, gradeEstimate, gradeMatch, parseNumber, spotLines,
   type OpenQ, type Question,
 } from './index';
 
@@ -110,5 +111,76 @@ describe('course validation', () => {
   it('requires a distractor in fill banks', () => {
     const fill = course({ ...base, type: 'fill', template: '[[1]] [[2]]', bank: ['x', 'y'], answers: ['x', 'y'] });
     expect(validateCourse(fill).join()).toMatch(/distractors/);
+  });
+});
+
+describe('spot the bug', () => {
+  const q = { answers: [4, 5] } as never;
+  it('needs exactly the offending lines, in any order', () => {
+    expect(gradeSpot(q, [5, 4])).toBe(true);
+    expect(gradeSpot(q, [4])).toBe(false);
+    expect(gradeSpot(q, [4, 5, 6])).toBe(false);
+    expect(gradeSpot(q, [])).toBe(false);
+  });
+  it('splits snippets into numbered rows, ignoring trailing newlines', () => {
+    expect(spotLines('a\n  b\nc\n\n')).toEqual(['a', '  b', 'c']);
+  });
+});
+
+describe('estimate', () => {
+  const q = (answer: number, tolerance = 0.05) => ({ answer, tolerance }) as never;
+  it('parses what people actually type', () => {
+    expect(parseNumber('50')).toBe(50);
+    expect(parseNumber(' 1,234.5 ')).toBe(1234.5);
+    expect(parseNumber('1,234')).toBe(1234);
+    expect(parseNumber('1 234')).toBe(1234);
+    expect(parseNumber('18,2')).toBe(18.2);
+    expect(parseNumber('18.2%')).toBe(18.2);
+    expect(parseNumber('5k')).toBe(5000);
+    expect(parseNumber('-3.5')).toBe(-3.5);
+    for (const bad of ['', 'abc', '1.2.3', '12 apples', '--1', '1e3x']) expect(parseNumber(bad), bad).toBeNull();
+  });
+  it('accepts values within the relative tolerance and rejects the rest', () => {
+    expect(gradeEstimate(q(50), 50)).toBe(true);
+    expect(gradeEstimate(q(50), 52.5)).toBe(true); // +5%
+    expect(gradeEstimate(q(50), 52.6)).toBe(false);
+    expect(gradeEstimate(q(50), 47.5)).toBe(true); // -5%
+    expect(gradeEstimate(q(50), null)).toBe(false);
+  });
+  it('tolerance 0 means exact', () => {
+    expect(gradeEstimate(q(27, 0), 27)).toBe(true);
+    expect(gradeEstimate(q(27, 0), 27.1)).toBe(false);
+  });
+});
+
+describe('match pairs', () => {
+  const q = { pairs: [{ left: 'a', right: 'A' }, { left: 'b', right: 'B' }, { left: 'c', right: 'C' }] } as never;
+  it('requires every left item connected to its own right item', () => {
+    expect(gradeMatch(q, ['A', 'B', 'C'])).toBe(true);
+    expect(gradeMatch(q, ['B', 'A', 'C'])).toBe(false);
+    expect(gradeMatch(q, ['A', 'B', null])).toBe(false);
+  });
+});
+
+describe('validation of the new question types', () => {
+  const wrap = (q: object) =>
+    Course.parse({ units: [{ id: 'u', title: 'U', emoji: 'x', description: 'd', lessons: [{ id: 'l', title: 'L', questions: [q, q, q] }] }] });
+  const base = { prompt: 'p', explanation: 'e' };
+
+  it('flags spot answers that are out of range or on blank lines', () => {
+    expect(validateCourse(wrap({ ...base, type: 'spot', source: 'a\nb\nc', answers: [2] }))).toEqual([]);
+    expect(validateCourse(wrap({ ...base, type: 'spot', source: 'a\nb\nc', answers: [9] })).join()).toMatch(/past the end/);
+    expect(validateCourse(wrap({ ...base, type: 'spot', source: 'a\n\nc', answers: [2] })).join()).toMatch(/blank/);
+    expect(validateCourse(wrap({ ...base, type: 'spot', source: 'a\nb', answers: [1] })).join()).toMatch(/3-20 lines/);
+  });
+  it('flags a zero estimate and defaults tolerance to 5%', () => {
+    expect(validateCourse(wrap({ ...base, type: 'estimate', answer: 0 })).join()).toMatch(/non-zero/);
+    const c = wrap({ ...base, type: 'estimate', answer: 10 });
+    expect((c.units[0]!.lessons[0]!.questions[0] as { tolerance: number }).tolerance).toBe(0.05);
+  });
+  it('flags duplicate match items', () => {
+    const pairs = (r2: string) => [{ left: 'a', right: 'x' }, { left: 'b', right: r2 }, { left: 'c', right: 'z' }];
+    expect(validateCourse(wrap({ ...base, type: 'match', pairs: pairs('y') }))).toEqual([]);
+    expect(validateCourse(wrap({ ...base, type: 'match', pairs: pairs('x') })).join()).toMatch(/duplicate right/);
   });
 });

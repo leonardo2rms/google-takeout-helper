@@ -90,6 +90,27 @@ lessons:
         answers: ["coroutineScope", "async", "async", "await"]
         explanation: "`coroutineScope` makes the two `async` calls children of the current coroutine (failure cancels both) and returns when both are done. Total latency becomes max(user, orders) instead of the sum. `runBlocking` would block the calling thread."
 
+      - type: spot
+        prompt: This coroutine blocks its thread and defeats the concurrency. Tap the offending line.
+        source: |
+          suspend fun refresh(): Pair<List<User>, List<Order>> = coroutineScope {
+              val users = async { api.users() }
+              val orders = async { api.orders() }
+              Thread.sleep(500)
+              users.await() to orders.await()
+          }
+        answers: [4]
+        explanation: "`Thread.sleep` blocks the thread the coroutine runs on, so every other coroutine on that dispatcher thread stalls too. `delay(500)` suspends instead and frees the thread. The same applies to blocking JDBC or file calls: move them to `withContext(Dispatchers.IO)`."
+
+      - type: match
+        prompt: Match each dispatcher to its job.
+        pairs:
+          - { left: "`Dispatchers.Default`", right: "CPU-bound work, sized to the core count" }
+          - { left: "`Dispatchers.IO`", right: "Blocking calls such as JDBC or file I/O" }
+          - { left: "`Dispatchers.Main`", right: "The UI thread in Android and desktop apps" }
+          - { left: "`Dispatchers.Unconfined`", right: "Starts in the caller's thread; rarely what you want" }
+        explanation: "Default and IO share one thread pool but have separate limits, so blocking on IO doesn't starve CPU work. Unconfined is mostly for tests and special cases because the resumption thread is unpredictable."
+
       - type: open
         prompt: Why is `GlobalScope.launch` discouraged, and what would you use inside a Spring service instead?
         modelAnswer: "GlobalScope coroutines are not tied to any lifecycle: they can't be cancelled with the component, they leak if they hang, and their exceptions don't propagate to a caller. Prefer suspend functions with `coroutineScope`/`supervisorScope` so work is bound to the caller, or, for background work owned by a bean, a dedicated CoroutineScope (SupervisorJob + an injected dispatcher) that is cancelled in @PreDestroy. Injecting the dispatcher also makes the code testable."

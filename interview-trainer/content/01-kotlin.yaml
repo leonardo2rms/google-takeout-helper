@@ -170,6 +170,15 @@ lessons:
         answer: a
         explanation: "Value classes are erased to the underlying type where possible, avoiding allocation. They are boxed when used as a nullable, a generic type argument or through an interface, so it's not free everywhere."
 
+      - type: match
+        prompt: Match each scope function to what it does.
+        pairs:
+          - { left: "`apply`", right: "Receiver is `this`; returns the receiver" }
+          - { left: "`also`", right: "Receiver is `it`; returns the receiver" }
+          - { left: "`let`", right: "Receiver is `it`; returns the lambda result" }
+          - { left: "`run`", right: "Receiver is `this`; returns the lambda result" }
+        explanation: "Two questions sort them: is the object `this` or `it`, and do you get the object back or the lambda's result? `apply`/`also` return the object (builders, side effects like logging); `let`/`run` return the result (transformations, null-checks with `?.let`)."
+
       - type: open
         prompt: How are Kotlin extension functions resolved, and what's one pitfall of that?
         modelAnswer: "Extension functions are resolved statically, at compile time, based on the declared type of the receiver expression, not its runtime type. They compile to static methods taking the receiver as the first parameter, so they can't access private members and they aren't overridden polymorphically. If a class has a member with the same signature, the member always wins. A typical pitfall is expecting `animal.speak()` to dispatch on the runtime subclass when `speak` is an extension."

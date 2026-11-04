@@ -7,19 +7,15 @@ lessons:
   - id: ai-coding
     title: Working with AI assistants
     questions:
-      - type: single
-        prompt: "An assistant proposes building a SQL query by concatenating a request parameter into the string. What do you do?"
-        code:
-          source: |
-            val sql = "SELECT * FROM users WHERE email = '" + email + "'"
-            jdbc.query(sql, mapper)
-        options:
-          - { id: a, text: "Reject it and use a parameterised query: AI output gets the same review as any other contributor's code" }
-          - { id: b, text: "Accept it; the assistant is usually right" }
-          - { id: c, text: "Accept it but add a comment" }
-          - { id: d, text: "Ask the assistant to make it 'more secure' and merge without reading" }
-        answer: a
-        explanation: "Assistants reproduce common patterns, including insecure ones. You remain accountable for what you merge: review for injection, authz, error handling and secrets, whoever (or whatever) wrote it."
+      - type: spot
+        prompt: An assistant generated this lookup. Tap the line you would reject in review.
+        source: |
+          fun findUser(email: String): User? {
+              val sql = "SELECT * FROM users WHERE email = '$email'"
+              return jdbc.query(sql, mapper).firstOrNull()
+          }
+        answers: [2]
+        explanation: "String-building a query from a parameter is SQL injection. Assistants reproduce common patterns, including insecure ones, and you stay accountable for what you merge: use a parameterised query (`WHERE email = ?`) and review AI output like any other contributor's code."
 
       - type: multi
         prompt: Select ALL habits that improve the quality of AI-assisted coding.
@@ -158,6 +154,16 @@ lessons:
           - { id: d, text: "Only test manually" }
         answer: a
         explanation: "Separate deterministic plumbing (parsing, retries, routing: unit-testable) from model quality (statistical: evals). Keep a few live integration checks outside the main CI gate."
+
+      - type: match
+        prompt: Match each term to its meaning.
+        pairs:
+          - { left: "RAG", right: "Ground answers in documents retrieved at question time" }
+          - { left: "Embeddings", right: "Vectors where similar meaning means a small distance" }
+          - { left: "Prompt caching", right: "Reuse a stable prompt prefix at lower cost and latency" }
+          - { left: "Eval set", right: "Representative cases used to compare prompt changes" }
+          - { left: "Prompt injection", right: "Untrusted text trying to act as instructions" }
+        explanation: "These fit together in a real feature: retrieval (embeddings + RAG) supplies the facts, caching keeps the long stable prefix cheap, an eval set tells you whether a change helped, and injection defences treat retrieved text as data, never as instructions."
 
       - type: open
         prompt: Design the guardrails for a customer-support chatbot that can issue refunds through a tool call.

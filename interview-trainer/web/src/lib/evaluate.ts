@@ -2,8 +2,11 @@ import {
   PASS_SCORE,
   gradeFill,
   gradeMulti,
+  gradeEstimate,
+  gradeMatch,
   gradeOrder,
   gradeSingle,
+  gradeSpot,
   heuristicCoverage,
   scoreFromCoverage,
   type GradeResponse,
@@ -16,6 +19,9 @@ export type Answer =
   | { type: 'multi'; selected: string[] }
   | { type: 'fill'; filled: (string | null)[] }
   | { type: 'order'; arranged: string[] }
+  | { type: 'spot'; selected: number[] }
+  | { type: 'estimate'; value: number }
+  | { type: 'match'; chosen: (string | null)[] }
   | { type: 'open'; text: string };
 
 export interface OpenOutcome {
@@ -60,6 +66,12 @@ export async function evaluate(q: Question, a: Answer, grade?: GradeFn): Promise
       return { correct: a.type === 'fill' && gradeFill(q, a.filled) };
     case 'order':
       return { correct: a.type === 'order' && gradeOrder(q, a.arranged) };
+    case 'spot':
+      return { correct: a.type === 'spot' && gradeSpot(q, a.selected) };
+    case 'estimate':
+      return { correct: a.type === 'estimate' && gradeEstimate(q, a.value) };
+    case 'match':
+      return { correct: a.type === 'match' && gradeMatch(q, a.chosen) };
     case 'open':
       return a.type === 'open' ? evaluateOpen(q, a.text, grade) : { correct: false };
   }
