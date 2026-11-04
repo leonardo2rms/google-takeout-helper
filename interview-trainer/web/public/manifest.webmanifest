@@ -1,0 +1,10 @@
+{
+  "name": "Interview Trainer",
+  "short_name": "Interview",
+  "description": "Duolingo-style interview practice for senior Kotlin, Spring, JVM and AI engineers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131f24",
+  "theme_color": "#58cc02",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
