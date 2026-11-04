@@ -1,0 +1,55 @@
+# Engagement: how the habit loop is built, and where we draw the line
+
+The loop: **a cue** (the Today card, a countdown the learner chose) -> **a five-minute action** (8 interleaved questions) ->
+**a benign reward** (the ring fills, the rank bar moves, a milestone is named once) -> **investment** (cards scheduled, topics
+mastered, days practised, all exportable) -> **the next cue** ("N ready to review").
+
+The engine is the due queue, not the confetti: spaced retrieval is the best-evidenced way to keep material from decaying
+before an interview. Gamification is the wrapper.
+
+## Where the code lives
+
+| Concern | File (`shared/src/`) | Notes |
+|---|---|---|
+| Data model, constants | `progress.ts` | `Progress` v2, `Card`, `DayLog`, limits |
+| Days | `day.ts` | UTC day numbers: DST, leap days and month ends are safe. Only `dayKey(Date)` touches the local timezone |
+| Scheduling | `srs.ts` | SM-2-lite, early reviews do not inflate, deadline cap, review queue, forecast |
+| Streak | `streak.ts` | `streakStatus` predicts, `advanceStreak` settles on the next practice (lazy, idempotent) |
+| Goal | `goal.ts` | targets are snapshotted per day, comeback day, 14-day bars |
+| Mastery | `mastery.ts` | unit strength, readiness, weak spots, weighted mixed practice |
+| Today | `daily.ts` | composition + `interleave` |
+| Plan | `plan.ts` | interview-date maths |
+| One write path | `events.ts` | `applySession(progress, result, {today, course})` returns the next progress **and** the events (rank-up, streak milestone, ...) |
+| Storage rules | `migrate.ts`, `storage.ts`, `backup.ts` | v1 -> v2, normalisation, load/save, export/import/merge |
+
+All of it is pure: `today` is always passed in, there is no `Date.now()` in `shared/`. The browser side is `web/src/lib/store.ts`
+(a single store shared by every component, synced across tabs).
+
+## Rules we hold ourselves to
+
+- No hearts, energy or anything that blocks practising. No paid, ad-gated or time-limited streak repair. No "streak in danger"
+  banners, countdown-to-midnight timers, sad mascots or red badge counters. Freezes are earned (every 7 days in a row) and capped at 2.
+- Rest days are the learner's choice and free. A lapse is "fresh start": the longest streak and the days practised overall never reset.
+- Copy is factual ("6 questions are ready to review"), never guilt. A long backlog is capped at "30+" and Today still asks for 8.
+- The only variable reward is additive, disclosed and switchable: about 1 session in 6 shows a "Worth remembering" tip with +5 XP,
+  decided by `fnv1a(date|sessions) % 6`, so a reload cannot re-roll it. It never gates anything.
+- Readiness means "how much of this course you would recall today", with coverage shown. It never claims a chance of passing.
+- No accounts, no analytics, no fake users or leaderboards. The learner owns the data: export and import it.
+- Celebrations are scaled (at most one big one per session, at most one burst per two minutes), respect `prefers-reduced-motion`
+  and have a switch. Onboarding is an inline card, never a modal, so deep links keep working.
+
+## Edge cases we decided on
+
+- **Midnight**: the day is taken when a session *finishes*. A session that crosses midnight counts for the new day.
+- **Clock moves backwards**: the streak holds, `lastDay` is re-anchored on the next practice, card intervals never go negative.
+- **Content edited**: question ids are positional, so a card stores a hash of the question; a mismatch drops the card.
+  `missed` entries for unknown ids are kept (harmless, and the migration stays lossless).
+- **Replaying a lesson**: counts towards the ring and practice (so it is never wasted) but cannot lengthen a card's interval.
+- **A week away**: the next day's goal is halved once. Cards that are very overdue lose strength gradually (retention is floored at 10%).
+- **Interview date**: past dates are ignored (with a "Set a new date?" prompt), today or tomorrow switches Today to due cards and weak spots, and card intervals are capped at half the time left.
+
+## Not built yet (specified)
+
+Achievements, confidence ratings, daily challenge, reminders (`.ics` first), weekly recap, mock interviews, teach-back, share card,
+transfer code/QR. The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
+defaults in `normalizeProgress`, so they need no migration.

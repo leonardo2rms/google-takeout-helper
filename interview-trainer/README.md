@@ -14,7 +14,9 @@ comfortable on a phone.
 | **146 questions / 8 units / 16 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & resilience · Algorithms & complexity · AI-assisted engineering |
 | **Question types** | `single`, `multi`, `fill` (tap tokens into blanks), `order` (tap lines into order), `spot` (tap the buggy line), `estimate` (type a number, tolerance-graded), `match` (connect pairs), `code` (write a function, run against tests), `open` (AI-graded, with interviewer follow-ups) |
 | **Lesson mechanics** | Check → feedback with explanation → continue. Misses return at the end of the lesson (max 2 retries). Perfect-lesson bonus. |
-| **Progress** | XP, day streak, stars per lesson, "Review mistakes" queue, "Mixed practice". Stored in `localStorage`. |
+| **Habit loop** | A **Today** card (8 interleaved questions: due reviews, weak spots, new material), a **daily goal ring**, a **forgiving streak** (earned freezes, chosen rest days), **ranks** (Associate to Fellow) and celebrations scaled to real milestones. See [Engagement](#engagement-and-progress). |
+| **Spaced repetition** | Every question you answer becomes a scheduled card (SM-2-lite). **Review due** shows what is ready, missed questions never get lost, and the schedule respects your interview date. |
+| **Progress** | Per-topic mastery and an honest **readiness** estimate, weak-spot targeting, XP, stars per lesson, an optional interview-date countdown and plan. Stored in `localStorage`; **export / import** a backup file. |
 | **Offline** | PWA: the whole course ships in the JS bundle and an app-shell service worker caches it. Works with no network. |
 
 ## Run it
@@ -61,18 +63,72 @@ How the grader is built (`server/src/grader.ts`):
 ### Single-file build (no server, no install)
 
 ```bash
-npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, ~400 kB)
+npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, ~570 kB)
 ```
 
 Everything (course, logic, styles) is inlined, with no service worker and no API server. Hosts that provide
 a `sample` capability (a claude.ai artifact does) grade open questions through the viewer's own Claude account;
 anywhere else it falls back to self-assessment. Handy for trying the app from a phone with nothing installed.
 
+## Engagement and progress
+
+Everything below is local to the device: no accounts, no tracking, nothing sent anywhere. Design notes and the ethics
+rules we hold ourselves to are in [`docs/engagement.md`](docs/engagement.md).
+
+**What you see on Home**
+
+- **Today**: one tap to a session of 8 questions, interleaved across topics: up to 5 due reviews, 2 weak spots, the rest new. A brand-new learner is simply invited to start the first lesson.
+- **Review due**: questions whose review date has come, plus anything you missed. Shown as "N ready to review" (capped at "30+").
+- **Daily goal ring** (default 8 questions, presets 8 / 16 / 24): tap for a 14-day chart. After a week away the next day's goal is halved once ("Easy restart").
+- **Streak chip**: practising any day keeps it alive. Every 7 days in a row earns a **freeze** (hold up to 2) that covers a missed day automatically; **rest days** you choose (up to 3 weekdays) are covered for free. A freeze is only spent when it covers the whole gap; otherwise you get a fresh start and keep the freeze. Longest streak and total days practised never reset.
+- **Rank** under the title (XP only goes up, so a rank is never lost), and **Progress**: readiness (an estimate of how much of this course you would recall today, with coverage shown, never a prediction of a result), a bar per topic and one tap to practise the weakest.
+- **Onboarding** is an inline card, not a modal: role, interview date, daily goal, usual practice time, all optional. Skipping is permanent and free. With an interview date you get a calm countdown and a plan line ("At 8/day you'll have seen everything with 6 days to spare"); the day before, practice switches to due cards and weak spots.
+- **Celebrations** only for real milestones (rank-up, streak 7/30/100, topic mastered, first goal met, perfect lesson), at most one per session, confetti never under `prefers-reduced-motion` and switchable in Settings. About 1 session in 6 shows a "Worth remembering" tip (+5 XP), decided by the date and your session count (so a reload never re-rolls it); the odds are printed in Settings and it can be turned off.
+
+**How scheduling works** (`shared/src/srs.ts`): a question answered right on the first try is scheduled 1 day out, then 3, then
+`interval x ease` (capped at 120 days); a miss, or an answer that only came right after seeing the feedback, comes back tomorrow with a lower ease.
+Reviewing early never lengthens the interval, so replaying a lesson ten times cannot game the schedule. With an interview date set,
+intervals are capped at half the time left, so every card gets at least two more looks before the day. Cards carry a hash of the
+question text: if a prompt in the YAML is rewritten, the old card is dropped instead of being attached to a different question.
+
+### Data model (`Progress` v2)
+
+Stored under `interview-trainer.progress.v2`:
+
+```text
+version: 2
+xp, streak, lastDay, lessons{id -> bestAccuracy, completions, lastDay}, missed[]     same meaning as v1
+longestStreak, freezes (0..2)
+cards{questionId -> h, ease, interval, due, reps, lapses, seen, firstTry, last}      spaced-repetition state
+days{YYYY-MM-DD -> xp, answered, firstTry, target}                                    per-day log, last 400 days
+goal{target}, profile{onboarded, role, interviewDate, restDays[], practiceTime}
+settings{haptics, sound, confetti, tips, confidence}, stats{sessions, answered, firstTry, perfect, practiceDays}
+milestones{key -> day}        dedupes celebrations ("rank:3", "streak:7", "unit:ddd:80", "goal:first", ...)
+```
+
+- **Upgrading from v1 is automatic and lossless.** The old `interview-trainer.progress.v1` value is read once, migrated and written under the v2 key; the v1 key is never touched, so rolling back to an older build still works. Existing streaks, XP and lessons carry over, cards are seeded for completed lessons (missed ones due now, the rest spread over the next week, so there is no avalanche), you get one welcome freeze, and ranks you already earned do not celebrate again. Running the migration on its own output changes nothing.
+- **Unreadable or newer data is never destroyed.** If the stored value is corrupt or was written by a newer version, the app starts empty but leaves the value alone; before its first save it copies it to `interview-trainer.progress.backup-YYYYMMDD`.
+- **Several tabs / the installed app at once** stay in sync via the `storage` event, and every write re-reads the latest state first so one tab cannot clobber another.
+- The app asks the browser for persistent storage (`navigator.storage.persist()`) after the first finished session, and on iPhone Safari (not installed) shows a one-time "Add to Home Screen" tip, because Safari may clear script-written storage of sites you have not installed after about a week of inactivity.
+
+### Export, import and moving to a new phone
+
+Settings -> **Your data**:
+
+- **Download backup** writes `interview-trainer-progress-YYYY-MM-DD.json` (a small envelope with the app name, format version, an export time, a checksum and the full progress). **Copy backup text** puts the same JSON on the clipboard; **Paste backup text instead** imports it again, for hosts where files are awkward (the single-file build in an iframe, for example).
+- **Import backup file** validates everything first (bad JSON, wrong app, damaged or edited file by checksum, a newer format, wrong field types are all rejected with a plain message and **nothing changes**). A good file shows what is inside and asks: **Merge** (keep the best of both: larger XP and counters, the streak from whichever side practised most recently, each card from the side that saw it last, union of mistakes and milestones; settings stay as they are on this device) or **Replace my progress**.
+- Older (v1) backups and a bare progress blob are accepted too. **Reset progress** asks for confirmation and suggests downloading a backup first.
+
 ## End-to-end tests
 
 ```bash
 npm run e2e        # builds the app, serves it with AI grading off, drives it in headless Chromium at phone size
 ```
+
+`e2e/engagement.spec.ts` covers the habit loop: upgrading a real v1 profile, the goal ring, the review queue appearing after a miss and clearing the next
+day (the page clock is moved with `page.clock`), freezes and rest days, Daily Practice, onboarding, export/import (including garbage and tampered files),
+two tabs staying in sync, celebrations with and without reduced motion, the readiness page, and 390px layout / tap-target / keyboard checks. Storage is
+seeded with `localStorage` blobs so each test starts from an exact state.
 
 `e2e/question-types.spec.ts` plays **every question type through the real UI** (reading the correct answers from the
 YAML, so it stays in sync with the content), and asserts the feedback, the XP awarded and that the page never
@@ -90,6 +146,7 @@ interview-trainer/
   server/           Express API: /api/health, /api/grade (+ serves web/dist in production)
   web/              React + Vite PWA
   e2e/              Playwright tests + screenshots
+  docs/             design notes (engagement.md: the habit loop and its ethics rules)
   scripts/          content:check, build-standalone
 ```
 
@@ -233,6 +290,6 @@ generated, so it works offline and is deterministic; the AI only grades.
 
 - **Architecture board** (drag & connect components, validate against a reference topology): the question schema is a
   discriminated union (`shared/src/schema.ts`), so it is one new type plus one component. Deliberately left out for now.
-- Spaced repetition on the missed pile (currently random order).
-- Per-topic skill meter; timed "mock interview" mode; export/import progress.
+- Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, user-chosen reminders (a calendar `.ics` first), a weekly recap card.
+- Later: timed "mock interview" mode, teach-back prompts, a shareable progress card, a transfer code / QR for moving between devices.
 - Real code execution for coding challenges (sandboxed Kotlin runner) instead of AI grading.
