@@ -374,11 +374,11 @@ lessons:
           - when: covered
             point: 3
             prompt: "How could you run the enrichment 8 at a time but still emit the results in the original order?"
-            modelAnswer: "Start each call as a `Deferred` with `async`, inside a scope that outlives the pipeline, send the deferreds through `buffer(8)` so up to eight calls are running while the collector waits on the oldest, and `await()` them one by one in the next `map`. The awaiting is sequential, so the order is preserved, while the work itself overlaps. `flatMapMerge` would deliver faster but unordered."
+            modelAnswer: "Start each call as a `Deferred` with `async`, inside a scope that outlives the pipeline, send the deferreds through `buffer(8)` so roughly eight calls are running while the collector waits on the oldest, and `await()` them one by one in the next `map`. The awaiting is sequential, so the order is preserved, while the work itself overlaps. `flatMapMerge` would deliver faster but unordered."
             keyPoints:
               - point: "Start each call as a Deferred (async)"
                 keywords: ["async", "deferred"]
-              - point: "buffer(8) keeps up to eight in flight"
+              - point: "buffer(8) keeps roughly eight in flight"
                 keywords: ["buffer"]
               - point: "await them in order, so ordering is preserved"
                 keywords: ["await", "in order", "preserved"]
