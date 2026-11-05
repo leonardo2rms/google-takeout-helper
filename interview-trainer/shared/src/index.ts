@@ -4,6 +4,7 @@ export * from './session';
 export * from './progress';
 export * from './extras';
 export * from './calibration';
+export * from './library';
 export * from './api';
 export * from './grading-prompt';
 export * from './code-runner';

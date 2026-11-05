@@ -1,0 +1,82 @@
+import { useEffect, useState } from 'react';
+import { MAX_NOTE_CHARS, dayKey, isBookmarked, noteOf, setNote, toggleBookmark, type Question } from '@trainer/shared';
+import { useProgress } from '../lib/store';
+
+interface Props {
+  q: Question;
+  /** Start with the note editor open (the Library uses this). */
+  startEditing?: boolean;
+  /** Where this appears, for stable test ids. */
+  testIdPrefix?: string;
+}
+
+/** Star a question and attach a short private note. Used under the lesson feedback and in the Library. */
+export function QuestionTools({ q, startEditing = false, testIdPrefix = 'tools' }: Props) {
+  const { progress, update } = useProgress();
+  const starred = isBookmarked(progress, q);
+  const saved = noteOf(progress, q);
+  const [editing, setEditing] = useState(startEditing);
+  const [draft, setDraft] = useState(saved ?? '');
+
+  // Another tab (or an import) may change the note while it is closed.
+  useEffect(() => {
+    if (!editing) setDraft(saved ?? '');
+  }, [saved, editing]);
+
+  const commit = () => {
+    update((p) => setNote(p, q, draft, dayKey(new Date())));
+    setEditing(false);
+  };
+
+  return (
+    <div className="q-tools" data-testid={testIdPrefix} data-no-lesson-keys>
+      <div className="q-tools-row">
+        <button
+          type="button"
+          className={`btn small tool-btn ${starred ? 'on' : ''}`}
+          aria-pressed={starred}
+          data-testid={`${testIdPrefix}-star`}
+          onClick={() => update((p) => toggleBookmark(p, q, dayKey(new Date())))}
+        >
+          <span aria-hidden="true">{starred ? '★' : '☆'}</span> {starred ? 'Saved' : 'Save'}
+        </button>
+        <button
+          type="button"
+          className="btn small tool-btn"
+          aria-expanded={editing}
+          data-testid={`${testIdPrefix}-note-btn`}
+          onClick={() => (editing ? setEditing(false) : (setDraft(saved ?? ''), setEditing(true)))}
+        >
+          <span aria-hidden="true">📝</span> {saved ? 'Edit note' : 'Add note'}
+        </button>
+      </div>
+
+      {!editing && saved && (
+        <p className="q-note" data-testid={`${testIdPrefix}-note`}>
+          <b>Your note</b> {saved}
+        </p>
+      )}
+
+      {editing && (
+        <div className="q-note-editor">
+          <label htmlFor={`note-${q.id}`} className="sr-only">Your private note</label>
+          <textarea
+            id={`note-${q.id}`}
+            className="answer-box"
+            rows={3}
+            maxLength={MAX_NOTE_CHARS}
+            value={draft}
+            placeholder="A private note, only on this device."
+            autoFocus
+            onChange={(e) => setDraft(e.target.value)}
+          />
+          <div className="q-note-actions">
+            <span className="hint">{draft.length}/{MAX_NOTE_CHARS}</span>
+            <button type="button" className="btn small ghost" onClick={() => setEditing(false)}>Cancel</button>
+            <button type="button" className="btn small secondary" data-testid={`${testIdPrefix}-note-save`} onClick={commit}>Save note</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

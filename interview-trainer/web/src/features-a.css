@@ -18,3 +18,32 @@
 .calibration { margin-bottom: 14px; }
 .calib-rows { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .calib-rows li { display: flex; justify-content: space-between; gap: 12px; }
+
+/* ---------- question tools (star + note) and the Library ---------- */
+.q-tools { display: grid; gap: 8px; margin-top: 12px; }
+.q-tools-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn.tool-btn { min-height: 44px; padding: 0 14px; color: var(--text); }
+.btn.tool-btn.on { border-color: var(--amber-text); background: var(--amber-bg); color: var(--amber-text); }
+.q-note { margin: 0; padding: 8px 12px; border-radius: 12px; background: var(--surface); color: var(--text); overflow-wrap: anywhere; white-space: pre-wrap; }
+.q-note-editor { display: grid; gap: 8px; }
+.q-note-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.q-note-actions .hint { margin-right: auto; }
+.lib-input, .lib-select { width: 100%; min-height: 48px; padding: 8px 12px; font: inherit; color: var(--text); background: var(--surface); border: 2px solid var(--border); border-radius: 12px; }
+.lib-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lib-selects label { min-width: 0; }
+.lib-filters { display: grid; gap: 10px; margin: 10px 0; }
+.lib-toggles { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip.lib-chip { min-height: 44px; cursor: pointer; color: var(--text); font-weight: 700; }
+.chip.lib-chip.on { border-color: var(--blue); background: var(--blue-bg); color: var(--blue-dark); }
+.lib-count { color: var(--muted); margin: 6px 0; }
+.link.inline { padding: 8px 4px; min-height: 44px; }
+.lib-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 12px; }
+.lib-item { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius); display: grid; gap: 8px; min-width: 0; }
+.lib-prompt { margin: 0; font-weight: 700; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 13px; align-items: center; }
+.lib-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.lib-actions .btn { min-height: 44px; }
+.pill.status-due { background: var(--amber-bg); color: var(--amber-text); }
+.pill.status-mastered { background: var(--green-bg); color: var(--green-text); }
+.lib-empty { padding: 16px 0; }
+.lib-search { padding-top: 6px; }

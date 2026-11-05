@@ -10,6 +10,7 @@ import { EstimateQuestion } from '../components/EstimateQuestion';
 import { Feedback } from '../components/Feedback';
 import { ConfidenceRow } from '../components/ConfidenceRow';
 import { Hint } from '../components/Hint';
+import { QuestionTools } from '../components/QuestionTools';
 import { FillQuestion } from '../components/FillQuestion';
 import { Inline } from '../components/Inline';
 import { MatchQuestion } from '../components/MatchQuestion';
@@ -133,6 +134,7 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat) return;
+      if (e.target instanceof Element && e.target.closest('[data-no-lesson-keys]')) return; // the note editor keeps its own Enter
       const inText = e.target instanceof HTMLTextAreaElement;
       if (inText && !(e.ctrlKey || e.metaKey)) return;
       if (e.target instanceof HTMLButtonElement) return; // keep native activation
@@ -207,6 +209,7 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
               overall={overallScore === null ? undefined : { score: overallScore, pass: passed }}
               onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
             />
+            <QuestionTools q={q} />
             {sure !== null && !followUp && (passed ? sure === 1 : sure === 3) && (
               <p className="confidence-note" data-testid="confidence-note">
                 {passed ? 'Right, though you were unsure: this one will come back soon to make it stick.' : 'Worth a closer look: you were sure. A surprise like this is the best moment to learn it, so it comes back soon.'}

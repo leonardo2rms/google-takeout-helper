@@ -179,6 +179,14 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </span>
       </a>
 
+      <a className="card action library-link" href="#/library" data-testid="library-link">
+        <span className="emoji" aria-hidden="true">📚</span>
+        <span>
+          <b>Library</b>
+          <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
+        </span>
+      </a>
+
       <p className="overall">{done}/{total} lessons completed{nextLesson ? <> · up next: <a href={`#/lesson/${nextLesson.id}`}>{nextLesson.title}</a></> : ' 🎉'}</p>
 
       {course.units.map((unit) => {
