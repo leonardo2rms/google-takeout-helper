@@ -24,9 +24,9 @@ lessons:
         prompt: "A token bucket has capacity 10 and refills 5 tokens per second. A client has been idle for a minute. Which statement is true?"
         options:
           - { id: a, text: "It can send 10 requests at once, then roughly 5 per second: a burst plus a sustained rate" }
-          - { id: b, text: "It can never send more than 5 requests in any single second, since 5 is the refill rate" }
+          - { id: b, text: "It can send no more than 5 requests in a single second, since 5 is the refill rate" }
           - { id: c, text: "It must wait one full second between any two requests, because tokens arrive once per second" }
-          - { id: d, text: "It can send unlimited requests for a minute, because a full bucket never runs empty" }
+          - { id: d, text: "It can send unlimited requests for a minute, because a full bucket does not run empty" }
         answer: a
         explanation: "The bucket size bounds the burst and the refill rate bounds the long-run average. After a quiet period the bucket is full, so 10 requests pass immediately (even 15 within that first second, counting refill). Once it is empty, only about 5 per second get through."
 
@@ -93,9 +93,9 @@ lessons:
         prompt: "Requests to a service vary wildly in cost (some take 10 ms, some 10 s). With plain round robin, a few instances end up overloaded while others idle. Which balancing strategy adapts to this?"
         options:
           - { id: a, text: "Least outstanding requests: send the next request to the instance with the fewest in flight" }
-          - { id: b, text: "Strict round robin, but with more instances so each one gets a smaller share" }
-          - { id: c, text: "Hash the client IP so each client always lands on the same instance, which spreads load evenly" }
-          - { id: d, text: "Always send to the first healthy instance in the list, and fail over only when it is down" }
+          - { id: b, text: "Strict round robin, but with more instances so each one gets a smaller share of the traffic and the load evens out" }
+          - { id: c, text: "Hash the client IP so each client lands on the same instance, which spreads load evenly" }
+          - { id: d, text: "Send to the first healthy instance in the list, and fail over when it is down" }
         answer: a
         explanation: "Round robin assumes every request costs the same. Counting in-flight requests naturally steers new work away from instances stuck on slow ones. IP hashing gives stickiness, not balance, and can pile many clients behind one NAT onto one instance."
 
@@ -113,8 +113,8 @@ lessons:
             {"email":"alice@example.com","plan":"pro"}
         options:
           - { id: a, text: "`public` lets shared caches like the CDN serve Alice's data to other users; use `private` or `no-store`" }
-          - { id: b, text: "`max-age` is given in milliseconds, so the response expires after only 3.6 seconds and is useless" }
-          - { id: c, text: "CDNs cannot cache JSON responses, only static files such as images, scripts and stylesheets" }
+          - { id: b, text: "`max-age` is given in milliseconds, so the response expires after 3.6 seconds and is useless" }
+          - { id: c, text: "CDNs do not cache JSON responses, just static files such as images, scripts and stylesheets" }
           - { id: d, text: "A response without a `Content-Length` header can never be cached, so the CDN will refuse it" }
         answer: a
         explanation: "`max-age` is in seconds. `public` explicitly allows shared caches to keep and reuse the response, which for per-user data leaks it to others. Cache static and public content at the edge; mark per-user responses `private` or `no-store`, or make the cache key include the user (and test it)."
@@ -162,7 +162,7 @@ lessons:
         prompt: "What does PACELC add to the CAP theorem?"
         options:
           - { id: a, text: "Even with no partition (Else), you still trade latency against consistency, e.g. waiting for acks" }
-          - { id: b, text: "Partitions can be avoided entirely if there is enough redundancy, so CAP's trade-off disappears" }
+          - { id: b, text: "Partitions can be avoided if there is enough redundancy, so CAP's trade-off disappears" }
           - { id: c, text: "Consistency and availability can both be fully kept during a partition if replicas are synchronous" }
           - { id: d, text: "A fourth guarantee, durability, which has to be traded off against partition tolerance and latency" }
         answer: a
@@ -213,7 +213,7 @@ lessons:
           - { id: a, text: "Spread that key's reads: a short-lived near cache in every app instance, or several copies under suffixed keys" }
           - { id: b, text: "Add more shards, since consistent hashing then divides the hot key's data across the new nodes" }
           - { id: c, text: "Switch the shard function to modulo hashing, which distributes the keys more evenly across nodes" }
-          - { id: d, text: "Lengthen the TTL of every key in the cluster, so that fewer reads reach the saturated node" }
+          - { id: d, text: "Lengthen the TTL of each key in the cluster, so that fewer reads reach the saturated node and the cache stays warm" }
         answer: a
         explanation: "One key lives on one shard, so more shards cannot split it: this is a hot key, not a capacity problem. Replicate the hot item (local caches, key suffixes `product:42#0..#7`, or a dedicated replica set) and detect hot keys with per-key metrics. Writes then have to update or expire every copy."
 
@@ -229,7 +229,7 @@ lessons:
           - { id: a, text: "For a short time after a user's write, serve that user's reads from the primary (or a caught-up replica)" }
           - { id: b, text: "Switch the whole system to eventual consistency, so that stale reads become acceptable to everyone" }
           - { id: c, text: "Let the browser cache the profile response for five minutes, so the user never has to wait for a replica to catch up" }
-          - { id: d, text: "Add more replicas, so that the load balancer can always find one of them that is already current" }
+          - { id: d, text: "Add more replicas, so that the load balancer can find one of them that is already current" }
         answer: a
         explanation: "The cause is asynchronous replication lag. Read-your-writes only needs to hold for the writer: pin their reads to the primary, or to a replica that has applied their write's log position, for a few seconds. Everybody else can keep reading replicas. More replicas do not shorten lag, and the system is already eventually consistent."
 
