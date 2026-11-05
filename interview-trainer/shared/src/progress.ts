@@ -1,4 +1,5 @@
 import type { Day } from './day';
+import { emptyExtras, type ProgressExtras } from './extras';
 
 export type QuestionId = string; // '<lessonId>/<n>'
 /** guess | think so | certain. Reserved for the confidence-rating feature; accepted (and ignored) by the scheduler today. */
@@ -69,7 +70,7 @@ export interface Stats {
   practiceDays: number;
 }
 
-export interface Progress {
+export interface Progress extends ProgressExtras {
   version: 2;
   // ---- v1 fields, same meaning ----
   xp: number;
@@ -122,4 +123,5 @@ export const emptyProgress = (): Progress => ({
   settings: { haptics: true, sound: false, confetti: true, tips: true, confidence: false },
   stats: { sessions: 0, answered: 0, firstTry: 0, perfect: 0, practiceDays: 0 },
   milestones: {},
+  ...emptyExtras(),
 });

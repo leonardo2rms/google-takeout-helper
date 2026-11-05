@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { READINESS_TEXT, readiness, topicStats, type Course, type Progress } from '@trainer/shared';
+import { Calibration } from '../components/Calibration';
 import { useToday } from '../lib/today';
 
 interface Props {
@@ -33,6 +34,8 @@ export function ProgressScreen({ course, progress }: Props) {
           Questions you have not seen yet count as zero, so it only rises as you really learn the material.
         </p>
       </section>
+
+      <Calibration progress={progress} />
 
       {weakest && (
         <a className="card action" href={`#/topic/${weakest.unitId}`} data-testid="weakest-topic">

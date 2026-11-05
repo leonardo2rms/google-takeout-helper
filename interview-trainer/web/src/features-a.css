@@ -1,0 +1,20 @@
+/*
+ * features-a: hints, confidence, library, daily challenge, achievements, mock interview.
+ * Structure and spacing only, using the existing tokens; colours and type are restyled in a later pass.
+ * Kept in its own file so merging with styles.css changes is trivial.
+ */
+
+/* ---------- hints ---------- */
+.btn.hint-btn { min-height: 44px; margin: 4px 0 12px; width: fit-content; align-self: flex-start; justify-self: start; gap: 6px; padding: 0 18px; }
+.hint-box { margin: 4px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--amber-bg); color: var(--amber-text); overflow-wrap: anywhere; }
+
+/* ---------- confidence ---------- */
+.confidence { display: grid; gap: 8px; margin: 14px 0 4px; }
+.confidence-label small { color: var(--muted); font-weight: 600; margin-left: 6px; }
+.confidence-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.confidence-chip { min-height: 44px; min-width: 88px; cursor: pointer; color: var(--text); font-weight: 700; }
+.confidence-chip.on { border-color: var(--blue); background: var(--blue-bg); color: var(--blue-dark); }
+.confidence-note { margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: var(--amber-bg); color: var(--amber-text); font-weight: 700; }
+.calibration { margin-bottom: 14px; }
+.calib-rows { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.calib-rows li { display: flex; justify-content: space-between; gap: 12px; }

@@ -79,6 +79,30 @@ export function tipQuestion(p: Progress, questions: readonly Question[], today: 
 
 export const explanationOf = (q: Question): string => q.explanation ?? (q.type === 'open' ? q.modelAnswer : '');
 
+/** Calibration counts (how often "sure" was right) and the per-type pass counters behind some badges. */
+function tally(
+  p: Progress,
+  r: LessonResult,
+  outcomes: Record<QuestionId, Outcome>,
+  questions: readonly Question[],
+): Pick<Progress, 'calibration' | 'passedByType'> {
+  const n: [number, number, number] = [...p.calibration.n];
+  const right: [number, number, number] = [...p.calibration.right];
+  for (const [id, c] of Object.entries(r.confidence ?? {})) {
+    const o = outcomes[id];
+    if (!o) continue;
+    n[c - 1]!++;
+    if (o === 'first') right[c - 1]!++;
+  }
+  const typeOf = new Map(questions.map((q) => [q.id, q.type] as const));
+  const passedByType = { ...p.passedByType };
+  for (const [id, o] of Object.entries(outcomes)) {
+    const t = typeOf.get(id);
+    if (t && (o === 'first' || o === 'retry')) passedByType[t] = (passedByType[t] ?? 0) + 1;
+  }
+  return { calibration: { n, right }, passedByType };
+}
+
 /**
  * The single write path for a finished session. Pure: returns the next progress plus what happened,
  * so the UI can celebrate without re-deriving anything.
@@ -125,6 +149,7 @@ export function applySession(
       practiceDays: p.stats.practiceDays + (newDay ? 1 : 0),
     },
     milestones: { ...p.milestones },
+    ...tally(p, r, outcomes, questions),
   };
 
   const events: SessionEvent[] = [];

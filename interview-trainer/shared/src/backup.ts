@@ -1,5 +1,6 @@
 import type { Day } from './day';
 import { fnv1a } from './hash';
+import { mergeExtras } from './extras';
 import { migrateProgress, normalizeProgress, pruneProgress, type MigrationContext } from './migrate';
 import type { Card, DayLog, LessonRecord, Progress } from './progress';
 
@@ -109,6 +110,7 @@ export function mergeProgress(local: Progress, incoming: Progress, ctx: Migratio
       practiceDays: Math.max(local.stats.practiceDays, incoming.stats.practiceDays),
     },
     milestones: maxRecord<Day>(local.milestones, incoming.milestones, (x, y) => (x <= y ? x : y)),
+    ...mergeExtras(local, incoming),
   };
   return pruneProgress(normalizeProgress(merged, ctx), ctx);
 }

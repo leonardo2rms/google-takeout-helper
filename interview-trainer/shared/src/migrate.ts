@@ -5,6 +5,7 @@ import {
   DAYS_KEPT, DEFAULT_GOAL, MAX_FREEZES, MAX_INTERVAL, MAX_REST_DAYS, ROLE_IDS, emptyProgress,
   type Card, type DayLog, type LessonRecord, type Progress,
 } from './progress';
+import { normalizeExtras } from './extras';
 import { rankFor } from './rank';
 import type { Question } from './schema';
 import { lessonIdOf, MAX_EASE, MIN_EASE, NEW_EASE } from './srs';
@@ -152,6 +153,7 @@ export function normalizeProgress(input: unknown, ctx: MigrationContext): Progre
       practiceDays: int(stats.practiceDays, 0, BIG, 0),
     },
     milestones,
+    ...normalizeExtras(p, ctx.today),
   };
 }
 

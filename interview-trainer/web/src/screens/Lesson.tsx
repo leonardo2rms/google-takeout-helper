@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize,
-  type OpenQ, type Question, type SessionSummary,
+  type Confidence, type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
 import { EstimateQuestion } from '../components/EstimateQuestion';
 import { Feedback } from '../components/Feedback';
+import { ConfidenceRow } from '../components/ConfidenceRow';
 import { Hint } from '../components/Hint';
 import { FillQuestion } from '../components/FillQuestion';
 import { Inline } from '../components/Inline';
@@ -17,6 +18,7 @@ import { OrderQuestion } from '../components/OrderQuestion';
 import { SpotQuestion } from '../components/SpotQuestion';
 import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 import { runCodeInWorker } from '../lib/run-code';
+import { useProgress } from '../lib/store';
 
 interface Props {
   title: string;
@@ -67,6 +69,9 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
   const [followUp, setFollowUp] = useState<FollowUpStage | null>(null);
   /** Questions whose hint was revealed (kept across retries; one reveal per question). */
   const [hinted, setHinted] = useState<ReadonlySet<string>>(() => new Set());
+  /** Optional "How sure are you?" for the question on screen (off unless switched on in Settings). */
+  const confidenceOn = useProgress().progress.settings.confidence;
+  const [sure, setSure] = useState<Confidence | null>(null);
 
   const feedbackRef = useRef<HTMLDivElement>(null);
   const q = currentQuestion(session);
@@ -109,10 +114,11 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
     }
     const pass = followUp ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 >= PASS_SCORE : isPass(outcome);
     setFollowUp(null);
-    const s = submit(session, pass, { hinted: hinted.has(q.id) });
+    const s = submit(session, pass, { hinted: hinted.has(q.id), confidence: sure ?? undefined });
+    setSure(null);
     if (currentQuestion(s) === undefined) onFinish(summarize(s));
     else setSession(s);
-  }, [outcome, q, phase, pending, followUp, session, hinted, onFinish]);
+  }, [outcome, q, phase, pending, followUp, session, hinted, sure, onFinish]);
 
   // A tiny tick on a correct answer, if the learner allows it and the device can.
   useEffect(() => {
@@ -189,6 +195,10 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
           {view.type === 'open' && <OpenQuestion q={view} checked={checked} aiAvailable={aiAvailable} onAnswer={setAnswer} />}
         </div>
 
+        {confidenceOn && phase === 'answer' && attempt === 0 && !followUp && view.type !== 'open' && view.type !== 'code' && (
+          <ConfidenceRow value={sure} onChange={setSure} />
+        )}
+
         {phase === 'feedback' && outcome && (
           <div ref={feedbackRef} className="feedback-anchor">
             <Feedback
@@ -197,6 +207,11 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
               overall={overallScore === null ? undefined : { score: overallScore, pass: passed }}
               onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
             />
+            {sure !== null && !followUp && (passed ? sure === 1 : sure === 3) && (
+              <p className="confidence-note" data-testid="confidence-note">
+                {passed ? 'Right, though you were unsure: this one will come back soon to make it stick.' : 'Worth a closer look: you were sure. A surprise like this is the best moment to learn it, so it comes back soon.'}
+              </p>
+            )}
             {pending && <p className="interviewer-note">🎤 The interviewer has a follow-up question for you.</p>}
             {!pending && !followUp && reviewHint && (() => {
               const hint = reviewHint(view, passed && attempt === 0 ? 'first' : passed ? 'retry' : 'failed');
