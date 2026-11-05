@@ -294,7 +294,7 @@ lessons:
       - type: single
         prompt: "Cache-aside: a reader misses and loads the OLD row from the database. Before it stores that value in the cache, a writer updates the row and deletes the cache key. Then the reader stores the old value. What is the state now, and what bounds the damage?"
         options:
-          - { id: a, text: "The cache serves the old value until the entry expires, which is why a TTL bounds the damage" }
+          - { id: a, text: "The cache serves the old value until the entry is removed, which is why a TTL bounds the damage" }
           - { id: b, text: "Both are consistent: the delete came last, so it wins and the reader's late store is rejected" }
           - { id: c, text: "The reader's store fails or is ignored because the key was deleted, so the next read reloads the row" }
           - { id: d, text: "The cache detects the conflicting store and rolls back the database update to keep both consistent" }
