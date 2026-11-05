@@ -1,7 +1,9 @@
 // Builds web/ in "standalone" mode and inlines everything into single files, in two shapes (see standalone-html.mjs):
 //   interview-trainer/dist/interview-trainer.html             a fragment, for hosts that wrap it in their own page (a claude.ai artifact)
 //   interview-trainer/dist/interview-trainer.standalone.html  a complete document, for opening from disk (file://) or any static host
-// No API server, no service worker, AI grading through the host's `sample` capability when it offers one.
+// No API server, no service worker, AI grading through the host's `sample` capability when it offers one, file offers
+// (backup, share image) through its `downloads` capability. Publish the fragment as an artifact with
+// capabilities: {"sample": {}, "downloads": true}.
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -36,3 +38,5 @@ for (const [name, html] of [
   writeFileSync(file, html);
   console.log(`Wrote ${file} (${(html.length / 1024).toFixed(0)} kB)`);
 }
+
+console.log('Publish as an artifact with capabilities: {"sample": {}, "downloads": true}');
