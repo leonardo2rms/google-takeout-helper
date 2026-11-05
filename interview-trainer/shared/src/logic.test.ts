@@ -138,7 +138,14 @@ describe('estimate', () => {
     expect(parseNumber('18.2%')).toBe(18.2);
     expect(parseNumber('5k')).toBe(5000);
     expect(parseNumber('-3.5')).toBe(-3.5);
-    for (const bad of ['', 'abc', '1.2.3', '12 apples', '--1', '1e3x']) expect(parseNumber(bad), bad).toBeNull();
+    expect(parseNumber('2M')).toBe(2_000_000);
+    expect(parseNumber('1.5m')).toBe(1_500_000);
+    expect(parseNumber('\u22125')).toBe(-5); // typographic minus
+    expect(parseNumber('\uFF15\uFF10')).toBe(50); // full-width digits
+    expect(parseNumber('12.345.678')).toBe(12_345_678); // several dots group thousands
+    expect(parseNumber('1.234')).toBe(1.234); // a single dot is a decimal point
+    expect(parseNumber('1.234,5')).toBe(1234.5);
+    for (const bad of ['', 'abc', '1.2.3', '1.23.456', '12 apples', '--1', '1e3', '1e3x', '2mm', 'm']) expect(parseNumber(bad), bad).toBeNull();
   });
   it('accepts values within the relative tolerance and rejects the rest', () => {
     expect(gradeEstimate(q(50), 50)).toBe(true);

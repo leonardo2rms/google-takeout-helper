@@ -142,6 +142,16 @@ test.describe('code questions run in a sandboxed worker', () => {
     await expect(page.locator('.tests')).toContainText('undefined,undefined,undefined,undefined,undefined');
   });
 
+  test('a test result is marked as stale as soon as the code is edited, and fresh again after a new run', async ({ page }) => {
+    await openIt(page);
+    await runTests(page);
+    await expect(page.getByTestId('stale-results')).toHaveCount(0);
+    await writeCode(page, `function ${q.entry}() { return null; }`);
+    await expect(page.getByTestId('stale-results')).toBeVisible();
+    await runTests(page);
+    await expect(page.getByTestId('stale-results')).toHaveCount(0);
+  });
+
   test('the symbol bar inserts characters at the cursor', async ({ page }) => {
     await openIt(page);
     const editor = page.getByRole('textbox', { name: 'Your code' });

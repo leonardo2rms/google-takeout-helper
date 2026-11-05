@@ -32,21 +32,23 @@ export function gradeSpot(q: SpotQ, selected: readonly number[]): boolean {
 }
 
 /**
- * Parses what a person types as a number: "50", "1,234.5", "1.234,5", "1 234", "18,2", "18.2%", "5k".
- * A lone comma followed by exactly three digits groups ("1,234" = 1234); any other lone comma is a decimal.
+ * Parses what a person types as a number: "50", "1,234.5", "1.234,5", "1 234", "18,2", "18.2%", "5k", "2M", "−5".
+ * A lone comma followed by exactly three digits groups ("1,234" = 1234); any other lone comma is a decimal. Dots that
+ * group thousands only count as grouping when there are several ("12.345.678"); a single "1.234" is a decimal.
+ * Full-width digits and the typographic minus are read like their ASCII forms.
  */
 export function parseNumber(raw: string): number | null {
-  let s = raw.trim().toLowerCase().replace(/[\s_]/g, '');
+  let s = raw.normalize('NFKC').trim().toLowerCase().replace(/[\s_]/g, '').replace(/[\u2212\u2013]/g, '-');
   if (s.endsWith('%')) s = s.slice(0, -1);
   let mult = 1;
-  if (s.endsWith('k')) {
-    mult = 1000;
-    s = s.slice(0, -1);
-  }
+  if (s.endsWith('k')) mult = 1000;
+  else if (s.endsWith('m')) mult = 1_000_000;
+  if (mult !== 1) s = s.slice(0, -1);
   if (s.includes(',') && s.includes('.')) {
     // Both separators: the one that comes last is the decimal point ("1,234.5" and "1.234,5" are both 1234.5).
     s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
   } else if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
+  else if (/^\d{1,3}(\.\d{3}){2,}$/.test(s)) s = s.replace(/\./g, '');
   else s = s.replace(',', '.');
   if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(s)) return null;
   const n = Number(s) * mult;
