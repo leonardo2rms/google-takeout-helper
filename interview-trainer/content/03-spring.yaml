@@ -421,7 +421,7 @@ lessons:
           - { id: c, text: "Annotate `OrderService` with `@Controller`; the web slice then scans it as a web-layer bean" }
           - { id: d, text: "Disable component scanning in the test, so that bean definitions are looked up nowhere" }
         answer: a
-        explanation: "Test slices (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`, ...) start only the part of the context they are about: for MVC that is controllers, advice, converters and filters, but no `@Service` or `@Repository`. That keeps them fast and focused, and the missing collaborators become explicit test doubles (`@MockitoBean`, or `@MockBean` before Spring Boot 3.4). Use `@SpringBootTest` for the few tests that need the whole wiring."
+        explanation: "Test slices (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`, ...) start only the part of the context they are about: for MVC that is controllers, advice, converters and filters, but no `@Service` or `@Repository`. That keeps them fast and focused, and the missing collaborators become explicit test doubles (`@MockitoBean`, or `@MockBean` before Spring Boot 3.4). With `controllers` set, the slice loads only the listed controllers, so annotating the service with `@Controller` would not even bring it in. Use `@SpringBootTest` for the few tests that need the whole wiring."
 
       - type: open
         prompt: "A colleague says: \"I put `@Transactional` on every service method, so we are safe.\" How do you respond, and how do you design transaction boundaries?"
