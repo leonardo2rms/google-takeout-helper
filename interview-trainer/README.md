@@ -373,19 +373,18 @@ The look is documented in [`docs/design-system.md`](docs/design-system.md). In s
 - The course, including correct answers, is in the client bundle, which is what makes instant feedback and offline
   mode possible. That's fine for a self-training tool, but not for anything proctored or competitive.
 
-## Roadmap / ideas
+## Roadmap
 
-- **Architecture board** (drag & connect components, validate against a reference topology): the question schema is a
-  discriminated union (`shared/src/schema.ts`), so it is one new type plus one component. Deliberately left out for now.
-- Specified, not built here: user-chosen reminders (a calendar `.ics` first), a weekly recap card, teach-back prompts, a shareable progress card, a transfer code / QR for moving between devices. (Hints, confidence, bookmarks and notes, the Library, the daily challenge, achievements and mock interviews are built: see [docs/learning-features.md](docs/learning-features.md).)
-- Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, a weekly recap card. (Reminders, the share card, the Ask why tutor and the accessibility pass are done.)
-- Later: timed "mock interview" mode, teach-back prompts, a transfer code / QR for moving between devices.
-- Real code execution for coding challenges (sandboxed Kotlin runner) instead of AI grading.
+The complete list of what is built and what is pending (prioritised, with context, files and acceptance criteria for each
+item) is in the [handoff](docs/HANDOFF.md). Headlines: remove the remaining answer-style tells in choice questions,
+verify real AI grading and the hosted page outside the sandbox, upgrade zod, resume a quit lesson, the architecture
+board question type, a sandboxed Kotlin runner, and monetization.
 
 ## Documentation
 
+- **[Handoff](docs/HANDOFF.md): start here.** Everything built, how it was verified, the prioritised backlog and gotchas.
 - [Architecture](docs/architecture.md): components, the data flow of a lesson, the `Progress` schema and migrations, the grading contract, the code sandbox, offline strategy, build variants and the reasons behind the key decisions.
 - [Testing](docs/testing.md): the test pyramid, how to run each layer, e2e ports and workers, committed screenshots, content tests, the flaky-test policy and the coverage ratchet.
 - [Content guide](docs/content-guide.md): how to write each of the nine question types, good distractors, rubrics and follow-ups, the fact-checking checklist and how to add a unit or lesson.
 - [Contributing](docs/contributing.md): setup, branch and commit conventions, the definition of done, adding a question type end to end, and releasing.
-- Design notes: [engagement](docs/engagement.md), [learning features](docs/learning-features.md), [accessibility](docs/accessibility.md); research drafts: [competitors](docs/COMPETITORS.md), [monetization](docs/MONETIZATION.md).
+- Design notes: [engagement](docs/engagement.md), [learning features](docs/learning-features.md), [accessibility](docs/accessibility.md); research: [competitors](docs/COMPETITORS.md), [monetization](docs/MONETIZATION.md), and the [research and audit archive](docs/research/README.md) (engagement and design specs, contrast and colour-blindness checks, two rounds of UX and QA audits).

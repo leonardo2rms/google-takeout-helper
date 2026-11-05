@@ -50,11 +50,11 @@ All of it is pure: `today` is always passed in, there is no `Date.now()` in `sha
 
 ## Not built yet (specified)
 
-Reminders (`.ics` first), weekly recap, teach-back, share card, transfer code/QR. (Achievements, confidence ratings, the daily challenge
-and mock interviews are built: see [`learning-features.md`](learning-features.md).) The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
-Achievements, confidence ratings, daily challenge, weekly recap, mock interviews, teach-back,
-transfer code/QR. The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
-defaults in `normalizeProgress`, so they need no migration.
+Weekly recap, teach-back, a transfer code / QR, a weekly backup nudge and sound are specified in
+[the engagement spec](research/engagement-spec.md) but not built; the [handoff](HANDOFF.md) (P2-4) has the details.
+Everything else in the recommended batch is built, including reminders, the share card, achievements, confidence
+ratings, the daily challenge and mock interviews (see [learning features](learning-features.md)). The `Progress` type
+has room: later additive fields are optional and get defaults in `normalizeProgress`, so they need no migration.
 
 ## Reminders
 
