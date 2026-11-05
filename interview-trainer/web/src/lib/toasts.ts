@@ -3,7 +3,7 @@ import type { AchievementDef } from '@trainer/shared';
 
 export interface BadgeToast {
   id: number;
-  badges: Pick<AchievementDef, 'id' | 'title' | 'emoji' | 'description'>[];
+  badges: Pick<AchievementDef, 'id' | 'title' | 'icon' | 'description'>[];
 }
 
 /** A tiny queue of "badge unlocked" notices, shown one at a time by <AchievementToasts />. */
@@ -14,7 +14,7 @@ const emit = () => listeners.forEach((l) => l());
 
 export function pushBadgeToast(badges: readonly AchievementDef[]): void {
   if (badges.length === 0) return;
-  queue = [...queue, { id: nextId++, badges: badges.map(({ id, title, emoji, description }) => ({ id, title, emoji, description })) }];
+  queue = [...queue, { id: nextId++, badges: badges.map(({ id, title, icon, description }) => ({ id, title, icon, description })) }];
   emit();
 }
 

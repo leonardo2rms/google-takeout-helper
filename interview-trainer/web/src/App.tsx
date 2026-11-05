@@ -176,7 +176,6 @@ function Screens() {
       <LessonScreen
         key={found.lesson.id}
         title={found.lesson.title}
-        color={found.unit.color}
         questions={found.lesson.questions}
         grade={grade}
         explain={explain}
@@ -229,8 +228,6 @@ function Screens() {
   return <Home course={course} progress={progress} health={health} update={update} onReset={reset} />;
 }
 
-const COLORS: Record<PracticeKind, string> = { mix: '#1cb0f6', review: '#ff9600', daily: '#58cc02', warmup: '#58cc02', topic: '#ce82ff', one: '#1cb0f6', challenge: '#ffc800' };
-
 /** Picks the questions for a session once, when the screen mounts, so answering does not reshuffle it. */
 function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string): Question[] {
   const today = dayKey(new Date());
@@ -275,18 +272,17 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
 
   if (questions.length === 0) {
     return (
-      <div className="summary">
-        <div className="trophy" aria-hidden="true">✨</div>
-        <h1>All clear!</h1>
-        <p className="muted">Nothing to review right now. New reviews appear as they come due.</p>
-        <a className="btn primary" href="#/">Back</a>
+      <div className="summary plain">
+        <p className="label">Review</p>
+        <h1>Nothing to review</h1>
+        <p className="muted">Nothing is due right now. New reviews appear as they come due.</p>
+        <div className="summary-actions"><a className="btn primary" href="#/">Back</a></div>
       </div>
     );
   }
   return (
     <LessonScreen
       title={title}
-      color={COLORS[kind]}
       questions={questions}
       grade={grade}
       explain={explain}
@@ -300,10 +296,11 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
 
 function NotFound() {
   return (
-    <div className="summary">
-      <div className="trophy" aria-hidden="true">🧭</div>
+    <div className="summary plain">
+      <p className="label">404</p>
       <h1>Lesson not found</h1>
-      <a className="btn primary" href="#/">Back home</a>
+      <p className="muted">That link does not point to a lesson in this course.</p>
+      <div className="summary-actions"><a className="btn primary" href="#/">Back home</a></div>
     </div>
   );
 }

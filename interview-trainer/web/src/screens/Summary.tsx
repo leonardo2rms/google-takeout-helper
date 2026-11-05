@@ -3,6 +3,7 @@ import {
   READINESS_TEXT, isLargeCelebration, pickCelebration, type ForecastBucket, type GoalToday, type SessionEvent, type SessionSummary, type Settings,
 } from '@trainer/shared';
 import { Confetti } from '../components/Confetti';
+import { Icon, type IconName } from '../components/icons';
 import { Inline } from '../components/Inline';
 import { AnimatedRing } from '../components/Ring';
 import { forecastText, plural, prefersReducedMotion } from '../lib/format';
@@ -26,14 +27,14 @@ export interface Finished {
 function headline(e: SessionEvent): { title: string; body: string } {
   switch (e.type) {
     case 'rank-up':
-      return { title: `New rank: ${e.title}`, body: 'Your total XP crossed the next step on the ladder. Ranks never go down.' };
+      return { title: `New rank: ${e.title}`, body: 'Your total XP passed the next step. Ranks never go down.' };
     case 'streak':
-      return { title: `${e.value}-day streak`, body: `${e.value} days in a row. That is a real habit forming.` };
+      return { title: `${e.value}-day streak`, body: `${e.value} days in a row.` };
     case 'unit-mastered':
       return { title: `${e.title}: mastered`, body: 'Your recall estimate for this whole topic passed 80%.' };
     case 'goal-met':
       return e.first
-        ? { title: 'Daily goal met', body: 'Your first time reaching a daily goal. Small, steady days add up.' }
+        ? { title: 'Daily goal met', body: 'The first time you have reached your daily goal.' }
         : { title: 'Daily goal met', body: 'Anything more today is a bonus.' };
     case 'perfect':
       return { title: 'Perfect lesson', body: 'Every question right on the first try.' };
@@ -44,26 +45,31 @@ function headline(e: SessionEvent): { title: string; body: string } {
   }
 }
 
+interface Note {
+  text: string;
+  icon?: IconName;
+}
+
 /** Small factual lines for events that are not the headline. */
-function note(e: SessionEvent, headlineType: string | undefined): string | null {
+function note(e: SessionEvent, headlineType: string | undefined): Note | null {
   if (e.type === headlineType) return null;
   switch (e.type) {
     case 'freeze-used':
-      return `🧊 ${e.count === 1 ? 'A freeze covered the day you missed' : `${e.count} freezes covered the days you missed`}. Your streak carried on.`;
+      return { icon: 'snowflake', text: `${e.count === 1 ? 'A freeze covered the day you missed' : `${e.count} freezes covered the days you missed`}. Your streak carried on.` };
     case 'freeze-earned':
-      return '🧊 You earned a streak freeze. You can hold up to 2.';
+      return { icon: 'snowflake', text: 'You earned a streak freeze. You can hold up to 2.' };
     case 'freeze-gift':
-      return '🧊 A welcome gift for updating: one streak freeze. It covers a missed day automatically.';
+      return { icon: 'snowflake', text: 'A welcome gift for updating: one streak freeze. It covers a missed day automatically.' };
     case 'rank-up':
-      return `New rank: ${e.title}`;
+      return { text: `New rank: ${e.title}` };
     case 'unit-mastered':
-      return `${e.title} mastered`;
+      return { text: `${e.title} mastered` };
     case 'goal-met':
-      return 'Daily goal met';
+      return { text: 'Daily goal met' };
     case 'readiness':
-      return `Readiness: ${READINESS_TEXT[e.label]}`;
+      return { text: `Readiness: ${READINESS_TEXT[e.label]}` };
     case 'streak':
-      return e.milestone ? `${e.value}-day streak` : null;
+      return e.milestone ? { text: `${e.value}-day streak` } : null;
     default:
       return null;
   }
@@ -93,15 +99,18 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
   }, [big, settings.confetti, settings.haptics]);
 
   const top = celebration && celebration.type !== 'tip' ? headline(celebration) : null;
-  const notes = [...events.map((e) => note(e, celebration?.type)).filter((n): n is string => n !== null), ...(finished.extraNotes ?? [])];
+  const notes: Note[] = [...events.map((e) => note(e, celebration?.type)).filter((n): n is Note => n !== null), ...(finished.extraNotes ?? []).map((text) => ({ text }))];
   const g = finished.goalAfter;
+  const heading = summary.perfect ? 'Clean run' : pct >= 70 ? 'Lesson complete' : 'Another pass needed';
+  const hasNext = Boolean(finished.nextLessonId);
 
   return (
-    <div className="summary">
+    <div className={`summary ${pct < 70 && !summary.perfect ? 'warn' : ''}`}>
       {burst && <Confetti onDone={() => setBurst(false)} />}
-      <div className="trophy" aria-hidden="true">{summary.perfect ? '🏆' : pct >= 70 ? '🎉' : '💪'}</div>
-      <h1>{summary.perfect ? 'Perfect lesson!' : pct >= 70 ? 'Lesson complete!' : 'Keep going!'}</h1>
-      <p className="muted">{finished.title}</p>
+      <p className="label">Result · {finished.title}</p>
+      <h1>{heading}</h1>
+      <p className="result-big" aria-label={`${pct} percent first-try accuracy`}>{pct}<small>%</small></p>
+      <p className="result-cap" aria-hidden="true">first-try accuracy</p>
 
       {top && (
         <section className="milestone" data-testid="celebration" data-kind={celebration!.type} aria-label="Milestone">
@@ -111,9 +120,10 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       )}
 
       <div className="tiles">
-        <div className="tile xp"><small>Total XP</small><b>⚡ {summary.xp}</b></div>
-        <div className="tile acc"><small>First-try accuracy</small><b>🎯 {pct}%</b></div>
-        <div className="tile fire"><small>Day streak</small><b>🔥 {streak}</b></div>
+        <div className="tile xp"><small>XP earned</small><b>+{summary.xp}</b></div>
+        <div className="tile acc"><small>Accuracy</small><b>{pct}%</b></div>
+        <div className="tile fire"><small>Streak</small><b><Icon name="flame" size="1em" /> {streak} d</b></div>
+        {outstanding > 0 && <div className="tile todo"><small>To revisit</small><b>{outstanding}</b></div>}
       </div>
 
       <div className="summary-goal" data-testid="summary-goal">
@@ -126,14 +136,14 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
 
       {finished.tip && (
         <section className="tip" data-testid="tip">
-          <b>💡 Worth remembering <span className="muted">(+{finished.tip.bonusXp} XP)</span></b>
+          <b><Icon name="lightbulb" /> Worth remembering <span className="muted">(+{finished.tip.bonusXp} XP)</span></b>
           <Inline text={finished.tip.text} />
         </section>
       )}
 
       {notes.length > 0 && (
         <ul className="notes" data-testid="summary-notes">
-          {notes.map((n) => <li key={n}>{n}</li>)}
+          {notes.map((n) => <li key={n.text}>{n.icon && <Icon name={n.icon} size="1.1em" />}<span>{n.text}</span></li>)}
         </ul>
       )}
 
@@ -148,8 +158,8 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       )}
 
       <div className="summary-actions">
-        {finished.nextLessonId && <a className="btn secondary" href={`#/lesson/${finished.nextLessonId}`}>Next lesson</a>}
-        <button type="button" className="btn primary" onClick={onHome} autoFocus>Continue</button>
+        {hasNext && <a className="btn primary" href={`#/lesson/${finished.nextLessonId}`} autoFocus>Next lesson <Icon name="arrow-right" size="1.1em" /></a>}
+        <button type="button" className={`btn ${hasNext ? '' : 'primary'}`} onClick={onHome} autoFocus={!hasNext}>Continue</button>
       </div>
     </div>
   );

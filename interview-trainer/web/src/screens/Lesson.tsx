@@ -10,6 +10,7 @@ import { CodeQuestion } from '../components/CodeQuestion';
 import { EstimateQuestion } from '../components/EstimateQuestion';
 import { Feedback } from '../components/Feedback';
 import { ConfidenceRow } from '../components/ConfidenceRow';
+import { Icon } from '../components/icons';
 import { Hint } from '../components/Hint';
 import { QuestionTools } from '../components/QuestionTools';
 import { FillQuestion } from '../components/FillQuestion';
@@ -27,7 +28,6 @@ import { useProgress } from '../lib/store';
 
 interface Props {
   title: string;
-  color: string;
   questions: Question[];
   /** Grades open answers with AI; undefined means offline (self-assessment). */
   grade?: GradeFn;
@@ -67,7 +67,7 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, color, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
+export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -170,7 +170,7 @@ export function LessonScreen({ title, color, questions, grade, explain, reviewHi
   const key = `${view.id}#${attempt}`;
 
   return (
-    <div className="lesson" style={{ ['--accent' as string]: color }}>
+    <div className="lesson">
       <header className="lesson-top">
         <button
           type="button"
@@ -180,18 +180,30 @@ export function LessonScreen({ title, color, questions, grade, explain, reviewHi
             if (window.confirm('Quit this lesson? Progress in it will be lost.')) onExit();
           }}
         >
-          ✕
+          <Icon name="x" />
         </button>
-        <div className="bar" role="progressbar" aria-label={title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(sessionProgress(session) * 100)}>
-          <div className="bar-fill" style={{ width: `${Math.max(sessionProgress(session) * 100, 3)}%` }} />
+        <div
+          className="bar gauge"
+          style={{ ['--step' as string]: `${100 / Math.max(1, session.total)}%` }}
+          role="progressbar"
+          aria-label={title}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(sessionProgress(session) * 100)}
+        >
+          <div className="fill" style={{ width: `${Math.max(sessionProgress(session) * 100, 2)}%` }} />
         </div>
-        <span className="xp-chip" aria-label={`${session.xp} XP earned`}>⚡ {session.xp}</span>
+        <span className="xp-chip" aria-label={`${session.xp} XP earned`}><span className="label" aria-hidden="true">XP</span> {session.xp}</span>
       </header>
 
       <div className="lesson-body">
-        <p className="kicker">
-          {attempt > 0 ? '↻ Try again · ' : ''}
-          {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
+        <p className={`kicker ${followUp ? 'follow' : ''}`}>
+          {attempt > 0 && <Icon name="rotate-ccw" size="1.1em" />}
+          {followUp && <Icon name="message-square-quote" size="1.1em" />}
+          <span>
+            {attempt > 0 ? 'Try again · ' : ''}
+            {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
+          </span>
         </p>
         <h1 className="prompt" ref={promptRef} tabIndex={-1}><Inline text={view.prompt} /></h1>
         {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
@@ -242,7 +254,7 @@ export function LessonScreen({ title, color, questions, grade, explain, reviewHi
                 {passed ? 'Right, though you were unsure: this one will come back soon to make it stick.' : 'Worth a closer look: you were sure. A surprise like this is the best moment to learn it, so it comes back soon.'}
               </p>
             )}
-            {pending && <p className="interviewer-note">🎤 The interviewer has a follow-up question for you.</p>}
+            {pending && <p className="interviewer-note"><Icon name="message-square-quote" /><span>Follow-up from the interviewer.</span></p>}
             {!pending && !followUp && reviewHint && (() => {
               const hint = reviewHint(view, passed && attempt === 0 ? 'first' : passed ? 'retry' : 'failed');
               return hint ? <p className="srs-note" data-testid="srs-note">{hint}</p> : null;

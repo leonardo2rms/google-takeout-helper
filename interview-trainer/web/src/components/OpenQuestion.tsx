@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { OpenQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 
 interface Props {
   q: OpenQ;
@@ -32,8 +33,11 @@ export function OpenQuestion({ q, checked, aiAvailable, onAnswer }: Props) {
         }}
       />
       <div className="open-meta">
-        <span>{aiAvailable ? '🤖 Graded by AI against a rubric' : '📴 Offline: you will self-check against the model answer'}</span>
-        <span>{text.length}/{q.maxChars}</span>
+        <span>
+          <Icon name={aiAvailable ? 'bot' : 'wifi-off'} />
+          {aiAvailable ? 'AI grading against a rubric' : 'AI grading off. You self-check against the model answer.'}
+        </span>
+        <span className="count-chars">{text.length}/{q.maxChars}</span>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { ChoiceQuestion } from './ChoiceQuestion';
 import { CodeQuestion } from './CodeQuestion';
 import { EstimateQuestion } from './EstimateQuestion';
 import { FillQuestion } from './FillQuestion';
+import { Icon } from './icons';
 import { Inline } from './Inline';
 import { MatchQuestion } from './MatchQuestion';
 import { OpenQuestion } from './OpenQuestion';
@@ -117,7 +118,7 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
   const isLast = index === questions.length - 1;
 
   return (
-    <div className="lesson mock-run" style={{ ['--accent' as string]: '#ff9600' }} data-testid="mock-run">
+    <div className="lesson mock-run" data-testid="mock-run">
       <header className="lesson-top mock-top">
         <button
           type="button"
@@ -127,11 +128,11 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
             if (window.confirm('Quit this mock interview? Nothing is saved and nothing is lost: it is only practice.')) onQuit();
           }}
         >
-          ✕
+          <Icon name="x" />
         </button>
         <span className="mock-count" data-testid="mock-count">{index + 1} / {questions.length}</span>
         <span className={`mock-timer ${left <= 60_000 ? 'low' : ''}`} role="timer" aria-label="Time left" data-testid="mock-timer">
-          ⏱ {clockText(left)}
+          <Icon name="timer" size="1.1em" /> {clockText(left)}
         </span>
       </header>
       <p className="sr-only" role="status" aria-live="polite" data-testid="mock-announce">{announcement}</p>
@@ -170,12 +171,12 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
                 data-testid={`mock-dot-${i + 1}`}
                 onClick={() => go(i)}
               >
-                {i + 1}{flag ? <span aria-hidden="true">⚑</span> : null}
+                {i + 1}{flag ? <Icon name="flag" /> : null}
               </button>
             );
           })}
         </nav>
-        <p className="hint mock-legend">Filled = answered · ⚑ = flagged to come back to · {answeredCount} of {questions.length} answered</p>
+        <p className="hint mock-legend">Filled = answered · dashed with a flag = flagged to come back to · {answeredCount} of {questions.length} answered</p>
         {!isLast && !confirming && (
           <button type="button" className="btn ghost small" data-testid="mock-finish-early" onClick={() => setConfirming(true)}>Finish early</button>
         )}
@@ -197,7 +198,7 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
 
       <footer className="lesson-bar mock-bar">
         <button type="button" className={`btn ghost mock-flag ${flagged.has(q.id) ? 'on' : ''}`} aria-pressed={flagged.has(q.id)} data-testid="mock-flag" onClick={toggleFlag}>
-          ⚑ {flagged.has(q.id) ? 'Flagged' : 'Flag'}
+          <Icon name="flag" size="1.1em" /> {flagged.has(q.id) ? 'Flagged' : 'Flag'}
         </button>
         <button type="button" className="btn ghost" data-testid="mock-prev" disabled={index === 0} onClick={() => go(index - 1)}>Back</button>
         {isLast ? (

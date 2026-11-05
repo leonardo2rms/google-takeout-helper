@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { shuffleDifferent, type OrderQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 import { ResultCue, type ResultState } from './ResultCue';
 
 interface Props {
@@ -39,6 +40,7 @@ export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
               <span className="sr-only">Position {pos + 1}: </span>
               {line}
               {checked ? <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} /> : <span className="sr-only"> (tap to remove)</span>}
+              {checked && <Icon name={state === 'correct' ? 'check' : 'x'} className="vmark" strokeWidth={2.5} />}
             </button>
           );
         })}

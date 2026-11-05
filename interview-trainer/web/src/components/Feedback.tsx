@@ -1,7 +1,8 @@
-import { PASS_SCORE, scoreFromCoverage, spotLines, verdictFor, type OpenVerdict, type Question } from '@trainer/shared';
+import { scoreFromCoverage, spotLines, verdictFor, type OpenVerdict, type Question } from '@trainer/shared';
 import type { ReactNode } from 'react';
 import { isPass, type Outcome } from '../lib/evaluate';
 import { CodeBlock } from './CodeBlock';
+import { Icon, type IconName } from './icons';
 import { Inline } from './Inline';
 import { TestResults } from './TestResults';
 
@@ -31,7 +32,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
   const score = open ? scoreFromCoverage(open.covered) : pass ? 1 : 0;
   const verdict = open ? verdictFor(score) : pass ? 'correct' : 'incorrect';
 
-  const title = headline(outcome, verdict, q.id);
+  const title = headline(outcome, verdict);
 
   // On a follow-up the card shows this answer, the bar shows the combined result: when they disagree, say so with amber.
   const own = pass ? 'good' : verdict === 'partial' ? 'meh' : 'bad';
@@ -41,6 +42,10 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
 
   return (
     <section className={`feedback ${tone}`} aria-labelledby="feedback-title">
+      <p className="verdict" data-testid="verdict">
+        <Icon name={VERDICT_ICON[tone]} size="1.1em" strokeWidth={2.5} />
+        <span>{verdictWord(tone, outcome, open ? open.covered : null)}</span>
+      </p>
       <h2 id="feedback-title" tabIndex={-1}>{title}</h2>
 
       {open && oq && (
@@ -48,7 +53,6 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
           <p className="score">
             {open.covered.filter(Boolean).length}/{open.covered.length} key points
             {open.gradedBy === 'ai' ? ' · graded by AI' : ' · self-assessed'}
-            {score >= PASS_SCORE ? ' ✓' : ''}
           </p>
           {open.feedback && <p className="ai-feedback"><Inline text={open.feedback} /></p>}
           {open.needsSelfAssessment && (
@@ -68,14 +72,15 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
                   </label>
                 ) : (
                   <span className={open.covered[i] ? 'yes' : 'no'}>
-                    <b aria-hidden="true">{open.covered[i] ? '✓' : '✗'}</b> <Inline text={kp.point} />
+                    <Icon name={open.covered[i] ? 'check' : 'x'} strokeWidth={2.5} />
+                    <span><span className="sr-only">{open.covered[i] ? 'Covered: ' : 'Missed: '}</span><Inline text={kp.point} /></span>
                   </span>
                 )}
               </li>
             ))}
           </ul>
           <details open={!pass || outcome.skipped}>
-            <summary>Model answer</summary>
+            <summary><Icon name="chevron-down" className="chev" />Model answer</summary>
             {oq.format === 'code' ? <CodeBlock source={oq.modelAnswer} /> : <p><Inline text={oq.modelAnswer} /></p>}
           </details>
         </>
@@ -83,7 +88,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
 
       {overall && (
         <p className="overall">
-          Interview result: <b>{Math.round(overall.score * 100)}%</b> across both answers, which {overall.pass ? 'counts as correct' : 'is not enough yet'}.
+          Combined result: <b>{Math.round(overall.score * 100)}%</b> over both answers, which {overall.pass ? 'counts as correct' : 'is not enough yet'}.
         </p>
       )}
 
@@ -91,7 +96,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
 
       {q.type === 'code' && (
         <details open={!pass}>
-          <summary>Reference solution</summary>
+          <summary><Icon name="chevron-down" className="chev" />Reference solution</summary>
           <CodeBlock source={q.solution} lang="javascript" />
           {q.kotlin && (
             <>
@@ -111,7 +116,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
       {q.type === 'match' && !pass && (
         <ul className="match-solution">
           {q.pairs.map((p) => (
-            <li key={p.left}><b><Inline text={p.left} /></b> → <Inline text={p.right} /></li>
+            <li key={p.left}><b><Inline text={p.left} /></b> <Icon name="arrow-right" size="1em" /> <Inline text={p.right} /></li>
           ))}
         </ul>
       )}
@@ -145,10 +150,16 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
   );
 }
 
-function pick<T>(items: T[], seed: string): T {
-  let h = 0;
-  for (const c of seed) h = (h * 31 + c.charCodeAt(0)) | 0;
-  return items[Math.abs(h) % items.length]!;
+const VERDICT_ICON: Record<'good' | 'bad' | 'meh', IconName> = { good: 'check', bad: 'x', meh: 'contrast' };
+
+/** The verdict as a word, so it never depends on colour or on the icon alone. */
+function verdictWord(tone: 'good' | 'bad' | 'meh', outcome: Outcome, covered: boolean[] | null): string {
+  if (outcome.skipped) return 'Skipped';
+  const points = covered ? `${covered.filter(Boolean).length}/${covered.length} points` : null;
+  if (outcome.open?.needsSelfAssessment) return points ? `Self-check · ${points}` : 'Self-check';
+  if (tone === 'good') return 'Correct';
+  if (tone === 'meh') return points ? `Partial · ${points}` : 'Partial';
+  return 'Incorrect';
 }
 
 function estimateLine(q: Extract<Question, { type: 'estimate' }>): string {
@@ -159,9 +170,9 @@ function estimateLine(q: Extract<Question, { type: 'estimate' }>): string {
 
 const trim = (n: number) => String(Math.round(n * 100) / 100);
 
-function headline(outcome: Outcome, verdict: OpenVerdict, seed: string): string {
+function headline(outcome: Outcome, verdict: OpenVerdict): string {
   if (outcome.skipped) return 'Here is the answer';
   if (outcome.open?.needsSelfAssessment) return 'Check your answer';
-  if (verdict === 'correct') return pick(['Correct!', 'Nice one!', 'Spot on!', 'Well done!'], seed);
+  if (verdict === 'correct') return 'Correct';
   return verdict === 'partial' ? 'Partly there' : 'Not quite';
 }

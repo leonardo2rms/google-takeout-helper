@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { spotLines, type SpotQ } from '@trainer/shared';
 import { highlight } from '../lib/highlight';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 import { ResultCue, type ResultState } from './ResultCue';
 
 interface Props {
@@ -51,6 +52,12 @@ export function SpotQuestion({ q, checked, onAnswer }: Props) {
               <span className="sr-only">Line {n}: </span>
               <span className="src">{line === '' ? ' ' : highlight(line)}</span>
               <ResultCue state={state as ResultState} />
+              {state && (
+                <span className="mark" aria-hidden="true">
+                  <Icon name={state === 'wrong' ? 'x' : 'check'} size="1.1em" strokeWidth={2.5} />
+                  {state === 'correct' ? 'Correct' : state === 'wrong' ? 'Incorrect' : 'Answer'}
+                </span>
+              )}
             </button>
           );
         })}

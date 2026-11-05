@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CodeQ, CodeRunResult } from '@trainer/shared';
 import type { Answer, RunCodeFn } from '../lib/evaluate';
+import { Icon } from './icons';
 import { TestResults } from './TestResults';
 
 interface Props {
@@ -87,8 +88,8 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
       )}
       {!blind && (
         <div className="run-row">
-          <button type="button" className="btn secondary small" disabled={checked || running} onClick={() => void runTests()}>
-            {running ? 'Running…' : '▶ Run tests'}
+          <button type="button" className="btn small" disabled={checked || running} onClick={() => void runTests()}>
+            {running ? 'Running…' : <><Icon name="play" size="1em" /> Run tests</>}
           </button>
           <span className="hint">Some tests are hidden. Check runs all of them.</span>
         </div>

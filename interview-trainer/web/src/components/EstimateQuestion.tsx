@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { parseNumber, type EstimateQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 
 interface Props {
   q: EstimateQ;
@@ -15,7 +16,7 @@ export function EstimateQuestion({ q, checked, onAnswer }: Props) {
 
   return (
     <div className="estimate">
-      <div className="estimate-row">
+      <div className="estimate-field" data-invalid={text.trim() !== '' && parsed === null}>
         <input
           id="estimate-input"
           className="estimate-input"
@@ -38,13 +39,11 @@ export function EstimateQuestion({ q, checked, onAnswer }: Props) {
         />
         {q.unit && <span className="unit">{q.unit}</span>}
       </div>
-      <p className="hint">
-        {text.trim() !== '' && parsed === null
-          ? 'Enter a number, e.g. 18.5'
-          : q.tolerance === 0
-            ? 'Give the exact number.'
-            : `Back-of-the-envelope is fine: within ${percent}% counts.`}
-      </p>
+      {text.trim() !== '' && parsed === null ? (
+        <p className="hint error"><Icon name="x" size="1.1em" strokeWidth={2.5} />Enter a number, e.g. 18.5</p>
+      ) : (
+        <p className="hint">{q.tolerance === 0 ? 'Give the exact number.' : `Back-of-the-envelope is fine: within ${percent}% counts.`}</p>
+      )}
     </div>
   );
 }

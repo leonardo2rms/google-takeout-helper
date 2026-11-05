@@ -4,6 +4,7 @@ import {
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { ChallengeCard } from '../components/ChallengeCard';
+import { Icon } from '../components/icons';
 import { OnboardingCard } from '../components/OnboardingCard';
 import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
@@ -11,6 +12,7 @@ import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
 import { cappedCount, plural } from '../lib/format';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
+import { unitStyle } from '../lib/unit-style';
 
 interface Props {
   course: Course;
@@ -20,7 +22,8 @@ interface Props {
   onReset: () => void;
 }
 
-const stars = (accuracy: number) => (accuracy >= 0.9 ? 3 : accuracy >= 0.7 ? 2 : 1);
+/** Three segments from the best first-try accuracy of a lesson (90% and 70% are the steps). */
+const mastery = (accuracy: number) => (accuracy >= 0.9 ? 3 : accuracy >= 0.7 ? 2 : 1);
 type SheetName = 'streak' | 'goal' | 'settings' | null;
 
 export function Home({ course, progress, health, update, onReset }: Props) {
@@ -83,38 +86,45 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   return (
     <div className="home">
       <header className="home-top">
-        <div>
+        <div className="wordmark">
+          <span className="mk" aria-hidden="true"><Icon name="check" size={18} strokeWidth={2.5} /></span>
           <h1>Interview Trainer</h1>
-          <p className="rank-line" data-testid="rank">
-            <b>{rank.title}</b>
-            {rank.next !== null ? ` · ${progress.xp}/${rank.next} XP to ${rank.nextTitle}` : ' · top rank'}
-          </p>
-          <div
-            className="rank-bar"
-            role="progressbar"
-            aria-label={`Progress to ${rank.nextTitle ?? 'top rank'}`}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(rank.fraction * 100)}
-          >
-            <div style={{ width: `${Math.round(rank.fraction * 100)}%` }} />
-          </div>
         </div>
-        <button type="button" className="icon-btn" aria-label="Settings" onClick={() => setSheet('settings')}>⚙</button>
+        <button type="button" className="icon-btn" aria-label="Settings" onClick={() => setSheet('settings')}><Icon name="settings" /></button>
       </header>
+
+      <div className="rank-block">
+        <p className="rank-line" data-testid="rank">
+          <b>{rank.title}</b>
+          {rank.next !== null ? ` · ${progress.xp}/${rank.next} XP to ${rank.nextTitle}` : ' · top rank'}
+        </p>
+        <div
+          className="rank-bar"
+          role="progressbar"
+          aria-label={`Progress to ${rank.nextTitle ?? 'top rank'}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(rank.fraction * 100)}
+        >
+          <div style={{ width: `${Math.round(rank.fraction * 100)}%` }} />
+        </div>
+      </div>
 
       <div className="home-stats">
         <button
           type="button"
           className="stat streak-chip"
+          data-label="Streak"
           data-testid="streak-chip"
           aria-label={`${status.streak} day streak${progress.freezes ? `, ${progress.freezes} freeze${progress.freezes === 1 ? '' : 's'}` : ''}. Show details`}
           onClick={() => setSheet('streak')}
         >
-          🔥 {status.streak}
-          {progress.freezes > 0 && <span className="freeze"> 🧊 {progress.freezes}</span>}
+          <b>
+            <Icon name="flame" /> {status.streak}
+            {progress.freezes > 0 && <span className="freeze"><Icon name="snowflake" size="1.1em" /> {progress.freezes}</span>}
+          </b>
         </button>
-        <span className="stat" title="Total XP" aria-label={`${progress.xp} XP`}>⚡ {progress.xp}</span>
+        <span className="stat xp-stat" data-label="XP" title="Total XP" aria-label={`${progress.xp} XP`}><b>{progress.xp.toLocaleString('en-US')}</b></span>
         <button
           type="button"
           className="goal-ring"
@@ -122,11 +132,11 @@ export function Home({ course, progress, health, update, onReset }: Props) {
           aria-label={`Daily goal ${goal.done}/${goal.target}: ${goal.done} of ${goal.target} questions today. Show details`}
           onClick={() => setSheet('goal')}
         >
-          <Ring fraction={goal.fraction} size={44} />
+          <Ring fraction={goal.fraction} size={40} />
           <span className="goal-text" data-testid="goal-text">{goal.done}/{goal.target}</span>
         </button>
       </div>
-      {note && <p className="stat-note" data-testid="streak-note">🧊 {note}</p>}
+      {note && <p className="stat-note" data-testid="streak-note"><Icon name="snowflake" size="1.1em" />{note}</p>}
       {status.state === 'lapsed' && (
         <p className="stat-note" data-testid="streak-note">
           Fresh start. Longest: {progress.longestStreak} · {plural(progress.stats.practiceDays, 'day')} practised
@@ -137,13 +147,16 @@ export function Home({ course, progress, health, update, onReset }: Props) {
 
       {iosTip && (
         <p className="notice" role="note">
-          On iPhone, add this app to your Home Screen (Share, then Add to Home Screen) so Safari does not clear your progress.{' '}
-          <button type="button" className="link" onClick={() => { dismissIosTip(); setIosTip(false); }}>Got it</button>
+          <Icon name="info" />
+          <span>
+            On iPhone, add this app to your Home Screen (Share, then Add to Home Screen) so Safari does not clear your progress.{' '}
+            <button type="button" className="link" onClick={() => { dismissIosTip(); setIosTip(false); }}>Got it</button>
+          </span>
         </p>
       )}
 
       <a className="card hero" href={hero.href} data-testid="daily-card">
-        <span className="emoji" aria-hidden="true">🎯</span>
+        <span className="tile-i solid" aria-hidden="true"><Icon name="target" size={22} /></span>
         <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
         <span className="cta" aria-hidden="true">{hero.cta}</span>
       </a>
@@ -158,75 +171,99 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </div>
       )}
 
-      <section className="practice">
+      <section className="practice" aria-label="Practice">
         <a className={`card action ${dueCount ? '' : 'disabled'}`} href={dueCount ? '#/review' : undefined} aria-disabled={!dueCount} data-testid="due-card">
-          <span className="emoji" aria-hidden="true">🩹</span>
+          <span className="tile-i" aria-hidden="true"><Icon name="rotate-ccw" size={22} /></span>
           <span>
             <b>Review due</b>
             <small data-testid="due-count" data-count={dueCount}>
               {dueCount ? `${cappedCount(dueCount)} ready to review` : 'All caught up'}
             </small>
           </span>
+          {dueCount > 0 && <Icon name="chevron-right" className="go" />}
         </a>
         <a className="card action" href="#/mix" data-testid="mix-card">
-          <span className="emoji" aria-hidden="true">🎲</span>
+          <span className="tile-i solid" aria-hidden="true"><Icon name="shuffle" size={22} /></span>
           <span><b>Mixed practice</b><small>8 questions, weighted toward your weak spots</small></span>
+          <Icon name="chevron-right" className="go" />
+        </a>
+        <a className="card action progress-link" href="#/progress" data-testid="progress-link">
+          <span className="tile-i" aria-hidden="true"><Icon name="chart-column" size={22} /></span>
+          <span>
+            <b>Progress</b>
+            <small data-testid="readiness-line">Readiness {ready.score} · {READINESS_TEXT[ready.label]}</small>
+          </span>
+          <Icon name="chevron-right" className="go" />
+        </a>
+        <a className="card action mock-link" href="#/mock" data-testid="mock-link">
+          <span className="tile-i" aria-hidden="true"><Icon name="timer" size={22} /></span>
+          <span>
+            <b>Mock interview</b>
+            <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
+          </span>
+          <Icon name="chevron-right" className="go" />
+        </a>
+        <a className="card action library-link" href="#/library" data-testid="library-link">
+          <span className="tile-i" aria-hidden="true"><Icon name="library" size={22} /></span>
+          <span>
+            <b>Library</b>
+            <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
+          </span>
+          <Icon name="chevron-right" className="go" />
         </a>
       </section>
 
-      <a className="card action progress-link" href="#/progress" data-testid="progress-link">
-        <span className="emoji" aria-hidden="true">📊</span>
-        <span>
-          <b>Progress</b>
-          <small data-testid="readiness-line">Readiness {ready.score} · {READINESS_TEXT[ready.label]}</small>
-        </span>
-      </a>
+      <div className="progress-line">
+        <div className="row">
+          <span className="label">{done} / {total} lessons</span>
+          {nextLesson ? <a href={`#/lesson/${nextLesson.id}`}>Up next: {nextLesson.title}</a> : <span className="label">All lessons done</span>}
+        </div>
+        <div className="segs" aria-hidden="true">
+          {Array.from({ length: total }, (_, i) => <i key={i} className={i < done ? 'on' : ''} />)}
+        </div>
+      </div>
 
-      <a className="card action mock-link" href="#/mock" data-testid="mock-link">
-        <span className="emoji" aria-hidden="true">⏱️</span>
-        <span>
-          <b>Mock interview</b>
-          <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
-        </span>
-      </a>
-
-      <a className="card action library-link" href="#/library" data-testid="library-link">
-        <span className="emoji" aria-hidden="true">📚</span>
-        <span>
-          <b>Library</b>
-          <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
-        </span>
-      </a>
-
-      <p className="overall">{done}/{total} lessons completed{nextLesson ? <> · up next: <a href={`#/lesson/${nextLesson.id}`}>{nextLesson.title}</a></> : ' 🎉'}</p>
-
-      {course.units.map((unit) => {
+      {course.units.map((unit, ui) => {
         const completed = unit.lessons.filter((l) => progress.lessons[l.id]).length;
+        const { icon, style } = unitStyle(unit);
         return (
-          <section key={unit.id} className="unit" style={{ ['--accent' as string]: unit.color }}>
-            <div className="unit-banner">
-              <span className="emoji big" aria-hidden="true">{unit.emoji}</span>
-              <div>
-                <h2>{unit.title}</h2>
-                <p>{unit.description}</p>
-              </div>
-              <span className="unit-count">{completed}/{unit.lessons.length}</span>
+          <section key={unit.id} className="unit-section" style={style} aria-labelledby={`unit-${unit.id}`}>
+            <div className="unit-head">
+              <span className="glyph" aria-hidden="true"><Icon name={icon} size={20} /></span>
+              <span className="label">Unit {String(ui + 1).padStart(2, '0')}</span>
+              <span className="tally" aria-label={`${completed} of ${unit.lessons.length} lessons done`}>{completed}/{unit.lessons.length}</span>
+              <h2 id={`unit-${unit.id}`}>{unit.title}</h2>
+              <p>{unit.description}</p>
             </div>
-            <ol className="path">
+            <ol className="lessons">
               {unit.lessons.map((lesson, i) => {
                 const rec = progress.lessons[lesson.id];
+                const isNext = lesson.id === nextLesson?.id;
+                const level = rec ? mastery(rec.bestAccuracy) : 0;
                 return (
-                  <li key={lesson.id} className={`node-row ${i % 2 ? 'right' : 'left'}`}>
-                    <a className={`node ${rec ? 'done' : ''}`} href={`#/lesson/${lesson.id}`} aria-label={`${i + 1}. ${lesson.title}${rec ? `, completed with ${stars(rec.bestAccuracy)} stars` : ''}`}>
-                      <span aria-hidden="true">{rec ? '★' : i + 1}</span>
+                  <li key={lesson.id}>
+                    <a
+                      className={`lesson-row ${isNext ? 'next' : ''} ${rec ? 'done' : ''}`}
+                      href={`#/lesson/${lesson.id}`}
+                      aria-label={`${i + 1}. ${lesson.title}${rec ? `, completed, mastery ${level} of 3` : ''}${isNext ? ', up next' : ''}`}
+                    >
+                      <span className="no" aria-hidden="true">{ui + 1}.{i + 1}</span>
+                      <span>
+                        <b>{lesson.title}</b>
+                        <small>
+                          {lesson.questions.length} questions
+                          {isNext && <span className="tag-next">Up next</span>}
+                        </small>
+                      </span>
+                      <span className="status" aria-hidden="true">
+                        {rec && (
+                          <span className="mastery">
+                            {[1, 2, 3].map((n) => <i key={n} className={n <= level ? 'on' : ''} />)}
+                          </span>
+                        )}
+                        <span className={`box ${rec ? 'done' : ''}`}>{rec && <Icon name="check" size={14} strokeWidth={2.75} />}</span>
+                      </span>
                     </a>
-                    <div className="node-label">
-                      <b>{lesson.title}</b>
-                      <small>
-                        {lesson.questions.length} questions
-                        {rec && <span className="stars" aria-hidden="true"> · {'★'.repeat(stars(rec.bestAccuracy))}{'☆'.repeat(3 - stars(rec.bestAccuracy))}</span>}
-                      </small>
-                    </div>
                   </li>
                 );
               })}
@@ -236,8 +273,9 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       })}
 
       <footer className="home-foot">
-        <p className={`pill ${health?.ai ? 'on' : ''}`}>
-          {health?.ai ? `🤖 AI grading on · ${health.model}` : '📴 AI grading off · open questions are self-assessed'}
+        <p className="status-line">
+          <Icon name={health?.ai ? 'bot' : 'wifi-off'} />
+          {health?.ai ? `AI grading on · ${health.model}` : 'AI grading off. Open answers are self-assessed.'}
         </p>
         <button type="button" className="link" onClick={() => setSheet('settings')}>Settings and backup</button>
       </footer>

@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
 import { READINESS_TEXT, readiness, topicStats, type Course, type Progress } from '@trainer/shared';
 import { Calibration } from '../components/Calibration';
+import { Icon } from '../components/icons';
 import { MockHistory } from '../components/MockHistory';
 import { TrophyCase } from '../components/TrophyCase';
 import { ShareCardButton } from '../components/ShareCardButton';
 import { useToday } from '../lib/today';
+import { unitStyle } from '../lib/unit-style';
 
 interface Props {
   course: Course;
@@ -17,14 +19,13 @@ export function ProgressScreen({ course, progress }: Props) {
   const today = useToday();
   const ready = useMemo(() => readiness(course, progress, today), [course, progress, today]);
   const topics = useMemo(() => topicStats(course, progress, today), [course, progress, today]);
-  const colorOf = (id: string) => course.units.find((u) => u.id === id)?.color ?? 'var(--blue)';
-  const emojiOf = (id: string) => course.units.find((u) => u.id === id)?.emoji ?? '';
+  const styleOf = (id: string) => unitStyle(course.units.find((u) => u.id === id) ?? { id });
   const weakest = topics.find((t) => t.unitId === ready.weakestUnitId);
 
   return (
     <div className="home progress-page">
       <header className="page-top">
-        <a className="icon-btn back" href="#/" aria-label="Back to home">←</a>
+        <a className="icon-btn back" href="#/" aria-label="Back to home"><Icon name="arrow-left" /></a>
         <h1>Progress</h1>
       </header>
 
@@ -42,17 +43,18 @@ export function ProgressScreen({ course, progress }: Props) {
 
       {weakest && (
         <a className="card action" href={`#/topic/${weakest.unitId}`} data-testid="weakest-topic">
-          <span className="emoji" aria-hidden="true">🎯</span>
+          <span className="tile-i" aria-hidden="true"><Icon name="target" size={22} /></span>
           <span><b>Your weakest topic: {weakest.title} ({pct(weakest.strength)}%)</b><small>Practise it</small></span>
+          <Icon name="chevron-right" className="go" />
         </a>
       )}
 
       <h2>Topics</h2>
       <ul className="topics">
         {topics.map((t) => (
-          <li key={t.unitId} data-testid={`topic-${t.unitId}`}>
+          <li key={t.unitId} data-testid={`topic-${t.unitId}`} style={styleOf(t.unitId).style}>
             <div className="topic-head">
-              <span aria-hidden="true">{emojiOf(t.unitId)}</span>
+              <span className="glyph" aria-hidden="true"><Icon name={styleOf(t.unitId).icon} /></span>
               <b>{t.title}</b>
               <span className="muted">{pct(t.strength)}%</span>
             </div>
@@ -64,7 +66,7 @@ export function ProgressScreen({ course, progress }: Props) {
               aria-valuemax={100}
               aria-valuenow={pct(t.strength)}
             >
-              <div style={{ width: `${pct(t.strength)}%`, background: colorOf(t.unitId) }} />
+              <div style={{ width: `${pct(t.strength)}%` }} />
             </div>
             <div className="topic-foot">
               <small className="muted">{t.seen}/{t.total} seen{t.due > 0 ? ` · ${t.due} due` : ''}{t.mastered > 0 ? ` · ${t.mastered} mastered` : ''}</small>

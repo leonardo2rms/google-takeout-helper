@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { MAX_NOTE_CHARS, dayKey, isBookmarked, noteOf, setNote, toggleBookmark, type Question } from '@trainer/shared';
 import { useProgress } from '../lib/store';
+import { Icon } from './icons';
 
 interface Props {
   q: Question;
@@ -38,7 +39,7 @@ export function QuestionTools({ q, startEditing = false, testIdPrefix = 'tools' 
           data-testid={`${testIdPrefix}-star`}
           onClick={() => update((p) => toggleBookmark(p, q, dayKey(new Date())))}
         >
-          <span aria-hidden="true">{starred ? '★' : '☆'}</span> {starred ? 'Saved' : 'Save'}
+          <Icon name="bookmark" /> {starred ? 'Saved' : 'Save'}
         </button>
         <button
           type="button"
@@ -47,7 +48,7 @@ export function QuestionTools({ q, startEditing = false, testIdPrefix = 'tools' 
           data-testid={`${testIdPrefix}-note-btn`}
           onClick={() => (editing ? setEditing(false) : (setDraft(saved ?? ''), setEditing(true)))}
         >
-          <span aria-hidden="true">📝</span> {saved ? 'Edit note' : 'Add note'}
+          <Icon name="square-pen" /> {saved ? 'Edit note' : 'Add note'}
         </button>
       </div>
 
@@ -73,7 +74,7 @@ export function QuestionTools({ q, startEditing = false, testIdPrefix = 'tools' 
           <div className="q-note-actions">
             <span className="hint">{draft.length}/{MAX_NOTE_CHARS}</span>
             <button type="button" className="btn small ghost" onClick={() => setEditing(false)}>Cancel</button>
-            <button type="button" className="btn small secondary" data-testid={`${testIdPrefix}-note-save`} onClick={commit}>Save note</button>
+            <button type="button" className="btn small primary" data-testid={`${testIdPrefix}-note-save`} onClick={commit}>Save note</button>
           </div>
         </div>
       )}
