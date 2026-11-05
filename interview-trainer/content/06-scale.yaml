@@ -200,7 +200,7 @@ lessons:
           - { id: c, text: "A shared database for the three services, so that a single local transaction covers everything" }
           - { id: d, text: "Retry each step forever without compensation and hope each service eventually succeeds" }
         answer: a
-        explanation: "Sagas trade atomicity for availability and give eventual consistency. Design compensations (refund, release stock) and make every step idempotent."
+        explanation: "Sagas trade atomicity for availability and give eventual consistency. Design compensations (refund, release stock) and make every step idempotent. Two-phase commit holds locks across all participants and blocks when the coordinator fails, a shared database defeats the premise that each service owns its data, and retrying without compensation leaves partial orders."
 
       - type: order
         hint: "Which attempt must be allowed to throw to the caller, and where does that call sit relative to the loop?"
@@ -411,7 +411,7 @@ lessons:
       - type: single
         prompt: "With cache-aside, a write must update the database and invalidate the cached entry. Which order is generally safer, and why?"
         options:
-          - { id: a, text: "Update the database first, then delete the cache entry: the stale window is only the gap" }
+          - { id: a, text: "Update the database first, then delete the cache entry: the stale window shrinks to the short gap" }
           - { id: b, text: "Delete the cache entry first, then update the database: this ensures that no stale value is read" }
           - { id: c, text: "Write the new value into the cache first, then the database, so that readers see it immediately" }
           - { id: d, text: "The order does not matter, because the cache and the database converge after the TTL anyway" }
