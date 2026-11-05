@@ -1,0 +1,324 @@
+id: testing
+title: Testing & Quality
+emoji: "🧪"
+color: "#f2559b"
+description: Test strategy, Spring test slices, Testcontainers, mocking pitfalls, coroutine testing, flaky tests and testing AI features.
+lessons:
+  - id: testing-strategy
+    title: Strategy and Spring tests
+    questions:
+      - type: single
+        prompt: "Teams following the testing 'trophy' or 'honeycomb' idea put more weight on integration tests than the classic pyramid does. What is the main reasoning?"
+        options:
+          - { id: a, text: "Many real bugs live in the wiring between components (SQL, serialization, configuration), which isolated unit tests full of mocks cannot see" }
+          - { id: b, text: "Unit tests are always slower than integration tests" }
+          - { id: c, text: "Integration tests never need test data or cleanup" }
+          - { id: d, text: "Unit tests cannot be written for Kotlin code" }
+        answer: a
+        explanation: "The pyramid's logic (many fast, cheap tests; few slow ones) still holds, but with modern tooling such as slices and Testcontainers, integration tests are cheaper than they were, and they check what users depend on. Judge a test by the confidence it buys per second and per hour of maintenance, not by its label."
+
+      - type: match
+        prompt: Match each test double to its definition.
+        pairs:
+          - { left: "Dummy", right: "Only fills a parameter list and is never actually used" }
+          - { left: "Stub", right: "Returns canned answers to the calls the test makes" }
+          - { left: "Spy", right: "Wraps a real object and records how it was called" }
+          - { left: "Mock", right: "Is set up with expectations about calls and fails if they are not met" }
+          - { left: "Fake", right: "Has a real but simplified implementation, such as an in-memory repository" }
+        explanation: "Names vary between libraries (Mockito calls everything a 'mock'), but the roles differ. Prefer stubs and fakes that let you assert on outcomes; reach for mocks and spies when the interaction itself is the behavior, such as 'an email was sent'."
+
+      - type: single
+        prompt: "What does `@WebMvcTest(OrderController::class)` set up?"
+        options:
+          - { id: a, text: "Only the Spring MVC slice (the controller, JSON conversion, validation, controller advice) with MockMvc; collaborators such as services must be supplied as mocks or fakes" }
+          - { id: b, text: "The full application context with every bean, plus an embedded server on a random port" }
+          - { id: c, text: "Only the JPA repositories, running on an embedded database" }
+          - { id: d, text: "Nothing from Spring: it is plain JUnit with no application context" }
+        answer: a
+        explanation: "Slice annotations load just one layer's auto-configuration, which is why they start fast. A full server on a random port is `@SpringBootTest(webEnvironment = RANDOM_PORT)`. Because services are not loaded, you provide them as mock beans or fakes."
+
+      - type: single
+        prompt: "Which statement about `@DataJpaTest` is accurate?"
+        options:
+          - { id: a, text: "Each test runs in a transaction that is rolled back at the end by default, so tests do not leak data into each other" }
+          - { id: b, text: "It loads all @Service and @Controller beans so you can test whole flows" }
+          - { id: c, text: "It starts a web server and connects to the production database" }
+          - { id: d, text: "It commits at the end of every test so later tests can reuse the data" }
+        answer: a
+        explanation: "The default rollback keeps tests isolated, but note that nothing may actually be flushed to the database, so constraint violations can stay hidden unless you flush explicitly. By default it may also swap in an embedded database; for production-faithful tests use a real engine via Testcontainers."
+
+      - type: multi
+        prompt: Select ALL of these that are common mocking pitfalls.
+        options:
+          - { id: a, text: "Verifying the exact sequence of internal calls instead of asserting on observable results" }
+          - { id: b, text: "Mocking a third-party library's types directly throughout your code instead of wrapping it in a small adapter you own and testing that adapter against the real thing" }
+          - { id: c, text: "Chains of mocks returning other mocks (deep stubs) just to reach the one value the test needs" }
+          - { id: d, text: "Replacing a slow external HTTP dependency with a fake in tests" }
+          - { id: e, text: "Giving each test its own freshly created stub" }
+        answers: [a, b, c]
+        explanation: "Interaction-heavy tests break on every refactoring that keeps behavior the same, and mocks of types you do not own encode your guess of how the library behaves. Wrap third-party code behind your own interface; fakes for slow dependencies and per-test fixtures are good practice."
+
+      - type: fill
+        lang: java
+        prompt: "Wire the container's JDBC URL into Spring at runtime. (The mapped port is random, so it cannot be hard-coded.)"
+        template: |
+          @SpringBootTest
+          class RepoIT {
+              // db: a started Testcontainers PostgreSQL container
+
+              @[[1]]
+              static void props(DynamicPropertyRegistry registry) {
+                  registry.add("spring.datasource.url", db::[[2]]);
+              }
+          }
+        bank: ["DynamicPropertySource", "getJdbcUrl", "TestPropertySource", "getHost", "Bean", "getDatabaseName"]
+        answers: ["DynamicPropertySource", "getJdbcUrl"]
+        explanation: "`@DynamicPropertySource` registers properties as suppliers evaluated after the container has started, so the random host port is known. `@TestPropertySource` only takes static values. In newer Spring Boot versions `@ServiceConnection` can do this wiring for you."
+
+      - type: spot
+        prompt: "The second test passes or fails depending on test order. Tap the line that causes this."
+        source: |
+          class CartTest {
+              companion object { val cart = Cart() }
+
+              @Test fun `adds an item`() {
+                  cart.add(book)
+                  assertEquals(1, cart.items.size)
+              }
+
+              @Test fun `a new cart is empty`() {
+                  assertEquals(0, cart.items.size)
+              }
+          }
+        answers: [2]
+        explanation: "JUnit creates a new test-class instance per test, but a `companion object` is shared by all of them, so state leaks between tests. Create the object per test (a field, or a `@BeforeEach`), and keep fixtures immutable or isolated so that tests can run in any order and in parallel."
+
+      - type: single
+        prompt: "Why do teams use test data builders (`anOrder().withStatus(SHIPPED).build()`) or factory functions with default arguments?"
+        options:
+          - { id: a, text: "Each test spells out only the values that matter for it, defaults fill in the rest, and a constructor change is fixed in one place" }
+          - { id: b, text: "They make tests run faster because objects are created lazily" }
+          - { id: c, text: "They remove the need for assertions" }
+          - { id: d, text: "JUnit requires builders to create test objects" }
+        answer: a
+        explanation: "Noise hides intent: a test that sets twelve constructor fields makes the one relevant field hard to see. In Kotlin, a function `anOrder(status = SHIPPED)` with default parameters often replaces a full builder."
+
+      - type: open
+        prompt: "When would you choose a full `@SpringBootTest` over a slice test, and how do you keep a Spring test suite fast and reliable?"
+        modelAnswer: "Slices such as @WebMvcTest and @DataJpaTest start only part of the context, so they are fast and focused: use them for controller contracts and repository queries. Use @SpringBootTest for a few end-to-end tests that need real wiring: the security filter chain, serialization through the real stack, transactions, messaging and auto-configuration. To keep the suite fast, remember that Spring caches application contexts keyed by their configuration, so reuse the same configuration across test classes and avoid things that fragment the cache, such as many different mock-bean sets, varying properties or @DirtiesContext. Use real dependencies through Testcontainers, with one shared container started once, instead of mocking the database, and keep the number of these slow tests small."
+        keyPoints:
+          - point: "Slice tests for fast, focused checks of one layer (web or persistence)"
+            keywords: ["slice", "webmvctest", "datajpatest", "focused"]
+          - point: "@SpringBootTest for a few end-to-end tests of real wiring (security, serialization, configuration)"
+            keywords: ["springboottest", "end-to-end", "wiring", "full context"]
+          - point: "Context caching: reuse the same configuration, avoid @DirtiesContext and varied mock or property setups"
+            keywords: ["context cach", "cached", "dirtiescontext", "reuse"]
+          - point: "Real dependencies via a shared Testcontainers instance rather than mocking the database"
+            keywords: ["testcontainers", "real database", "container"]
+        followUps:
+          - when: missed
+            point: 3
+            prompt: "Why can adding one extra mock bean to a single test class make the whole suite slower?"
+            modelAnswer: "Spring caches an application context and reuses it for test classes with an identical configuration: the same config classes, properties, active profiles and mock bean definitions. A class that declares a different mock bean, property or profile has a different cache key, so Spring has to build a new context, which can take seconds. With many variations the suite pays that startup cost over and over. The fix is to share a base configuration, put common mocks in one shared test configuration, and avoid @DirtiesContext, which throws the cached context away."
+            keyPoints:
+              - point: "Contexts are cached and reused for an identical configuration"
+                keywords: ["cache", "identical configuration", "same configuration"]
+              - point: "A different mock, property or profile creates a new context with a slow startup"
+                keywords: ["new context", "different", "startup"]
+              - point: "Share configuration and avoid @DirtiesContext"
+                keywords: ["share", "dirtiescontext", "common"]
+          - when: covered
+            point: 4
+            prompt: "Testcontainers makes the suite slower and needs Docker on CI. Is it worth it compared with an in-memory database such as H2?"
+            modelAnswer: "Usually yes when the code depends on real database behavior. H2 imitates only part of a real database's SQL dialect, types, locking and functions, so a test can pass on H2 and fail in production, or the reverse; native queries, JSON columns and migrations (Flyway or Liquibase) are common culprits. Testcontainers runs the same engine as production, so those get tested for real. Keep it fast by starting one container per test run, as a shared singleton reused across test classes. CI must provide Docker."
+            keyPoints:
+              - point: "An in-memory database differs from production in dialect, types and behavior, so tests can mislead"
+                keywords: ["dialect", "differ", "behavio", "production"]
+              - point: "Testcontainers runs the real engine, so migrations and native queries are tested for real"
+                keywords: ["same engine", "real engine", "migration", "native"]
+              - point: "Keep it fast with one shared, reused container; CI needs Docker"
+                keywords: ["shared", "singleton", "reuse", "docker"]
+
+  - id: testing-craft
+    title: Craft, flakiness and AI features
+    questions:
+      - type: order
+        kind: steps
+        prompt: Put the test-driven development loop in order.
+        lines:
+          - "Write a small failing test for the next behavior"
+          - "Run it and confirm it fails for the expected reason"
+          - "Write the simplest code that makes it pass"
+          - "Run the tests and confirm they pass"
+          - "Refactor the code and tests while keeping the tests green"
+        explanation: "Seeing the test fail first proves that it can fail: a test you never saw red might pass for the wrong reason. Refactoring only happens on green, so the tests protect you while you improve the design."
+
+      - type: estimate
+        prompt: "Your CI suite has 200 independent tests, each failing spuriously 1% of the time. What is the chance, in percent, that a given CI run fails at least once with no real bug?"
+        answer: 86.6
+        tolerance: 0.02
+        unit: "%"
+        explanation: "The chance that all 200 pass is 0.99^200 = 0.134, so at least one fails with probability 1 - 0.134 = 86.6%. Small flake rates compound across a large suite, and a red build people learn to re-run stops carrying information. Quarantine and fix flaky tests, do not retry them forever."
+
+      - type: multi
+        prompt: Select ALL common root causes of flaky tests.
+        options:
+          - { id: a, text: "Tests share mutable state (static fields, a database, files) and depend on execution order" }
+          - { id: b, text: "Asserting after a fixed sleep instead of waiting for a condition, so the result depends on timing" }
+          - { id: c, text: "Using the real clock, time zone or random numbers without controlling them" }
+          - { id: d, text: "Calling real external services over the network" }
+          - { id: e, text: "Giving test methods descriptive names" }
+          - { id: f, text: "Building each test's fixture fresh and isolated" }
+        answers: [a, b, c, d]
+        explanation: "Flakiness is nondeterminism: shared state, concurrency and time, randomness, and the outside world. Fix the cause (inject a clock, await a condition, isolate data, fake the network) instead of adding retries."
+
+      - type: spot
+        prompt: "This test fails now and then on a loaded CI machine. Tap the line that makes it flaky."
+        source: |
+          @Test
+          fun `sends welcome email after signup`() {
+              service.signUp("ana@example.com")   // publishes the email on another thread
+              Thread.sleep(200)
+              verify { mailer.send("ana@example.com") }
+          }
+        answers: [4]
+        explanation: "A fixed sleep is a guess about timing: too short and the test flakes, too long and it slows the suite. Wait for the condition with a timeout (for example Awaitility), or inject a synchronous executor or test dispatcher so that the work finishes before the assertion."
+
+      - type: match
+        prompt: Match each testing technique to what it does.
+        pairs:
+          - { left: "Contract test", right: "Verifies that a service's requests and responses match what its consumers expect, so teams can deploy independently" }
+          - { left: "Characterisation test", right: "Records what legacy code does today, right or wrong, so you can refactor safely" }
+          - { left: "Property-based test", right: "States an invariant, runs it on many generated inputs and shrinks a failure to a minimal example" }
+          - { left: "Mutation testing", right: "Injects small bugs into the code to see whether any test notices" }
+          - { left: "Integration test", right: "Exercises several real components together, such as your code with a real database" }
+        explanation: "Each answers a different question. Characterisation tests are the first step on untested legacy code: pin the behavior with the code as it is, then change it. Mutation testing measures how much your tests actually check, which line coverage cannot."
+
+      - type: code
+        prompt: "Write `findFlaky(runs)`. Each run is `{ test, commit, passed }`. A test is flaky if, on the SAME commit, it both passed and failed. Return the names of the flaky tests, without duplicates, sorted alphabetically."
+        starter: |
+          function findFlaky(runs) {
+            // your code
+          }
+        entry: findFlaky
+        tests:
+          - args:
+              - - { test: A, commit: c1, passed: true }
+                - { test: A, commit: c1, passed: false }
+                - { test: B, commit: c1, passed: true }
+            expect: ["A"]
+          - args:
+              - - { test: A, commit: c1, passed: false }
+                - { test: A, commit: c2, passed: true }
+            expect: []
+          - args:
+              - []
+            expect: []
+          - args:
+              - - { test: B, commit: c9, passed: false }
+                - { test: A, commit: c9, passed: true }
+                - { test: B, commit: c9, passed: true }
+                - { test: A, commit: c9, passed: false }
+            expect: ["A", "B"]
+          - args:
+              - - { test: A, commit: c1, passed: true }
+                - { test: A, commit: c1, passed: false }
+                - { test: A, commit: c1, passed: true }
+                - { test: A, commit: c1, passed: false }
+            expect: ["A"]
+            hidden: true
+          - args:
+              - - { test: A, commit: c1, passed: true }
+                - { test: A, commit: c1, passed: true }
+                - { test: A, commit: c2, passed: false }
+                - { test: A, commit: c2, passed: false }
+            expect: []
+            hidden: true
+        solution: |
+          function findFlaky(runs) {
+            const outcomes = new Map();
+            for (const { test, commit, passed } of runs) {
+              const key = JSON.stringify([test, commit]);
+              const seen = outcomes.get(key) ?? new Set();
+              seen.add(passed);
+              outcomes.set(key, seen);
+            }
+            const flaky = new Set();
+            for (const [key, seen] of outcomes) {
+              if (seen.size === 2) flaky.add(JSON.parse(key)[0]);
+            }
+            return [...flaky].sort();
+          }
+        kotlin: |
+          data class Run(val test: String, val commit: String, val passed: Boolean)
+
+          fun findFlaky(runs: List<Run>): List<String> =
+              runs.groupBy { it.test to it.commit }
+                  .filterValues { group -> group.map { it.passed }.toSet().size == 2 }
+                  .keys.map { it.first }.distinct().sorted()
+        explanation: "The key is 'same code, different result': a test that fails on commit c1 and passes on c2 may simply have caught a real bug that was fixed. Comparing outcomes per (test, commit) pair isolates nondeterminism, which is how CI systems detect flaky tests automatically."
+
+      - type: single
+        prompt: "How long does this test take to run?"
+        code:
+          source: |
+            @Test
+            fun `waits ten seconds`() = runTest {
+                var done = false
+                launch { delay(10_000); done = true }
+                advanceUntilIdle()
+                assertTrue(done)
+            }
+        options:
+          - { id: a, text: "Almost no time: `delay` inside `runTest` uses virtual time, and `advanceUntilIdle()` moves the scheduler's clock forward" }
+          - { id: b, text: "Ten real seconds, as `delay` always waits for real" }
+          - { id: c, text: "It fails, because `delay` cannot be used in tests" }
+          - { id: d, text: "It hangs, because `launch` needs a real dispatcher" }
+        answer: a
+        explanation: "`runTest` runs the body on a test scheduler with a virtual clock, so delays are skipped instantly, which makes timeout, retry and debounce logic testable. It only works if the code under test uses the injected test dispatcher, so inject dispatchers instead of hard-coding `Dispatchers.IO`."
+
+      - type: single
+        prompt: "A mutation testing tool changes `if (age >= 18)` to `if (age > 18)` and every test still passes. What does this tell you?"
+        options:
+          - { id: a, text: "No test pins down the boundary at 18: the line may be covered, but nothing asserts that behavior" }
+          - { id: b, text: "The code is correct and the tests are excellent" }
+          - { id: c, text: "The mutation tool is broken" }
+          - { id: d, text: "Line coverage must be below 100%" }
+        answer: a
+        explanation: "A surviving mutant is a gap in the assertions. This is why mutation testing complements coverage: a test can execute a line without checking anything about it. (Some mutants are equivalent, meaning no test could tell them apart, but this one changes behavior at age 18.) Add a test for age 17, 18 and 19."
+
+      - type: open
+        prompt: "Your team ships a feature where an LLM summarises support tickets. How do you test it?"
+        modelAnswer: "Do not assert exact strings, since the output varies: treat it as evaluation. Build an eval set of representative real inputs, including edge and adversarial cases, with expected properties. Score outputs with deterministic checks where possible (valid JSON or schema, required fields, no personal data, length limits, cites the ticket) and a rubric or LLM-as-judge for quality, calibrated against human labels. Run the evals on every prompt, model or retrieval change, track the scores over time and gate releases on thresholds, remembering the variance (several samples). Test the surrounding deterministic code normally by faking the model client, and monitor production samples to grow the eval set."
+        keyPoints:
+          - point: "Builds an eval set of representative and edge cases instead of exact-string assertions"
+            keywords: ["eval", "golden", "dataset", "representative"]
+          - point: "Combines deterministic checks (schema, safety) with a rubric or LLM judge calibrated against humans"
+            keywords: ["judge", "rubric", "schema", "deterministic", "human"]
+          - point: "Runs evals on every prompt or model change, tracks scores and gates on thresholds, allowing for variance"
+            keywords: ["regression", "every prompt", "threshold", "track", "variance"]
+          - point: "Fakes the model client to test surrounding code, and monitors production"
+            keywords: ["fake", "stub", "mock", "monitor", "production"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "You use a second LLM to grade the outputs. What can go wrong, and how do you keep that judge trustworthy?"
+            modelAnswer: "A judge model has its own errors and biases: it may favor longer answers, its own style, or whichever option it sees first, and it can be inconsistent between runs. Calibrate it: have humans label a sample of outputs, measure how often the judge agrees, and refine the rubric until agreement is acceptable. Use a narrow rubric with a pass or fail per criterion, prefer deterministic checks wherever they work, and re-check agreement periodically and whenever you change the judge model."
+            keyPoints:
+              - point: "Judges have biases and variance (length, position, inconsistency)"
+                keywords: ["bias", "length", "position", "inconsisten", "variance"]
+              - point: "Calibrate against human labels and measure agreement"
+                keywords: ["human", "agreement", "calibrat", "label"]
+              - point: "Use a narrow rubric and prefer deterministic checks where possible"
+                keywords: ["rubric", "deterministic", "narrow"]
+          - when: covered
+            point: 3
+            prompt: "A prompt change raises the average eval score by 2 points on a 50-case set. Do you ship it?"
+            modelAnswer: "Not on that evidence alone. With 50 cases and a nondeterministic model, a 2 point change may be noise. Check the variance by running several samples, look at per-case regressions rather than only the average, because a few important cases may have broken, and grow the set around the cases that matter most. Then roll out gradually behind a flag or canary and compare production metrics before going to everyone."
+            keyPoints:
+              - point: "A small gain on a small set may be noise; check variance with repeated runs"
+                keywords: ["noise", "variance", "several samples", "repeat"]
+              - point: "Inspect per-case regressions, not only the average"
+                keywords: ["per-case", "regression", "average"]
+              - point: "Grow the set and roll out gradually, comparing production metrics"
+                keywords: ["canary", "flag", "gradual", "grow"]
