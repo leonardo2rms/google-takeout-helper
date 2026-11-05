@@ -100,10 +100,49 @@ describe('parked copies', () => {
     expect(listParked(s).map((c) => c.raw)).toEqual(['one']);
   });
 
-  it('gives up cleanly when a day has used up every suffix', () => {
+  it('continues on the next day stamp when a day has used up every suffix, instead of refusing to save', () => {
     const s = fake();
-    for (let i = 0; i < 31; i++) s.data.set(parkedKey('unreadable', '2026-11-05', i + 1), `x${i}`);
-    expect(parkRaw(s, 'new', '2026-11-05', 'unreadable')).toBeNull();
+    for (let i = 0; i < 99; i++) s.data.set(parkedKey('unreadable', '2026-11-05', i + 1), `x${i}`);
+    const key = parkRaw(s, 'new', '2026-11-05', 'unreadable');
+    expect(key).toBe(parkedKey('unreadable', '2026-11-06', 1));
+    expect(listParked(s)[0]).toMatchObject({ key, raw: 'new' });
+  });
+
+  it('keeps the copy it just wrote when the clock was set back (copies from a later day exist)', () => {
+    const s = fake();
+    for (let i = 0; i < MAX_PARKED.unreadable; i++) s.data.set(parkedKey('unreadable', '2027-01-01', i + 1), `later-${i}`);
+    const key = parkRaw(s, future, '2026-11-05', 'unreadable');
+    expect(key).not.toBeNull();
+    const kept = listParked(s);
+    expect(kept).toHaveLength(MAX_PARKED.unreadable);
+    expect(kept.map((c) => c.raw)).toContain(future); // the newest-version data survives
+    expect(kept[0]!.key).toBe(key); // and sorts newest, so the "recovered" banner (keys above the acknowledged one) fires
+    expect(kept.map((c) => c.raw)).not.toContain('later-0'); // the oldest was the one dropped
+  });
+
+  it('keeps safety copies from being dropped in the same clock-set-back case', () => {
+    const s = fake();
+    for (let i = 0; i < MAX_PARKED.safety; i++) s.data.set(parkedKey('safety', '2027-01-01', i + 1), `later-${i}`);
+    expect(parkRaw(s, 'mine', '2026-11-05', 'safety')).not.toBeNull();
+    expect(listParked(s).map((c) => c.raw)).toContain('mine');
+  });
+
+  it('does not overwrite an existing slot in a storage that cannot list its keys', () => {
+    const data = new Map<string, string>();
+    const blind: StorageLike = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v) };
+    const k1 = parkRaw(blind, 'first', '2026-11-05', 'unreadable');
+    const k2 = parkRaw(blind, 'second', '2026-11-05', 'unreadable');
+    expect(k1).not.toBe(k2);
+    expect([...data.values()].sort()).toEqual(['first', 'second']);
+  });
+
+  it('never reuses a slot after rotation freed a lower one, and ignores keys with an impossible date', () => {
+    const s = fake();
+    s.data.set(`${BACKUP_PREFIX}99999999`, 'impossible-date');
+    for (let i = 0; i < 12; i++) parkRaw(s, `b${i}`, '2026-11-05', 'unreadable');
+    const raws = listParked(s).map((c) => c.raw);
+    expect(raws).toContain('b11');
+    expect(new Set(raws).size).toBe(raws.length);
   });
 
   it('lists both kinds with their day, and ignores other keys', () => {
@@ -138,5 +177,57 @@ describe('parked copies', () => {
     const s = fake();
     s.removeItem = () => { throw new Error('denied'); };
     for (let i = 0; i < MAX_PARKED.unreadable + 1; i++) expect(parkRaw(s, `b${i}`, '2026-11-05', 'unreadable')).not.toBeNull();
+  });
+});
+
+describe('loadProgress keeps a copy before normalising away data (N-S2-4)', () => {
+  const valid = () => JSON.parse(JSON.stringify({ ...emptyProgress(), xp: 40 })) as Record<string, unknown>;
+
+  it('parks the original when a same-version profile carries a field this version does not know', () => {
+    const raw = JSON.stringify({ ...valid(), futureThing: { a: 1 } });
+    const s = fake({ [KEY_V2]: raw });
+    const res = loadProgress(s, ctx);
+    expect(res.progress.xp).toBe(40);
+    expect(res.protectedRaw).toBeNull();
+    expect(listParked(s).map((c) => c.raw)).toEqual([raw]); // the original text, extra field included
+    expect(s.data.get(KEY_V2)).not.toContain('futureThing');
+  });
+
+  it('parks the original when a field is malformed (a streak of "x")', () => {
+    const raw = JSON.stringify({ ...valid(), streak: 'x' });
+    const s = fake({ [KEY_V2]: raw });
+    loadProgress(s, ctx);
+    expect(listParked(s).map((c) => c.raw)).toEqual([raw]);
+  });
+
+  it('parks when a nested field is unknown or an invalid record is dropped', () => {
+    const p = valid() as { settings: Record<string, unknown>; cards: Record<string, unknown> };
+    p.settings.hologram = true;
+    const raw = JSON.stringify(p);
+    const s = fake({ [KEY_V2]: raw });
+    loadProgress(s, ctx);
+    expect(listParked(s)).toHaveLength(1);
+  });
+
+  it('does not write the normalised profile when the copy cannot be made: the original stays, protected', () => {
+    const raw = JSON.stringify({ ...valid(), futureThing: 1 });
+    const s = fake({ [KEY_V2]: raw });
+    s.failKeys = (k) => k.startsWith(BACKUP_PREFIX);
+    const res = loadProgress(s, ctx);
+    expect(res.protectedRaw).toBe(raw);
+    expect(s.data.get(KEY_V2)).toBe(raw);
+    expect(res.progress.xp).toBe(40);
+  });
+
+  it('stays quiet for routine changes: defaults filled in, clamped numbers, retired days', () => {
+    const old = valid() as Record<string, unknown>;
+    delete old.longestStreak; // a default gets filled in
+    old.freezes = 99; // clamped
+    old.days = { '2020-01-01': { xp: 5, answered: 1, firstTry: 1, target: 3 } }; // older than the retention window
+    const s = fake({ [KEY_V2]: JSON.stringify(old) });
+    const res = loadProgress(s, ctx);
+    expect(res.protectedRaw).toBeNull();
+    expect(listParked(s)).toEqual([]);
+    expect(s.data.get(KEY_V2)).not.toContain('2020-01-01'); // still normalised and rewritten
   });
 });

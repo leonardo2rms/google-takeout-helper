@@ -1,4 +1,4 @@
-import type { Day } from './day';
+import { addDays, isDay, type Day } from './day';
 import { migrateProgress, type MigrationContext } from './migrate';
 import { emptyProgress, type Progress } from './progress';
 
@@ -34,7 +34,8 @@ export interface ParkedCopy {
 
 /** How many copies of each kind are kept. The oldest goes only after a newer one was written successfully. */
 export const MAX_PARKED: Record<ParkedKind, number> = { unreadable: 8, safety: 3 };
-const MAX_PER_DAY = 30;
+/** Highest `-NN` suffix of one day's key; the next copy then continues on the following day's stamp. */
+const MAX_PER_DAY = 99;
 
 export interface Loaded {
   progress: Progress;
@@ -76,6 +77,11 @@ export function loadProgress(storage: StorageLike, ctx: MigrationContext): Loade
     if (res.problem) return { progress: res.progress, raw: raw2, protectedRaw: raw2, from: 0 };
     let raw = raw2;
     if (res.changed) {
+      // Normalising may throw data away (fields this version does not know, malformed values). That is only done once a
+      // copy of the original exists; when no copy can be made the original stays and is protected like unreadable data.
+      if (res.lossy && parkRaw(storage, raw2, ctx.today, 'unreadable') === null) {
+        return { progress: res.progress, raw: raw2, protectedRaw: raw2, from: 2 };
+      }
       raw = JSON.stringify(res.progress);
       safeSet(storage, KEY_V2, raw);
     }
@@ -131,28 +137,50 @@ export function listParked(storage: StorageLike): ParkedCopy[] {
   return out.sort((a, b) => (a.key < b.key ? 1 : a.key > b.key ? -1 : 0));
 }
 
+/** Where a well-formed parked key sits in creation order: the day stamp it carries, then its `-NN` index. */
+function slotOf(key: string, prefix: string): { stamp: string; n: number } | null {
+  const m = /^(\d{8})(?:-(\d{2}))?$/.exec(key.slice(prefix.length));
+  if (!m || !isDay(dayOfStamp(m[1]!))) return null;
+  return { stamp: m[1]!, n: m[2] === undefined ? 1 : Number(m[2]) };
+}
+
 /**
  * Sets `raw` aside under a key that is never reused: an existing copy is never replaced, so a second corruption cannot
  * erase the first. An identical copy that is already there counts as success. Returns the key holding the copy,
  * or null if it could not be written (quota, blocked storage): the caller must then keep the original where it is.
- * After a successful write the oldest copies beyond `MAX_PARKED` are dropped.
+ * After a successful write the oldest copies beyond `MAX_PARKED` are dropped, never the one just written.
+ *
+ * Copies are ordered by a sequence that only moves forward: the new key is always one past the newest existing one, even
+ * when the device clock went backwards (then the older day stamp is not used). Rotating by the wall-clock day alone would
+ * delete the copy just written whenever copies from a "later" day exist.
  */
 export function parkRaw(storage: StorageLike, raw: string, today: Day, kind: ParkedKind): string | null {
   const existing = listParked(storage).filter((c) => c.kind === kind);
   const same = existing.find((c) => c.raw === raw);
   if (same) return same.key;
-  // Always one past the highest index used today, so keys keep sorting in creation order even after rotation freed a lower slot.
-  const prefix = (kind === 'unreadable' ? BACKUP_PREFIX : SAFETY_PREFIX) + today.replaceAll('-', '');
-  let highest = 0;
+  const prefix = kind === 'unreadable' ? BACKUP_PREFIX : SAFETY_PREFIX;
+  let stamp = today.replaceAll('-', '');
+  let n = 1;
   for (const c of existing) {
-    if (!c.key.startsWith(prefix)) continue;
-    const m = /^-(\d{2})$/.exec(c.key.slice(prefix.length));
-    highest = Math.max(highest, m ? Number(m[1]) : c.key === prefix ? 1 : 0);
+    const slot = slotOf(c.key, prefix);
+    if (slot && (slot.stamp > stamp || (slot.stamp === stamp && slot.n >= n))) {
+      stamp = slot.stamp;
+      n = slot.n + 1;
+    }
   }
-  const key = highest < MAX_PER_DAY ? parkedKey(kind, today, highest + 1) : null;
+  let key: string | null = null;
+  for (let tries = 0; tries < 200 && key === null; tries++, n++) {
+    if (n > MAX_PER_DAY) {
+      stamp = addDays(dayOfStamp(stamp)!, 1).replaceAll('-', '');
+      n = 1;
+    }
+    const candidate = parkedKey(kind, dayOfStamp(stamp)!, n);
+    if (safeGet(storage, candidate) === null) key = candidate; // a storage that cannot enumerate must not overwrite a slot
+  }
   if (key === null || !safeSet(storage, key, raw)) return null;
   const all = listParked(storage).filter((c) => c.kind === kind); // newest first
   for (const old of all.slice(MAX_PARKED[kind])) {
+    if (old.key === key) continue;
     try {
       storage.removeItem?.(old.key);
     } catch {
