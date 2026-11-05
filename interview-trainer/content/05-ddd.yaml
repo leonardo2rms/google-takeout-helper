@@ -84,9 +84,9 @@ lessons:
         prompt: "In a hexagonal/DDD layout, where does the `OrderRepository` *interface* belong?"
         options:
           - { id: a, text: "The domain layer, so the domain defines the contract and JPA implements it elsewhere" }
-          - { id: b, text: "Infrastructure, next to the JPA implementation, because only that code uses it" }
+          - { id: b, text: "Infrastructure, next to the JPA implementation, because that code uses it" }
           - { id: c, text: "The web layer, because controllers are the main callers of repositories" }
-          - { id: d, text: "A shared 'common' module so that every service reuses one repository contract" }
+          - { id: d, text: "A shared 'common' module so that each service reuses one repository contract" }
         answer: a
         explanation: "The domain declares what it needs in domain terms (`save(order)`, `findById(id)`), and infrastructure implements it. That's the dependency inversion that keeps the domain free of Spring/JPA."
 
@@ -156,8 +156,8 @@ lessons:
         prompt: "In Sales, a \"Customer\" has credit limits and discounts. In Shipping, a \"Customer\" is just a delivery address and phone number. What does DDD recommend?"
         options:
           - { id: a, text: "Separate bounded contexts, each with its own Customer model, linked by an identifier" }
-          - { id: b, text: "One shared Customer class holding every field, so that all teams use the same definition" }
-          - { id: c, text: "A single global Customer table that every context reads and writes directly" }
+          - { id: b, text: "One shared Customer class holding each field, so that all teams use the same definition" }
+          - { id: c, text: "A single global Customer table that each context reads and writes directly" }
           - { id: d, text: "Rename one of the two concepts to avoid the clash, and keep one canonical model for the whole company" }
         answer: a
         explanation: "A model is only valid within a boundary. Trying to build one canonical model forces every team to couple to every other team's concerns."
@@ -190,7 +190,7 @@ lessons:
           - { id: a, text: "An integration event published across bounded contexts" }
           - { id: b, text: "An internal domain event raised and handled inside one aggregate" }
           - { id: c, text: "Neither; events have no schema" }
-          - { id: d, text: "Any event, since all events are public" }
+          - { id: d, text: "Each event, since all events are public" }
         answer: a
         explanation: "Domain events are internal facts and may change freely. An integration event is a published contract: design it deliberately, version it, and don't leak your internal model through it."
 
@@ -199,7 +199,7 @@ lessons:
         prompt: "A service saves an order to its DB and then publishes `OrderPlaced` to Kafka. The process crashes between the two steps. Which pattern fixes the inconsistency?"
         options:
           - { id: a, text: "Transactional outbox: write the event to an outbox table in the same transaction, then relay it" }
-          - { id: b, text: "Publish first and save afterwards, so that a crash can only leave an unsaved order" }
+          - { id: b, text: "Publish first and save afterwards, so that a crash leaves at worst an unsaved order" }
           - { id: c, text: "Wrap both calls in a try/catch and retry the failed step when the process restarts" }
           - { id: d, text: "Use a bigger Kafka cluster with acks=all so that the broker never loses the message" }
         answer: a
@@ -278,7 +278,7 @@ lessons:
         options:
           - { id: a, text: "Append a correcting event (a new `PriceChanged(sku, 99)` or a `PriceCorrected`); stored events are immutable facts" }
           - { id: b, text: "Edit or delete the wrong event, so the history shows the right price from the start" }
-          - { id: c, text: "Fix only the read model and leave the event stream as it is, since projections are disposable" }
+          - { id: c, text: "Fix the read model and leave the event stream as it is, since projections are disposable" }
           - { id: d, text: "Drop the event store and rebuild it from the current database tables, which hold the right price" }
         answer: a
         explanation: "The event log is the source of truth and the audit trail, so you add to it rather than rewrite it: the wrong event stays visible, and the correction says what changed and why. Editing history silently invalidates every projection and snapshot built from it. Patching only a read model leaves the source of truth wrong, so the next rebuild would bring the bug back."
@@ -287,8 +287,8 @@ lessons:
         prompt: "A CQRS system updates its read model asynchronously from events. After placing an order, the user is redirected to 'My orders' and the order is missing. Which fix keeps the benefit of the asynchronous read model?"
         options:
           - { id: a, text: "Return the order from the command and show it right away, or have the query wait for the projection's version (read-your-writes)" }
-          - { id: b, text: "Make every command sleep for a couple of seconds before it returns, so that the projection always has time to catch up under load" }
-          - { id: c, text: "Read from the write model's tables again and drop the asynchronous read model entirely" }
+          - { id: b, text: "Make each command sleep for a couple of seconds before it returns, so that the projection always has time to catch up under load" }
+          - { id: c, text: "Read from the write model's tables again and drop the asynchronous read model" }
           - { id: d, text: "Accept it, because eventual consistency means a UI can never show recent changes" }
         answer: a
         explanation: "Eventual consistency is a UX design problem as well as a technical one. Typical answers: optimistic UI using the command's response, a pending state, or a version token that lets the read side wait (briefly, with a timeout) for the projection to catch up. A fixed sleep is a race that is wrong under load, and querying the write model gives up the reason for having a read model."
