@@ -1,6 +1,23 @@
-import { defineConfig } from 'vitest/config';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, type Plugin } from 'vitest/config';
+// Relative import on purpose (same reason as web/vite.config.ts): this file is bundled before workspaces resolve.
+import { loadCourse } from './shared/src/load-content';
+
+const root = fileURLToPath(new URL('.', import.meta.url));
+
+/** Same `virtual:course` module the web build uses, so web/src/lib code that imports the course can be tested. */
+function virtualCourse(): Plugin {
+  const id = 'virtual:course';
+  return {
+    name: 'virtual-course',
+    resolveId: (source) => (source === id ? `\0${id}` : null),
+    load: (source) => (source === `\0${id}` ? `export default ${JSON.stringify(loadCourse(resolve(root, 'content')))};` : null),
+  };
+}
 
 export default defineConfig({
+  plugins: [virtualCourse()],
   test: {
     include: ['shared/src/**/*.test.ts', 'server/src/**/*.test.ts', 'web/src/**/*.test.ts', 'content/**/*.test.ts'],
     coverage: {
