@@ -257,3 +257,144 @@ lessons:
             keywords: ["volatile", "synchronized", "lock", "start", "join", "final"]
           - point: "Names at least two safe-publication mechanisms (volatile field, locks, concurrent collections, static initialiser, final fields)"
             keywords: ["safe publication", "concurrenthashmap", "blockingqueue", "queue", "static initial", "volatile field", "final field", "atomicreference"]
+
+  - id: jvm-advanced
+    title: JIT, class loading & diagnostics
+    questions:
+      - type: single
+        prompt: "After the JIT has warmed up, what may happen to the allocation of `d` in this hot method?"
+        code:
+          source: |
+            data class Vec(val x: Double, val y: Double)
+
+            fun length(x1: Double, y1: Double, x2: Double, y2: Double): Double {
+                val d = Vec(x2 - x1, y2 - y1)
+                return Math.sqrt(d.x * d.x + d.y * d.y)
+            }
+        options:
+          - { id: a, text: "C2 may prove that `d` never escapes the method and eliminate the allocation (scalar replacement), keeping `x` and `y` in registers" }
+          - { id: b, text: "The JVM always places such short-lived objects on the thread stack instead of the heap" }
+          - { id: c, text: "Escape analysis moves `d` into Metaspace so the GC never sees it" }
+          - { id: d, text: "Nothing can change: the JIT is not allowed to remove an allocation, because the garbage collector must be able to see every object" }
+        answer: a
+        explanation: "Escape analysis asks whether an object can be seen outside the method (stored in a field, passed to a non-inlined call, returned). If not, HotSpot's optimising compiler can replace the object by its fields and skip the allocation entirely. It is an optimisation, never a guarantee, and it depends on inlining: once `d` is passed to a call that is not inlined, it escapes and is allocated normally."
+
+      - type: single
+        prompt: "The call `it.area()` is hot. With one `Shape` implementation in production it is fast; when all five implementations flow through it, it gets noticeably slower. Why?"
+        code:
+          source: |
+            interface Shape { fun area(): Double }
+            // Circle, Square, Triangle, Rect and Hexagon implement Shape
+
+            fun total(shapes: List<Shape>): Double = shapes.sumOf { it.area() }
+        options:
+          - { id: a, text: "With one or two receiver types the JIT can inline the target behind a cheap type check and optimise across it; with more (a megamorphic call site) it falls back to virtual dispatch that cannot be inlined" }
+          - { id: b, text: "Interface calls are always slower than calls on a concrete class, regardless of how many types are seen" }
+          - { id: c, text: "Each additional implementation triggers a full garbage collection" }
+          - { id: d, text: "The JIT is disabled for call sites that see more than one class" }
+        answer: a
+        explanation: "HotSpot records which receiver types each call site sees. A monomorphic or bimorphic site is inlined with a guard, and inlining opens the door to further optimisations (escape analysis, constant folding). A site that sees many types needs a real virtual or interface call. This is why the same code can behave differently in a benchmark with one implementation and in production with many."
+
+      - type: multi
+        prompt: Select ALL true statements about class loading on the JVM.
+        options:
+          - { id: a, text: "A class is identified by its name together with its defining class loader: the same bytes loaded by two loaders give two distinct, incompatible types" }
+          - { id: b, text: "By default a class loader first delegates to its parent and only loads the class itself if the parent cannot" }
+          - { id: c, text: "Classes can be unloaded only when their defining class loader is unreachable and has been garbage collected" }
+          - { id: d, text: "All classes referenced by the main class are loaded and initialised eagerly at JVM startup" }
+          - { id: e, text: "Metaspace is limited by default by `-Xmx`" }
+        answers: [a, b, c]
+        explanation: "Loading is lazy (on first use), and Metaspace is a separate native-memory area that is unbounded unless `-XX:MaxMetaspaceSize` is set. Because classes live as long as their loader, a leaked reference to a webapp's class loader (a ThreadLocal, a static in a shared library, a registered JDBC driver, a live thread) keeps every class of the old deployment alive: the classic Metaspace leak on redeploys. The same class name loaded by two loaders is also the reason for puzzling `ClassCastException: X cannot be cast to X`."
+
+      - type: single
+        prompt: What does this safepoint log line tell you?
+        code:
+          lang: text
+          source: |
+            [41.208s][info][safepoint] Safepoint "G1CollectForAllocation", Time since last: 1204563800 ns, Reaching safepoint: 1812004300 ns, At safepoint: 19800100 ns, Total: 1831804400 ns
+        options:
+          - { id: a, text: "The GC work took about 20 ms, but the JVM waited about 1.8 s for application threads to reach the safepoint; look for threads that are slow to reach a poll (a long loop without safepoint polls, or a thread stalled by the OS) instead of tuning the collector" }
+          - { id: b, text: "The collection itself took 1.8 s, so increase the heap or switch to another collector" }
+          - { id: c, text: "The JVM spent 1.8 s resizing Metaspace" }
+          - { id: d, text: "This is normal: the 'Reaching safepoint' phase is always the longest part of a pause" }
+        answer: a
+        explanation: "A safepoint pause has two parts: time to safepoint (waiting until every Java thread has stopped at a poll) and the work done while stopped. All threads that already stopped sit idle during the first part, so the application sees the whole 1.8 s. GC logs that report only the collection time hide this; `-Xlog:safepoint` shows it. Tools that sample stacks or async-profiler help find the thread that was slow to arrive."
+
+      - type: spot
+        prompt: "Another thread sometimes calls `onPrice` and prints \"null\" as the currency. Tap the line that lets the object be seen too early."
+        source: |
+          class PriceListener(bus: EventBus) {
+              val currency: String
+
+              init {
+                  bus.register(this)
+                  currency = "EUR"
+              }
+
+              fun onPrice(p: Price) = println("${p.value} $currency")
+          }
+        answers: [5]
+        explanation: "`this` escapes from the constructor before `currency` is assigned: once registered, the bus (and another thread) can call `onPrice` on a half-built object. The Java Memory Model's guarantee for final fields (everyone who sees the reference sees the constructor-time values) only holds if `this` does not escape during construction. Finish construction first and register afterwards, for example in a factory function or a `start()` method."
+
+      - type: match
+        prompt: Match each diagnostic tool to what it is for.
+        pairs:
+          - { left: "JFR (Java Flight Recorder)", right: "Low-overhead recording of CPU samples, allocations, locks and GC events from a running JVM into a file" }
+          - { left: "Heap dump (`jcmd <pid> GC.heap_dump`)", right: "Snapshot of the live objects, to find what retains memory in a tool such as Eclipse MAT" }
+          - { left: "Thread dump (`jcmd <pid> Thread.print`)", right: "The stack of every thread at one instant, showing blocked threads and deadlocks" }
+          - { left: "async-profiler", right: "Sampling profiler that produces flame graphs without safepoint bias" }
+        explanation: "Pick the tool by the question: 'where is the CPU going or what is allocating' (JFR or async-profiler), 'who holds all this memory' (heap dump), 'why is everything stuck' (thread dump, ideally several a few seconds apart). JFR is designed to be safe to leave running in production; a heap dump pauses the JVM and can be large."
+
+      - type: estimate
+        prompt: "A service allocates about 500 MB per second. The eden space of the young generation is 2,000 MB. Roughly how many seconds pass between young collections, if eden fills completely each time?"
+        answer: 4
+        tolerance: 0
+        unit: seconds
+        explanation: "2,000 MB / 500 MB per second = 4 s between young GCs. The frequency is only half of the story: a young collection copies the survivors, so its cost grows with the amount of live data, not with the garbage. That is why a bigger eden usually reduces GC overhead (fewer collections, more time for objects to die) without a proportionally longer pause."
+
+      - type: multi
+        prompt: Select ALL true statements about virtual threads (JDK 21).
+        options:
+          - { id: a, text: "They are scheduled by the JVM onto a small pool of carrier threads, by default a `ForkJoinPool` sized to the number of available processors" }
+          - { id: b, text: "You should keep them in a fixed-size pool and reuse them, like platform threads" }
+          - { id: c, text: "`ThreadLocal` works in virtual threads, but a large per-thread cache multiplied by hundreds of thousands of threads becomes expensive" }
+          - { id: d, text: "To limit concurrent use of a scarce resource such as a database or a rate-limited API, use a `Semaphore` or a bounded resource pool instead of limiting the thread count" }
+          - { id: e, text: "They let CPU-bound code use more cores than there are carrier threads" }
+        answers: [a, c, d]
+        explanation: "Virtual threads are cheap, so you create one per task (`Executors.newVirtualThreadPerTaskExecutor()`) and never pool them; pooling was a way to ration expensive platform threads. Rationing moves to the resource that is actually scarce, which a semaphore expresses directly. Parallelism for CPU-bound work is still limited by the carrier threads, hence by the cores."
+
+      - type: open
+        prompt: "You benchmark two implementations with a simple loop and `System.nanoTime()`, and one looks 10x faster. Why might the result be misleading, and how do you measure properly?"
+        modelAnswer: "A hand-rolled loop measures the wrong thing. The JVM starts in the interpreter and the tiered JIT compiles hot code later, so the early iterations measure interpreted or C1 code, not steady state, and you need warm-up. The JIT may also remove the work altogether: if the result is never used it can eliminate the computation as dead code, and constant inputs can be folded at compile time, so you end up timing an empty loop. Allocation, GC and the type profile left by earlier code distort results further. A harness such as JMH handles this: it runs warm-up iterations before measuring, forks a fresh JVM per benchmark so profiles are not polluted, keeps inputs in non-final @State fields so they are not constants, and uses a Blackhole (or returns the result) to defeat dead-code elimination. Even then I would sanity-check the numbers against a profile and a realistic workload, because a microbenchmark can differ from production behaviour."
+        keyPoints:
+          - point: "Warm-up: the tiered JIT (interpreter, C1, C2) means early iterations are not steady state"
+            keywords: ["warm-up", "warmup", "tiered", "interpret"]
+          - point: "The JIT can eliminate unused work (dead-code elimination) and fold constants"
+            keywords: ["dead-code", "dead code", "constant", "eliminat"]
+          - point: "Use a harness such as JMH: forks, warm-up iterations, @State inputs, Blackhole"
+            keywords: ["jmh", "blackhole", "fork"]
+          - point: "Validate against realistic workloads and profiles; microbenchmarks can mislead"
+            keywords: ["realistic", "production", "profile", "workload"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "What is dead-code elimination in a benchmark, and how does JMH protect you from it?"
+            modelAnswer: "If the result of a computation is never used, the JIT is free to drop the computation, so the benchmark times an empty loop and reports absurdly fast numbers. JMH defends against this by letting the benchmark method return its result, which JMH consumes, or by passing values to a Blackhole. It also reads inputs from non-final @State fields so the compiler cannot constant-fold them."
+            keyPoints:
+              - point: "An unused result lets the JIT drop the whole computation"
+                keywords: ["never used", "unused", "drop", "empty"]
+              - point: "Return the value or pass it to a Blackhole"
+                keywords: ["blackhole", "return"]
+              - point: "Inputs come from non-final @State fields, so they cannot be constant-folded"
+                keywords: ["@state", "constant", "fold"]
+          - when: covered
+            point: 3
+            prompt: "Why does JMH run each benchmark in a freshly forked JVM?"
+            modelAnswer: "The JIT's decisions depend on the profile collected so far, for example which receiver types were seen at a call site. Code from earlier benchmarks in the same JVM pollutes that profile and can turn a monomorphic call site megamorphic, so results would depend on the order in which benchmarks ran. A fresh fork gives each benchmark clean state, and running several forks also averages out run-to-run variance."
+            keyPoints:
+              - point: "JIT decisions depend on the collected profile"
+                keywords: ["profile"]
+              - point: "Earlier benchmarks pollute it, for example turning a call site megamorphic"
+                keywords: ["pollut", "megamorphic", "receiver types"]
+              - point: "A fresh JVM gives clean state and averages out variance"
+                keywords: ["fresh", "clean state", "variance"]

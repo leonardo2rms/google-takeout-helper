@@ -299,3 +299,151 @@ lessons:
                 keywords: ["pool", "downstream", "serializ", "serialis", "gc", "thread pool", "lock"]
               - point: "Compare slow and fast requests; look at percentiles, not averages"
                 keywords: ["percentile", "p99", "compare", "average"]
+
+  - id: spring-advanced
+    title: Transactions, config & testing
+    questions:
+      - type: match
+        prompt: Match each transaction propagation to its behaviour.
+        pairs:
+          - { left: "`REQUIRED`", right: "Joins the current transaction, or starts one if none exists (the default)" }
+          - { left: "`REQUIRES_NEW`", right: "Suspends the current transaction and runs in a new, independent one" }
+          - { left: "`NESTED`", right: "Runs inside the current transaction using a savepoint, when the transaction manager supports it" }
+          - { left: "`MANDATORY`", right: "Throws an exception if there is no existing transaction" }
+          - { left: "`NEVER`", right: "Throws an exception if a transaction exists" }
+        explanation: "`REQUIRED` is what you want most of the time. `REQUIRES_NEW` suits work that must survive an outer rollback (an audit record), at the price of a second database connection. `NESTED` lets an inner failure roll back to the savepoint without aborting the outer transaction, but not every transaction manager supports it. `MANDATORY` and `NEVER` are assertions about the caller."
+
+      - type: single
+        prompt: A row fails inside `importRow` and the exception is caught as shown. What happens when `importAll` returns?
+        code:
+          source: |
+            @Service
+            class Importer(private val worker: RowWorker, private val repo: ImportRepo) {
+
+                @Transactional
+                fun importAll(rows: List<Row>) {
+                    for (row in rows) {
+                        try {
+                            worker.importRow(row)   // another bean, @Transactional (REQUIRED), throws on bad data
+                        } catch (e: RuntimeException) {
+                            log.warn("skipping {}", row, e)
+                        }
+                    }
+                    repo.markFinished()
+                }
+            }
+        options:
+          - { id: a, text: "UnexpectedRollbackException: the exception passing through the inner proxy marked the shared transaction rollback-only, so the outer commit fails" }
+          - { id: b, text: "The good rows are committed and only the failing row is skipped" }
+          - { id: c, text: "Only the failing row's changes are rolled back, because the inner call used a savepoint" }
+          - { id: d, text: "The outer commit succeeds, because the exception was caught" }
+        answer: a
+        explanation: "With `REQUIRED` the inner call joins the outer transaction. When the exception leaves the inner proxy, Spring marks the whole transaction rollback-only, and catching it in the caller does not clear that mark. To skip bad rows independently use `REQUIRES_NEW` (or `NESTED`) on `importRow`, or validate before writing."
+
+      - type: multi
+        prompt: "Two requests update the same account with read-modify-write and one update is lost. Select ALL effective fixes."
+        options:
+          - { id: a, text: "Optimistic locking with a `@Version` column, so the second update fails and can be retried" }
+          - { id: b, text: "A pessimistic write lock (`SELECT ... FOR UPDATE`) when reading the row" }
+          - { id: c, text: "One atomic statement such as `UPDATE account SET balance = balance - :amount WHERE id = :id AND balance >= :amount`" }
+          - { id: d, text: "Make the service method `synchronized`" }
+          - { id: e, text: "Lower the isolation level to `READ_UNCOMMITTED`" }
+        answers: [a, b, c]
+        explanation: "A lost update needs either detection (version check), exclusion (row lock) or a statement the database applies atomically. `synchronized` only covers one JVM, and with a proxy-based `@Transactional` the commit happens after the synchronized method has returned, so another thread can read the old value before the commit. Weaker isolation makes anomalies more likely, not less."
+
+      - type: estimate
+        prompt: "Each request holds one connection for its outer transaction and then, while still holding it, needs a second connection for a `REQUIRES_NEW` call. The pool has 10 connections and nothing else uses it. What is the largest number of concurrent requests for which a pool deadlock is impossible?"
+        answer: 9
+        tolerance: 0
+        unit: requests
+        explanation: "A pool cannot deadlock if at least one request can always finish: the rule is pool size >= requests x (connections per request - 1) + 1. With 9 requests holding one connection each, one connection is still free, so one request gets its second connection, completes and releases both. With 10 requests, all 10 connections are held by outer transactions and everybody waits for a second one until the timeout. Avoid holding a connection while asking for another."
+
+      - type: fill
+        prompt: Register the HTTP exporter only when it is enabled by a property, and a no-op exporter when no other `Exporter` bean exists.
+        template: |
+          @Configuration
+          class ExporterConfig {
+
+              @Bean
+              @[[1]](prefix = "app.export", name = ["enabled"], havingValue = "true")
+              fun httpExporter(): Exporter = HttpExporter()
+
+              @Bean
+              @[[2]]
+              fun noopExporter(): Exporter = NoopExporter()
+          }
+        bank: ["ConditionalOnProperty", "ConditionalOnMissingBean", "ConditionalOnBean", "ConditionalOnClass", "Profile"]
+        answers: ["ConditionalOnProperty", "ConditionalOnMissingBean"]
+        explanation: "`@ConditionalOnProperty` turns a bean on from configuration. `@ConditionalOnMissingBean` makes the second bean a back-off default, the same mechanism auto-configuration uses; `@ConditionalOnBean` would do the opposite. Condition evaluation depends on the order in which bean definitions are processed, which is why these conditions are most reliable in auto-configuration classes."
+
+      - type: multi
+        prompt: Select ALL true statements about `@ConfigurationProperties`.
+        options:
+          - { id: a, text: "Properties with a common prefix are bound to a typed class, with relaxed binding: `app.max-retries`, `app.maxRetries` and the environment variable `APP_MAXRETRIES` all bind to `maxRetries`" }
+          - { id: b, text: "With `@Validated` and Bean Validation constraints, invalid configuration makes the application fail at startup" }
+          - { id: c, text: "It can only bind `String` values; other types must be converted by hand" }
+          - { id: d, text: "Annotating the class is not enough by itself: it must also be registered, for example with `@EnableConfigurationProperties` or `@ConfigurationPropertiesScan`, or be a bean" }
+          - { id: e, text: "Values can only come from `application.properties`, never from environment variables" }
+        answers: [a, b, d]
+        explanation: "Typed, validated configuration fails fast at startup instead of with a `NullPointerException` hours later, and the same class is easy to construct in a unit test. Binding handles conversion (durations, lists, enums, nested objects) and reads from every property source, including environment variables and command-line arguments."
+
+      - type: single
+        prompt: What is the main problem with this metric?
+        code:
+          source: |
+            fun onRequest(req: HttpServletRequest, userId: String) {
+                registry.counter("api.requests", "path", req.requestURI, "user", userId).increment()
+            }
+        options:
+          - { id: a, text: "Every distinct path and user combination creates a new time series, so unbounded tag values (high cardinality) blow up memory in the app and the metrics backend" }
+          - { id: b, text: "`counter()` is not thread-safe, so counts are lost" }
+          - { id: c, text: "Tag keys must be unique across the whole application" }
+          - { id: d, text: "Counters cannot have tags, only gauges can" }
+        answer: a
+        explanation: "Each unique tag combination is its own series. Keep tag values low-cardinality and bounded: the route template (`/orders/{id}`), the status class, the outcome. Spring's own `http.server.requests` metric tags the URI template, not the raw URI, for exactly this reason. Put per-user detail into logs and traces instead."
+
+      - type: single
+        prompt: "`@WebMvcTest(OrderController::class)` fails with `NoSuchBeanDefinitionException: OrderService`. What is the idiomatic fix?"
+        options:
+          - { id: a, text: "Provide the collaborator as a mock bean in the test (for example `@MockBean` or `@MockitoBean`): the slice deliberately loads only web-layer beans" }
+          - { id: b, text: "Replace it with `@SpringBootTest` for every controller test" }
+          - { id: c, text: "Annotate `OrderService` with `@Controller` so the slice picks it up" }
+          - { id: d, text: "Disable component scanning in the test" }
+        answer: a
+        explanation: "Test slices (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`, ...) start only the part of the context they are about: for MVC that is controllers, advice, converters and filters, but no `@Service` or `@Repository`. That keeps them fast and focused, and the missing collaborators become explicit test doubles. Use `@SpringBootTest` for the few tests that need the whole wiring."
+
+      - type: open
+        prompt: "A colleague says: \"I put `@Transactional` on every service method, so we are safe.\" How do you respond, and how do you design transaction boundaries?"
+        modelAnswer: "I would push back, because a blanket annotation is not a design. The transaction boundary belongs on the use case, the application-service method, and should be as short as possible: no remote calls or slow work inside it, since it holds a database connection and row locks for its whole duration and a slow dependency then exhausts the pool. I would make sure the team understands propagation and rollback rules: a participating call joins the outer transaction, an exception passing through an inner proxy marks it rollback-only, checked exceptions do not roll back by default, REQUIRES_NEW needs a second connection, and self-invocation bypasses the proxy. Concurrency needs a deliberate choice as well: isolation level, optimistic locking with a version column or pessimistic locks, and readOnly for queries. Side effects such as emails or messages should happen after the commit, with a transactional event listener on AFTER_COMMIT or an outbox, instead of inside the transaction."
+        keyPoints:
+          - point: "Boundary on the use case (application service) and short: no remote calls inside, because it holds a connection and locks"
+            keywords: ["use case", "application service", "short", "remote call", "connection"]
+          - point: "Know propagation and rollback rules: joining, rollback-only, REQUIRES_NEW, checked exceptions, self-invocation"
+            keywords: ["propagation", "requires_new", "rollback-only", "rollbackfor", "checked"]
+          - point: "Handle concurrency deliberately: isolation, optimistic (@Version) or pessimistic locking, readOnly queries"
+            keywords: ["isolation", "@version", "optimistic", "pessimistic", "readonly"]
+          - point: "Do side effects after commit (AFTER_COMMIT listener, outbox) instead of inside the transaction"
+            keywords: ["after_commit", "transactionaleventlistener", "outbox", "after the commit"]
+        followUps:
+          - when: missed
+            point: 4
+            prompt: "What does `@TransactionalEventListener(phase = AFTER_COMMIT)` give you, and what is its catch?"
+            modelAnswer: "The listener runs only if the transaction actually commits, so no email or message goes out for work that was rolled back. The catch is that it runs after the commit: a failure in the listener cannot roll the business change back, the event is lost if the process crashes between commit and delivery (use a transactional outbox when that matters), and database work done in the listener needs its own transaction, for example REQUIRES_NEW, because the original one is already complete."
+            keyPoints:
+              - point: "Runs only if the transaction commits, so nothing is sent for rolled-back work"
+                keywords: ["only if", "rolled back", "actually commits"]
+              - point: "A listener failure cannot undo the change, and the event can be lost on a crash (use an outbox)"
+                keywords: ["lost", "crash", "outbox"]
+              - point: "Database work in the listener needs its own transaction"
+                keywords: ["requires_new", "own transaction", "new transaction"]
+          - when: covered
+            point: 1
+            prompt: "Why is it dangerous to keep a transaction open across an HTTP call to another service?"
+            modelAnswer: "The transaction holds a database connection and usually row locks for the whole duration of the call. When the remote service is slow, connections stay busy longer, the pool is exhausted and unrelated requests start to wait, while the locks block other writers. The remote effect also cannot be rolled back together with the database. Make the call before or after the transaction, or publish an event through an outbox."
+            keyPoints:
+              - point: "Holds a connection, so a slow call exhausts the pool"
+                keywords: ["connection", "pool"]
+              - point: "Row locks block other writers"
+                keywords: ["lock"]
+              - point: "The remote effect cannot be rolled back with the database"
+                keywords: ["rolled back", "roll back", "rollback"]
