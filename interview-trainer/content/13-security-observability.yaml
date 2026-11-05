@@ -242,9 +242,9 @@ lessons:
                  `- fx-service  GET  /rate    TIMEOUT 1050 ms
         options:
           - { id: a, text: "The call from pricing-service to fx-service, which took about 1050 ms and timed out" }
-          - { id: b, text: "auth-service, because authentication runs first and each later call has to wait for it" }
-          - { id: c, text: "The database query in pricing-service, since SQL is the usual cause of slow requests" }
-          - { id: d, text: "cart-service, since it is the middle call and carts are usually the slowest part" }
+          - { id: b, text: "auth-service (35 ms), because authentication runs first and each later call has to wait for it" }
+          - { id: c, text: "The database query in pricing-service (20 ms), since SQL is the usual cause of slow requests" }
+          - { id: d, text: "cart-service (60 ms), since it is the middle call and carts are usually the slowest part" }
         answer: a
         explanation: "Read a trace by finding the span that accounts for most of the time: the fx-service call is nearly the whole 1105 ms of pricing. Next questions: why does it time out (the dependency, the network, a missing deadline?), and should pricing cache rates or fall back to the last known value rather than wait?"
 
