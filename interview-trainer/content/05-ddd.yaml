@@ -249,3 +249,130 @@ lessons:
                 keywords: ["by id", "identity", "eventual", "event"]
               - point: "Large aggregates cause contention and slow loading"
                 keywords: ["contention", "large", "big", "slow"]
+
+  - id: ddd-advanced
+    title: CQRS, events & boundaries
+    questions:
+      - type: match
+        prompt: Match each kind of message to what it is.
+        pairs:
+          - { left: "Command", right: "A request to do something, addressed to one handler, which may reject it" }
+          - { left: "Query", right: "A request for data that does not change any state" }
+          - { left: "Domain event", right: "A fact that happened inside one bounded context, named in the past tense and free to change with the model" }
+          - { left: "Integration event", right: "A published, versioned contract that other bounded contexts or services rely on" }
+        explanation: "CQRS starts from this vocabulary: commands change state through the write model, queries read from a model shaped for the screen. Keeping domain events (internal facts) apart from integration events (public contracts) lets you refactor the domain without breaking every subscriber."
+
+      - type: single
+        prompt: "In an event-sourced system a bug stored `PriceChanged(sku, 90)` when the price should have been 99. What is the right way to correct the history?"
+        options:
+          - { id: a, text: "Append a correcting event (a new `PriceChanged(sku, 99)` or a dedicated `PriceCorrected`); stored events are immutable facts and projections replay to the corrected state" }
+          - { id: b, text: "Edit or delete the wrong event in the event store" }
+          - { id: c, text: "Fix only the read model and leave the event stream as it is" }
+          - { id: d, text: "Drop the event store and rebuild it from the current database tables" }
+        answer: a
+        explanation: "The event log is the source of truth and the audit trail, so you add to it rather than rewrite it: the wrong event stays visible, and the correction says what changed and why. Editing history silently invalidates every projection and snapshot built from it. Patching only a read model leaves the source of truth wrong, so the next rebuild would bring the bug back."
+
+      - type: single
+        prompt: "A CQRS system updates its read model asynchronously from events. After placing an order, the user is redirected to 'My orders' and the order is missing. Which fix keeps the benefit of the asynchronous read model?"
+        options:
+          - { id: a, text: "Return the new order from the command and show it right away, or have the query wait until the projection has reached the version the command produced (read-your-writes)" }
+          - { id: b, text: "Make every command sleep for two seconds before it returns" }
+          - { id: c, text: "Query the write model's tables again and drop the read model" }
+          - { id: d, text: "Accept it: with eventual consistency a UI must never show recent changes" }
+        answer: a
+        explanation: "Eventual consistency is a UX design problem as well as a technical one. Typical answers: optimistic UI using the command's response, a pending state, or a version token that lets the read side wait (briefly, with a timeout) for the projection to catch up. A fixed sleep is a race that is wrong under load, and querying the write model gives up the reason for having a read model."
+
+      - type: multi
+        prompt: Select ALL true statements about sagas.
+        options:
+          - { id: a, text: "In orchestration, a central coordinator tells each participant what to do next and tracks the state of the saga" }
+          - { id: b, text: "In choreography, each service reacts to events and emits its own, with no central coordinator" }
+          - { id: c, text: "Choreography keeps the whole process visible in one place, so it is easier to follow than orchestration" }
+          - { id: d, text: "Compensating actions restore the earlier state exactly as if the steps had never happened" }
+          - { id: e, text: "Sagas lack isolation: other transactions can see intermediate states, so designs add countermeasures such as pending states or semantic locks" }
+        answers: [a, b, e]
+        explanation: "Choreography is loosely coupled but the flow is spread across services (hard to see and to debug); orchestration makes the flow explicit at the price of a coordinator, which should be a durable state machine. A compensation is a semantic undo (a refund, a cancellation), not a rollback: the original effect existed for a while and others may have seen it, hence the need for countermeasures."
+
+      - type: spot
+        prompt: This handler publishes events to other teams. Tap the line with two design problems.
+        source: |
+          @Service
+          class PlaceOrderHandler(private val orders: OrderRepository, private val kafka: KafkaTemplate<String, Any>) {
+              @Transactional
+              fun handle(cmd: PlaceOrder) {
+                  val order = Order.place(cmd)
+                  orders.save(order)
+                  order.pullEvents().forEach { kafka.send("orders", it) }
+              }
+          }
+        answers: [7]
+        explanation: "First, it sends the aggregate's internal domain events straight to a public topic, so every refactoring of the domain model breaks subscribers; map them to deliberately designed, versioned integration events. Second, it is a dual write: the broker send is not part of the database transaction, so a crash or rollback leaves the two out of sync. Write the integration event to an outbox table in the same transaction and let a relay publish it."
+
+      - type: fill
+        prompt: Compose two business rules into one that holds only when both hold.
+        template: |
+          fun interface Specification<T> {
+              fun isSatisfiedBy(candidate: T): Boolean
+          }
+
+          infix fun <T> Specification<T>.[[1]](other: Specification<T>): Specification<T> =
+              Specification { isSatisfiedBy(it) [[2]] other.isSatisfiedBy(it) }
+
+          val eligible = isAdult and hasVerifiedEmail
+        bank: ["and", "or", "&&", "||", "not", "xor"]
+        answers: ["and", "&&"]
+        explanation: "The Specification pattern turns a business rule into an object that can be named, tested alone and combined (`and`, `or`, `not`), so rules such as 'eligible for credit' read like the domain language instead of being buried in `if` chains. `&&` short-circuits, so the second rule is evaluated only when the first holds."
+
+      - type: multi
+        prompt: Select ALL practices that keep a modular monolith modular.
+        options:
+          - { id: a, text: "Each module exposes a small public API and keeps its internals, including its entities and tables, private" }
+          - { id: b, text: "Modules may join each other's tables directly when it is faster" }
+          - { id: c, text: "Modules communicate through that public API or through events, not through each other's repositories" }
+          - { id: d, text: "Module boundaries are verified automatically, for example with architecture tests (ArchUnit) or Spring Modulith's module verification" }
+          - { id: e, text: "Each module needs its own deployable and service discovery, otherwise it is not a module" }
+        answers: [a, c, d]
+        explanation: "A modular monolith gets most of the benefit of service boundaries (clear ownership, independent change, a path to extract a module later) without network calls. The boundaries only last if they are enforced: package-private visibility, separate Gradle modules or tests that fail the build on illegal dependencies. Shared tables are the usual way they erode."
+
+      - type: estimate
+        prompt: "An aggregate has 2,300 events. Snapshots are stored every 1,000 events (after events 1,000 and 2,000). The repository loads the latest snapshot and replays only the events after it. How many events are replayed?"
+        answer: 300
+        tolerance: 0
+        unit: events
+        explanation: "The latest snapshot covers events 1 to 2,000, so events 2,001 to 2,300 are replayed: 300. Snapshots are a pure optimisation (you can always replay from the start), so they can be dropped and rebuilt, and the interval trades storage and snapshot work against load time."
+
+      - type: open
+        prompt: "A team wants to use event sourcing for the whole system, \"because we need an audit log\". What is your take?"
+        modelAnswer: "Event sourcing stores the sequence of domain events as the source of truth and derives the current state by replaying them. It fits where the history itself is valuable: audit, temporal queries (what did we know last Tuesday), complex workflows, and building new projections from past events. It also has real costs: events are immutable, so evolving their schema needs versioning and upcasting; long streams need snapshots; read models are eventually consistent, which affects the UI; the complexity and learning curve are significant; and erasing personal data (GDPR) conflicts with immutability, usually solved by keeping personal data out of the events or encrypting it per subject and deleting the key (crypto-shredding). Needing an audit log alone is not a reason: an append-only audit table or change-data-capture gives that far more cheaply. I would apply event sourcing selectively, to the aggregates or bounded contexts where history drives the business, and use plain state-based persistence elsewhere."
+        keyPoints:
+          - point: "Fits where history matters: audit, temporal queries, rebuilding projections, complex workflows"
+            keywords: ["audit", "temporal", "history", "projection"]
+          - point: "Costs: event schema evolution (versioning, upcasting), snapshots, eventual consistency, complexity"
+            keywords: ["upcast", "schema", "snapshot", "eventual", "complexity"]
+          - point: "Privacy and deletion conflict with immutability: keep personal data out or use crypto-shredding"
+            keywords: ["gdpr", "crypto-shredding", "personal data", "privacy"]
+          - point: "Apply selectively per aggregate or context; an audit table can cover audit-only needs"
+            keywords: ["selective", "bounded context", "audit table", "not everywhere"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "How do you change the schema of events that are already stored?"
+            modelAnswer: "Stored events are never rewritten in place. You version them and add upcasters that translate an old version into the current one when events are read, so the aggregate code only deals with the latest shape. Prefer additive, backward-compatible changes such as new optional fields. For a breaking change you can introduce a new event type, and as a last resort migrate the stream into a new store by copying and transforming it."
+            keyPoints:
+              - point: "Events are versioned, never rewritten in place"
+                keywords: ["version"]
+              - point: "Upcasters translate old versions when events are read"
+                keywords: ["upcast"]
+              - point: "Prefer additive, backward-compatible changes or a new event type"
+                keywords: ["additive", "backward", "new event type"]
+          - when: covered
+            point: 3
+            prompt: "How would you handle a request to erase a customer's personal data when events are immutable?"
+            modelAnswer: "Keep personal data out of the events where possible, storing only a reference to data held in a deletable store. If it must be in the events, encrypt it with a key per data subject and delete the key when asked (crypto-shredding), so the events remain but the data is unreadable. Projections, snapshots and caches must be cleaned up as well."
+            keyPoints:
+              - point: "Keep personal data out of events, using a reference to a deletable store"
+                keywords: ["reference", "out of the event", "deletable"]
+              - point: "Otherwise encrypt per subject and delete the key (crypto-shredding)"
+                keywords: ["crypto", "key"]
+              - point: "Clean projections, snapshots and caches too"
+                keywords: ["projection", "cache", "snapshot"]
