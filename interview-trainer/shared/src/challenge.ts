@@ -89,8 +89,12 @@ export const challengeResult = (p: Pick<Progress, 'challenge'>, day: Day): 'pass
 /** Records the day's result. Only the first result of a day counts (a replay earns nothing and changes nothing). */
 export function recordChallenge(p: Progress, day: Day, pass: boolean): Progress {
   if (p.challenge[day]) return p;
+  const newest = Object.keys(p.challenge).sort().pop();
   const challenge: Progress['challenge'] = { ...p.challenge, [day]: pass ? 'pass' : 'fail' };
-  for (const d of Object.keys(challenge)) if (daysBetween(d, day) >= CHALLENGE_KEPT) delete challenge[d];
+  // A day far beyond everything recorded is more likely a wrong device clock than 400 quiet days: it must not erase the
+  // history (it would be gone for good once the clock is corrected), so nothing is aged out by it.
+  const clockJumped = newest !== undefined && daysBetween(newest, day) >= CHALLENGE_KEPT;
+  if (!clockJumped) for (const d of Object.keys(challenge)) if (daysBetween(d, day) >= CHALLENGE_KEPT) delete challenge[d];
   return { ...p, challenge };
 }
 

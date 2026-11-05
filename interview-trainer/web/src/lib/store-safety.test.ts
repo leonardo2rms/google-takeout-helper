@@ -115,6 +115,23 @@ describe('a failed write never loses unsaved sessions (S0-2)', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it('the back-off doubles from 4 s and stops growing at 60 s (retries at +4, +8, +16, +32, then every 60 s)', async () => {
+    const { store } = await load();
+    const attempts = vi.spyOn(storage, 'setItem');
+    storage.failWrites = true;
+    store.updateProgress(addXp(10));
+    const tries = () => attempts.mock.calls.length;
+    expect(tries()).toBe(1);
+    // times of the retries: 4, 12, 28, 60, then 120 and 180 (a missing cap would give 124 and 252)
+    const checkpoints: Array<[number, number]> = [[3999, 1], [4000, 2], [11_999, 2], [12_000, 3], [27_999, 3], [28_000, 4], [59_999, 4], [60_000, 5], [119_999, 5], [120_000, 6], [179_999, 6], [180_000, 7]];
+    let now = 0;
+    for (const [at, expected] of checkpoints) {
+      await vi.advanceTimersByTimeAsync(at - now);
+      now = at;
+      expect(tries(), `${at} ms`).toBe(expected);
+    }
+  });
+
   it('saves when the page is hidden, closed or back online; retrySave is a no-op when nothing is pending', async () => {
     const { store } = await load();
     store.retrySave(); // before anything is loaded
