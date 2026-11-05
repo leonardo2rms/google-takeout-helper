@@ -65,7 +65,7 @@ export function ProgressScreen({ course, progress }: Props) {
           </>
         ) : (
           <>
-            <p className="big-number" data-testid="readiness-score" aria-label="No score yet"><span aria-hidden="true">–</span></p>
+            <p className="big-number" data-testid="readiness-score" role="img" aria-label="No score yet"><span aria-hidden="true">–</span></p>
             <p><b data-testid="readiness-label">Not enough data yet</b> · {pct(ready.coverage)}% of the course seen</p>
             <p className="muted">A score from so few questions would say little. It appears once about {READINESS_NEEDS} of the course has been seen.</p>
           </>

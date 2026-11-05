@@ -55,7 +55,7 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
 
       <section className="mock-score" aria-labelledby="mock-score-title">
         <h2 id="mock-score-title" className="sr-only">Overall</h2>
-        <p className="result-big" data-testid="mock-score" aria-label={`${report.score} percent`}>{report.score}<small>%</small></p>
+        <p className="result-big" data-testid="mock-score" role="img" aria-label={`${report.score} percent`}>{report.score}<small>%</small></p>
         <p>
           <b>{report.correct} of {report.total}</b> correct · {clockText(usedSec * 1000)} of {limitMin}:00 used
         </p>

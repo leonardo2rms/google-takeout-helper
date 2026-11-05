@@ -120,7 +120,7 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       {burst && <Confetti onDone={() => setBurst(false)} />}
       <p className="label">Result · {finished.title}</p>
       <h1>{heading}</h1>
-      <p className="result-big" aria-label={`${pct} percent first-try accuracy`}>{pct}<small>%</small></p>
+      <p className="result-big" role="img" aria-label={`${pct} percent first-try accuracy`}>{pct}<small>%</small></p>
       <p className="result-cap" aria-hidden="true">first-try accuracy</p>
       {ending && <p className="muted ending-line" data-testid="ending-line">{ending}</p>}
 
