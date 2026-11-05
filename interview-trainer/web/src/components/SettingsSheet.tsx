@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
 import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
+import { RecoveredData } from './DataSafety';
 import { ReadingSection } from './ReadingSection';
 import { RemindersSection } from './RemindersSection';
 import { RestDays } from './RestDays';
@@ -166,6 +167,8 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
           </div>
         )}
       </section>
+
+      <RecoveredData />
 
       <section>
         <button type="button" className="link" onClick={() => window.confirm('Reset all progress, XP and streak? This cannot be undone. Download a backup first if unsure.') && onReset()}>

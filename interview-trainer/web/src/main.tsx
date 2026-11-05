@@ -5,6 +5,7 @@ import { isStandalone } from './lib/sample-grader';
 import { registerServiceWorker } from './lib/sw-register';
 import './styles.css';
 import './features-a.css';
+import './safety.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

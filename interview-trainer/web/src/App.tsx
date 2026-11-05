@@ -12,6 +12,7 @@ import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { AchievementToasts } from './components/AchievementToasts';
+import { DataSafetyBanners } from './components/DataSafety';
 import { useReminderCheck } from './lib/reminders';
 import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
@@ -80,6 +81,7 @@ function Shell() {
       >
         Skip to main content
       </a>
+      <DataSafetyBanners />
       <main id="main" tabIndex={-1}>
         <Screens />
       </main>
