@@ -9,6 +9,7 @@
  *   npm run content:lint            report only (exit 0)
  *   npm run content:lint -- --list  also list every question where the answer is the strictly longest option
  *   npm run content:lint -- --offenders  list questions where one option's style differs from the rest
+ *   npm run content:lint -- --unit scale,ddd  per-feature detail for those units
  */
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -358,6 +359,14 @@ export function styleReport(r: { overall: StyleStats; units: StyleStats[] }): st
   return [head, ...r.units.map(row), row(r.overall), '', detail('single', r.overall.single), detail('multi', r.overall.multi)].join('\n');
 }
 
+/** Per-feature detail for one unit (rates in a small unit are noisy; aim for the same proportions as the whole course). */
+export function unitStyleReport(s: StyleStats): string {
+  const p = (x: number) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : '-');
+  const rows = (kind: string, stats: FeatureStat[]) =>
+    stats.map((f) => `  ${kind.padEnd(7)}${FEATURES[f.feature].label.padEnd(48)} correct ${f.answers}/${f.answerTotal} (${p(f.answerTotal ? f.answers / f.answerTotal : NaN)})  wrong ${f.distractors}/${f.distractorTotal} (${p(f.distractorTotal ? f.distractors / f.distractorTotal : NaN)})` + (kind === 'single' ? `  prefer ${p(f.prefer)}  avoid ${p(f.avoid)}` : '')).join('\n');
+  return `${s.unit}: ${s.singles} singles, ${s.multis} multis; combined rule ${p(s.combined)}, bag of words ${p(s.bow)}, answer is the shortest ${p(s.singles ? s.shortest / s.singles : NaN)}\n${rows('single', s.single)}\n${rows('multi', s.multi)}`;
+}
+
 export function lint(course: Course): { overall: Stats; units: Stats[] } {
   const all = choices(course);
   return { overall: measure(all, 'ALL'), units: course.units.map((u) => measure(all, u.id)) };
@@ -392,16 +401,17 @@ export function violations(r: { overall: Stats; units: Stats[] }): Violation[] {
 
 export function describeViolations(v: Violation[]): string {
   const fmt = (x: Violation, n: number) => (x.what.includes('correlates') || x.what.includes('(lift)') ? n.toFixed(2) : `${(n * 100).toFixed(0)}%`);
-  return v
-    .map(
-      (x) =>
-        `${x.scope}: ${x.what} at ${fmt(x, x.value)} (limit ${fmt(x, x.limit)}).` +
-        (x.hint ??
-          (x.offenders.length
+  const lines = v.map(
+    (x) =>
+      `${x.scope}: ${x.what} at ${fmt(x, x.value)} (limit ${fmt(x, x.limit)}).` +
+      (x.hint
+        ? ''
+        : x.offenders.length
           ? ` Shorten the correct option (move detail into the explanation) or make the distractors as long and as specific as the answer, in:\n    ${x.offenders.join('\n    ')}`
-          : ' Make wrong options as detailed as the right one; see docs/content-guide.md, "Balanced options".')),
-    )
-    .join('\n');
+          : ' Make wrong options as detailed as the right one; see docs/content-guide.md, "Balanced options".'),
+  );
+  const hints = [...new Set(v.flatMap((x) => (x.hint ? [x.hint.trim()] : [])))];
+  return [...lines, ...hints].join('\n');
 }
 
 const pct = (n: number, d: number) => (d ? `${((n / d) * 100).toFixed(0)}%`.padStart(4) : '   -');
@@ -442,6 +452,8 @@ if (isMain) {
     `\nstyle limits: lift in [${STYLE_LIMITS.liftLow}, ${STYLE_LIMITS.liftHigh}] once a feature is on ${STYLE_LIMITS.minSupport}+ options, prefer/avoid rule <= ${STYLE_LIMITS.rule * 100}%, combined rule <= ${STYLE_LIMITS.combined * 100}%, bag of words <= ${STYLE_LIMITS.bow * 100}% (chance 25%).`,
   );
   const v = [...violations(r), ...styleViolations(st)];
+  const ui = process.argv.indexOf('--unit');
+  if (ui > 0) for (const id of (process.argv[ui + 1] ?? '').split(',')) { const u = st.units.find((x) => x.unit === id); console.log(u ? `\n${unitStyleReport(u)}` : `\nno unit ${id}`); }
   if (process.argv.includes('--offenders'))
     for (const f of FEATURE_NAMES) console.log(`\n${FEATURES[f].label}: one option differs from the rest in\n  ${styleOffenders(course, f).join('\n  ')}`);
   if (process.argv.includes('--list')) console.log(`\nAnswer is the strictly longest option:\n  ${r.overall.offenders.join('\n  ')}`);
