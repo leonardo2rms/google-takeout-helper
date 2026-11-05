@@ -19,10 +19,10 @@ lessons:
                 return false
             }
         options:
-          - { id: a, text: "O(n²)" }
-          - { id: b, text: "O(n)" }
-          - { id: c, text: "O(n log n)" }
-          - { id: d, text: "O(2ⁿ)" }
+          - { id: a, text: "`O(n²)`" }
+          - { id: b, text: "`O(n)`" }
+          - { id: c, text: "`O(n log n)`" }
+          - { id: d, text: "`O(2ⁿ)`" }
         answer: a
         explanation: "The inner loop runs n-1, n-2, ... 1 times: n(n-1)/2 comparisons, which is O(n²) in the worst case (no duplicates)."
 
@@ -38,10 +38,10 @@ lessons:
                 return false
             }
         options:
-          - { id: a, text: "O(n) time, O(n) space" }
-          - { id: b, text: "O(n) time, O(1) space" }
-          - { id: c, text: "O(n²) time, O(n) space" }
-          - { id: d, text: "O(n log n) time, O(1) space" }
+          - { id: a, text: "`O(n)` time, `O(n)` space" }
+          - { id: b, text: "`O(n)` time, `O(1)` space" }
+          - { id: c, text: "`O(n²)` time, `O(n)` space" }
+          - { id: d, text: "`O(n log n)` time, `O(1)` space" }
         answer: a
         explanation: "One pass with expected O(1) hash operations, but the set can grow to n elements. You've traded memory for time. Sorting first gives O(n log n) time with O(1) extra space if you may mutate the input."
 
@@ -56,10 +56,10 @@ lessons:
                 }
             }
         options:
-          - { id: a, text: "O(log n), since `i` doubles on each pass" }
-          - { id: b, text: "O(n), since the loop runs until `i` reaches n" }
-          - { id: c, text: "O(√n), since doubling reaches n in half the steps" }
-          - { id: d, text: "O(1), since multiplying `i` takes constant time" }
+          - { id: a, text: "`O(log n)`, since `i` doubles on each pass" }
+          - { id: b, text: "`O(n)`, since the loop runs until `i` reaches n" }
+          - { id: c, text: "`O(√n)`, since doubling reaches n in half the steps" }
+          - { id: d, text: "`O(1)`, since multiplying `i` takes constant time" }
         answer: a
         explanation: "`i` doubles each iteration, so it takes log₂(n) steps to reach n. Each multiplication is O(1), but the number of iterations is log n, not n, √n or a constant."
 
@@ -76,10 +76,10 @@ lessons:
                 }
             }
         options:
-          - { id: a, text: "O(n log n): n outer passes, each taking log n halving steps" }
-          - { id: b, text: "O(n²): n outer passes, each running up to n steps" }
-          - { id: c, text: "O(log n): `j` halves, so the outer loop barely matters" }
-          - { id: d, text: "O(n): halving is a single operation, so each outer pass is O(1)" }
+          - { id: a, text: "`O(n log n)`: n outer passes, each taking log n halving steps" }
+          - { id: b, text: "`O(n²)`: n outer passes, each running up to n steps" }
+          - { id: c, text: "`O(log n)`: `j` halves, so the outer loop barely matters" }
+          - { id: d, text: "`O(n)`: halving is a single operation, so each outer pass is `O(1)`" }
         answer: a
         explanation: "The outer loop runs n times and the inner loop halves j each time: log n steps. The product is n log n."
 
@@ -91,10 +91,10 @@ lessons:
             fun fib(n: Int): Long =
                 if (n < 2) n.toLong() else fib(n - 1) + fib(n - 2)
         options:
-          - { id: a, text: "O(2ⁿ), reduced to O(n) with memoisation" }
-          - { id: b, text: "O(n), reduced to O(log n) with memoisation" }
-          - { id: c, text: "O(n²), reduced to O(n) with memoisation" }
-          - { id: d, text: "O(n!), reduced to O(n²) with memoisation" }
+          - { id: a, text: "`O(2ⁿ)`, reduced to `O(n)` with memoisation" }
+          - { id: b, text: "`O(n)`, reduced to `O(log n)` with memoisation" }
+          - { id: c, text: "`O(n²)`, reduced to `O(n)` with memoisation" }
+          - { id: d, text: "`O(n!)`, reduced to `O(n²)` with memoisation" }
         answer: a
         explanation: "The call tree roughly doubles at each level (tight bound ≈ 1.618ⁿ, commonly quoted as O(2ⁿ)). With a cache each value of n is computed once."
 
@@ -105,10 +105,10 @@ lessons:
           source: |
             val common = a.filter { it in b }
         options:
-          - { id: a, text: "O(n·m); convert `b` to a HashSet first, which brings it down to O(n + m) overall" }
-          - { id: b, text: "O(n + m); no improvement is possible, since both lists have to be read once" }
-          - { id: c, text: "O(n); `in` on a list is O(1), so the filter loop is what matters" }
-          - { id: d, text: "O(n log m); sort `b` first and then each lookup costs O(1)" }
+          - { id: a, text: "`O(n·m)`; turn `b` into a set first, which makes it `O(n + m)`" }
+          - { id: b, text: "`O(n + m)`; no improvement is possible, since both lists have to be read once" }
+          - { id: c, text: "`O(n)`; `in` on a list is `O(1)`, so the filter loop is what matters" }
+          - { id: d, text: "`O(n log m)`; sort `b` first and then each lookup costs `O(1)`" }
         answer: a
         explanation: "`in` on a List is a linear scan. `val set = b.toSet()` costs O(m) once, then each `in` is expected O(1). A hidden O(n²) like this is one of the most common production performance bugs."
 
@@ -121,10 +121,10 @@ lessons:
                 s += i.toString()
             }
         options:
-          - { id: a, text: "Each `+=` copies the whole string so far; use StringBuilder (or buildString)" }
+          - { id: a, text: "Each `+=` allocates a new string and copies the old one into it; use a StringBuilder instead" }
           - { id: b, text: "Strings are stored as linked lists of characters, so each append walks the whole list" }
-          - { id: c, text: "`toString` is O(n) in the number of digits, so each iteration is expensive; cache the results" }
-          - { id: d, text: "It is O(n); there is no problem, because the JIT turns the loop into one StringBuilder" }
+          - { id: c, text: "`toString` is `O(n)` in the number of digits, so each iteration is expensive; cache the results" }
+          - { id: d, text: "It is `O(n)`; there is no problem, because the JIT turns the loop into one StringBuilder" }
         answer: a
         explanation: "Strings are immutable, so concatenation allocates a new string and copies both parts. Total copying is 1+2+...+n. The JIT does not merge appends across loop iterations, `toString` of a small number is cheap, and strings are not linked lists. `buildString { ... }` appends in amortised O(1)."
 
@@ -230,10 +230,10 @@ lessons:
         hint: "What does Java 8 do when a bucket's chain grows long?"
         prompt: "A HashMap's keys all collide into one bucket. On Java 8+, what is the typical lookup cost for Comparable keys?"
         options:
-          - { id: a, text: "O(log n), because buckets with many entries are converted to balanced trees" }
-          - { id: b, text: "O(n), because a collided bucket is always a linked list that has to be scanned" }
-          - { id: c, text: "O(1), because a hash lookup is constant time no matter how the keys collide" }
-          - { id: d, text: "O(n²), because each colliding entry has to be compared against each other" }
+          - { id: a, text: "`O(log n)`, because a bucket that has many entries becomes a balanced tree" }
+          - { id: b, text: "`O(n)`, because a collided bucket is always a linked list that has to be scanned" }
+          - { id: c, text: "`O(1)`, because a hash lookup is constant time no matter how the keys collide" }
+          - { id: d, text: "`O(n²)`, because each colliding entry has to be compared against each other" }
         answer: a
         explanation: "Since Java 8, a bucket with 8+ entries (and table size >= 64) becomes a red-black tree. It defends against hash-collision attacks and bad hashCode implementations, but a good hash function is still what makes lookups O(1)."
 
@@ -241,10 +241,10 @@ lessons:
         hint: "Where do the other elements have to go when you insert at the front?"
         prompt: "What is the cost of `list.add(x)` on an `ArrayList` vs `list.add(0, x)`?"
         options:
-          - { id: a, text: "Amortised O(1) at the end; O(n) at the front, as elements shift" }
-          - { id: b, text: "O(1) for both, because the backing array is indexed directly" }
-          - { id: c, text: "O(n) for both, because each add may copy the whole array" }
-          - { id: d, text: "O(log n) for both, because the array is searched first" }
+          - { id: a, text: "Amortised `O(1)` at the end and `O(n)` at the front, since the elements have to shift" }
+          - { id: b, text: "`O(1)` for both: the backing array is indexed directly" }
+          - { id: c, text: "`O(n)` for both, because each add may copy the whole array" }
+          - { id: d, text: "`O(log n)` for both, because the array is searched first" }
         answer: a
         explanation: "Appends occasionally trigger a resize-and-copy, but averaged over many appends each is O(1). Use ArrayDeque if you need cheap insertion at both ends."
 
@@ -267,10 +267,10 @@ lessons:
                 process(list.removeAt(0))
             }
         options:
-          - { id: a, text: "O(n²); use ArrayDeque (O(1) removeFirst) or iterate without removing" }
-          - { id: b, text: "O(n), since each removal is a single operation; nothing to improve" }
-          - { id: c, text: "O(n log n), since removal shifts log n elements; use a TreeSet" }
-          - { id: d, text: "O(1) per iteration, because the list is accessed by index; fine as is" }
+          - { id: a, text: "`O(n²)`, because each `removeAt(0)` shifts the rest; use an ArrayDeque instead" }
+          - { id: b, text: "`O(n)`, since each removal is a single operation; nothing to improve" }
+          - { id: c, text: "`O(n log n)`, since removal shifts log n elements; use a TreeSet" }
+          - { id: d, text: "`O(1)` per iteration, because the list is accessed by index; fine as is" }
         answer: a
         explanation: "Each `removeAt(0)` shifts all remaining elements. If you just need to visit every element, `for (x in list)` is O(n). If it's a queue, use ArrayDeque."
 
@@ -332,10 +332,10 @@ lessons:
                 return if (best == Int.MAX_VALUE) 0 else best
             }
         options:
-          - { id: a, text: "O(n): `left` only moves forward, so the inner loop runs at most n times in total" }
-          - { id: b, text: "O(n²): there is a loop nested inside a loop, so the work is quadratic" }
-          - { id: c, text: "O(n log n): each pointer move needs a lookup in a sorted structure" }
-          - { id: d, text: "O(n x target): the inner loop can repeat up to `target` times per step" }
+          - { id: a, text: "`O(n)`: `left` never moves back, so the inner loop takes at most n steps overall" }
+          - { id: b, text: "`O(n²)`: there is a loop nested inside a loop, so the work is quadratic" }
+          - { id: c, text: "`O(n log n)`: each pointer move needs a lookup in a sorted structure" }
+          - { id: d, text: "`O(n x target)`: the inner loop can repeat up to `target` times per step" }
         answer: a
         explanation: "Count the work per pointer, not per loop nesting: `right` advances n times and `left` advances at most n times, and neither ever moves back. That is amortised analysis, and it is the reason sliding windows and two-pointer techniques turn O(n²) scans into O(n). The positivity of the numbers is what makes shrinking the window safe."
 
@@ -528,10 +528,10 @@ lessons:
       - type: single
         prompt: "What are the time and extra space of the standard approach that finds the k largest of n values by scanning them once and keeping a min-heap of size k?"
         options:
-          - { id: a, text: "O(n log k) time and O(k) extra space" }
-          - { id: b, text: "O(n log n) time and O(n) extra space" }
-          - { id: c, text: "O(n) time and O(1) extra space" }
-          - { id: d, text: "O(k log n) time and O(n) extra space" }
+          - { id: a, text: "`O(n log k)` time and `O(k)` extra space" }
+          - { id: b, text: "`O(n log n)` time and `O(n)` extra space" }
+          - { id: c, text: "`O(n)` time and `O(1)` extra space" }
+          - { id: d, text: "`O(k log n)` time and `O(n)` extra space" }
         answer: a
         explanation: "Each of the n values is compared with the heap's root (the smallest of the k largest seen so far), which is O(1); only if it is larger does it replace the root, costing O(log k). So the worst case is O(n log k) with a heap of k elements. It beats sorting everything (O(n log n)) when k is much smaller than n, and it works on a stream that does not fit in memory. A min-heap, not a max-heap, because the element you may need to evict is the smallest of the survivors."
 
