@@ -203,7 +203,7 @@ lessons:
           - { id: c, text: "Wrap both calls in a try/catch and retry the failed step when the process restarts" }
           - { id: d, text: "Use a bigger Kafka cluster with acks=all so that the broker never loses the message" }
         answer: a
-        explanation: "A DB and a broker can't share a transaction (the dual-write problem). The outbox makes the event part of the local atomic commit, and a relay or CDC process delivers it at-least-once."
+        explanation: "A DB and a broker can't share a transaction (the dual-write problem). The outbox makes the event part of the local atomic commit, and a relay or CDC process delivers it at-least-once. Swapping the order only moves the gap (an event for an order that was never saved), a try/catch does not run when the process dies and nothing durable says which step to retry, and broker settings such as acks=all cannot help when the crash happens before the publish."
 
       - type: single
         prompt: "What is the best starting heuristic for drawing microservice boundaries?"
