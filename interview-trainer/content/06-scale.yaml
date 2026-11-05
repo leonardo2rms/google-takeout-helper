@@ -51,7 +51,7 @@ lessons:
         hint: "Think about what an average does to a rare, very slow response."
         prompt: Why do SREs track p99 latency instead of just the average?
         options:
-          - { id: a, text: "An average hides the tail, and with fan-out to many services most users hit it" }
+          - { id: a, text: "An average hides the tail, and with fan-out to many services a large share of requests hit it" }
           - { id: b, text: "p99 is cheaper to compute than an average, as it needs only the largest samples" }
           - { id: c, text: "The average is hard to compute across several instances, while percentiles can be merged" }
           - { id: d, text: "p99 excludes network time: it shows what the service itself is doing" }
@@ -178,7 +178,7 @@ lessons:
           - { id: c, text: "The runtime notices the backlog and adds consumer threads, so the queue drains on its own" }
           - { id: d, text: "The queue discards the oldest items, which is safe because they are stale" }
         answer: a
-        explanation: "Backpressure propagates 'slow down' upstream: bounded queues, `Flow` operators with buffers, reactive streams demand, or consumer lag-based autoscaling for Kafka."
+        explanation: "Backpressure propagates 'slow down' upstream: bounded queues, `Flow` operators with buffers, reactive streams demand, or consumer lag-based autoscaling for Kafka. When the producer cannot be slowed (incoming client requests, say), a full queue should reject work instead, so callers fail fast."
 
       - type: single
         hint: "Think about limiting how much of a shared resource any one dependency may use."
@@ -195,7 +195,7 @@ lessons:
         hint: "No distributed lock and no two-phase commit: what can you do about a failed step after earlier ones succeeded?"
         prompt: "An order spans three services, each with its own database. Which approach keeps data consistent without distributed locks?"
         options:
-          - { id: a, text: "A saga of local transactions chained by events, with compensating actions on failure" }
+          - { id: a, text: "A saga of local transactions chained by messages, with compensating actions on failure" }
           - { id: b, text: "Two-phase commit across all three databases: it gives atomic commits at little cost" }
           - { id: c, text: "A shared database for the three services, so that a single local transaction covers everything" }
           - { id: d, text: "Retry each step forever without compensation and hope each service eventually succeeds" }
