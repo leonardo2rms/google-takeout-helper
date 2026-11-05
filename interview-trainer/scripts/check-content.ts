@@ -15,7 +15,7 @@ try {
       }
       console.log(`  ${u.id}/${l.id}: ${l.questions.length} questions`);
     }
-    console.log(`${u.emoji} ${u.title}: ${u.lessons.length} lessons, ${n} questions`);
+    console.log(`${u.icon ?? "-"} ${u.title}: ${u.lessons.length} lessons, ${n} questions`);
   }
   console.log('\nBy type:', counts);
   console.log('Content OK');

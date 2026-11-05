@@ -1,0 +1,349 @@
+id: data
+title: Data & Persistence
+icon: database
+description: Indexes and query plans, isolation levels, optimistic and pessimistic locking, JPA pitfalls, pagination, migrations and caching.
+lessons:
+  - id: data-sql
+    title: Indexes, plans & locking
+    questions:
+      - type: single
+        prompt: "A query for one customer's orders takes over 100 ms. What does this plan tell you, and what is the most sensible first fix?"
+        code:
+          lang: text
+          source: |
+            EXPLAIN ANALYZE SELECT * FROM orders WHERE customer_id = 4711;
+
+            Seq Scan on orders  (cost=0.00..21500.00 rows=12 width=72)
+                                (actual time=0.04..118.30 rows=9 loops=1)
+              Filter: (customer_id = 4711)
+              Rows Removed by Filter: 999991
+            Execution Time: 118.4 ms
+        options:
+          - { id: a, text: "The database reads all one million rows to return nine; add an index on customer_id" }
+          - { id: b, text: "The statistics are badly wrong (12 estimated vs 9 actual), so run ANALYZE and nothing else" }
+          - { id: c, text: "The query needs more work_mem, because the filter spills to disk while it scans the table" }
+          - { id: d, text: "The table is too small to need an index, so add LIMIT 9 and let the scan stop early" }
+        answer: a
+        explanation: "`Rows Removed by Filter: 999991` next to `rows=9` is the signature of a missing index: almost everything that is read is thrown away. The estimate (12) is close to the truth (9), so the statistics are fine; `work_mem` matters for sorts and hashes, not for a filter; and a million-row table is not small. With a B-tree index on `customer_id` the database can jump straight to the matching rows. Always compare estimated and actual rows before blaming the planner."
+        difficulty: easy
+
+      - type: multi
+        prompt: "Ordinary B-tree indexes exist on `email` and on `created_at`. Select all predicates that generally stop the database from using the index for an efficient lookup."
+        options:
+          - { id: a, text: "WHERE lower(email) = 'ana@example.com'" }
+          - { id: b, text: "WHERE email LIKE '%@example.com'" }
+          - { id: c, text: "WHERE created_at >= '2024-05-01' AND created_at < '2024-05-02'" }
+          - { id: d, text: "WHERE email = 'ana@example.com'" }
+          - { id: e, text: "WHERE YEAR(created_at) = 2024" }
+        answers: [a, b, e]
+        explanation: "An index is sorted by the stored column value. Wrapping the column in a function (`lower(email)`, `YEAR(created_at)`) means the planner would have to compute the function for every row, unless you create an expression (functional) index. A leading wildcard has no sorted prefix to seek on. A plain equality or a half-open range on the bare column is exactly what a B-tree is for; prefer the range form over a function on the column."
+
+      - type: estimate
+        prompt: "Assume each B-tree page holds about 200 child pointers (fan-out 200). How many levels of pages must a lookup walk, root to leaf, to find one key among 1,000,000 keys?"
+        answer: 3
+        tolerance: 0
+        unit: levels
+        explanation: "One level covers 200 keys, two levels 200 x 200 = 40,000, three levels 200^3 = 8,000,000. So 1,000,000 keys need 3 levels. This is why an index lookup stays at a handful of page reads even for huge tables; in practice the top levels are cached, so it is often one disk read."
+
+      - type: code
+        prompt: "A composite B-tree index has its columns in order (`indexCols`). A query has equality filters on `eqCols` and at most one range filter on `rangeCol` (or `null`). Write `usableIndexColumns(indexCols, eqCols, rangeCol)`: the number of leading index columns that can narrow the scan (classic B-tree seek; ignore skip-scan features). Walk the columns in order: an equality column counts and continues; a range column counts but ends the walk; any other column ends the walk."
+        starter: |
+          function usableIndexColumns(indexCols, eqCols, rangeCol) {
+            // your code
+            return 0;
+          }
+        entry: usableIndexColumns
+        tests:
+          - { args: [["a", "b", "c"], ["a", "b"], null], expect: 2 }
+          - { args: [["a", "b", "c"], ["a", "b", "c"], null], expect: 3 }
+          - { args: [["a", "b", "c"], ["a", "c"], null], expect: 1 }
+          - { args: [["a", "b", "c"], ["b", "c"], null], expect: 0 }
+          - { args: [["a", "b", "c"], ["a"], "b"], expect: 2 }
+          - { args: [["a", "b", "c"], ["a", "c"], "b"], expect: 2, hidden: true }
+          - { args: [["a", "b", "c"], ["a"], "c"], expect: 1, hidden: true }
+          - { args: [["a", "b", "c"], ["a", "b"], "c"], expect: 3, hidden: true }
+          - { args: [["a", "b", "c"], [], "a"], expect: 1, hidden: true }
+        solution: |
+          function usableIndexColumns(indexCols, eqCols, rangeCol) {
+            let n = 0;
+            for (const col of indexCols) {
+              if (eqCols.includes(col)) {
+                n++;
+              } else {
+                if (col === rangeCol) n++;
+                break;
+              }
+            }
+            return n;
+          }
+        kotlin: |
+          fun usableIndexColumns(indexCols: List<String>, eqCols: Set<String>, rangeCol: String?): Int {
+              var n = 0
+              for (col in indexCols) {
+                  if (col in eqCols) {
+                      n++
+                  } else {
+                      if (col == rangeCol) n++
+                      break
+                  }
+              }
+              return n
+          }
+        explanation: "This is the leftmost-prefix rule. An index on (a, b, c) is sorted by a, then b within equal a, then c. Equalities on a and b pin down one contiguous slice; a range on b gives a contiguous slice too, but c is no longer sorted inside it, so it can only be used as a filter, not to seek. A gap (no filter on b) means c cannot be used either. Put equality columns first, then the range or sort column."
+
+      - type: match
+        prompt: "Match each concurrency anomaly to what the transaction experiences."
+        pairs:
+          - { left: "Dirty read", right: "Seeing another transaction's change before it has committed" }
+          - { left: "Non-repeatable read", right: "Reading the same row twice and getting different committed values" }
+          - { left: "Phantom read", right: "Running the same range query twice and getting a different set of rows" }
+          - { left: "Lost update", right: "Two read-modify-write cycles on one row where one overwrites the other's change" }
+        explanation: "The SQL standard defines its isolation levels by which of the first three may occur (READ COMMITTED forbids dirty reads, REPEATABLE READ also forbids non-repeatable reads, SERIALIZABLE forbids phantoms too), but real databases differ: Postgres REPEATABLE READ is snapshot isolation and also prevents phantoms. Lost update is not in that list, so check how your database and level handle it."
+
+      - type: single
+        prompt: "Two on-call doctors each run: check that at least 2 doctors are on call, then set their own row to off-call. Both transactions run at the same time, both commit, and zero doctors are on call. Each transaction updated only its own row. What happened and what is a dependable remedy?"
+        options:
+          - { id: a, text: "Write skew; run these transactions at SERIALIZABLE (and retry on failures), or lock the rows the check reads" }
+          - { id: b, text: "A dirty read; the second transaction saw uncommitted data, so switch to READ COMMITTED" }
+          - { id: c, text: "A lost update; add a @Version column to each doctor's row so the second commit fails" }
+          - { id: d, text: "A non-repeatable read; switching to REPEATABLE READ is enough and nothing else is needed" }
+        answer: a
+        explanation: "Each transaction made a decision based on a read that the other transaction's write invalidated, yet they wrote different rows, so row-level conflict detection (including @Version on each row) never fires. This is write skew, possible under snapshot isolation (including Postgres REPEATABLE READ). Fixes: SERIALIZABLE with retries, explicitly locking the rows the check depends on (`SELECT ... FOR UPDATE`), or modelling the rule so that both transactions write the same row or a constraint."
+        difficulty: hard
+
+      - type: multi
+        prompt: "Two requests debit the same account: each reads the balance, computes the new value in the application and writes it back. Select all changes that prevent a lost update."
+        options:
+          - { id: a, text: "A single statement: UPDATE account SET balance = balance - :amt WHERE id = :id AND balance >= :amt" }
+          - { id: b, text: "SELECT ... FOR UPDATE on the row inside the transaction, then update" }
+          - { id: c, text: "A version column checked in the UPDATE's WHERE clause, with a retry when zero rows are updated" }
+          - { id: d, text: "Keep the plain SELECT then UPDATE, just inside a transaction at the default READ COMMITTED level" }
+          - { id: e, text: "Mark the Kotlin service method synchronized" }
+        answers: [a, b, c]
+        explanation: "The single atomic UPDATE lets the database do the read-modify-write itself. SELECT ... FOR UPDATE makes the second request wait for the first to commit before it reads. The version column detects the conflict and forces a retry. A plain SELECT then UPDATE at READ COMMITTED still lets both read the same old balance. `synchronized` only serialises calls inside one JVM, which fails the moment you run two instances."
+
+      - type: fill
+        lang: sql
+        prompt: "Several workers poll a `jobs` table. Complete the clause so each worker claims different rows and never waits for rows another worker has locked."
+        template: |
+          SELECT id FROM jobs
+           WHERE status = 'NEW'
+           ORDER BY id
+           LIMIT 10
+           FOR UPDATE [[1]] [[2]]
+        bank: ["SKIP", "LOCKED", "NOWAIT", "SHARE", "WAIT"]
+        answers: ["SKIP", "LOCKED"]
+        explanation: "`FOR UPDATE SKIP LOCKED` (PostgreSQL, MySQL 8 and others) silently leaves out rows that other transactions hold locked, which turns a table into a safe work queue for many workers. `NOWAIT` would raise an error instead of skipping. Keep the claiming transaction short and mark rows as taken in the same transaction."
+
+      - type: open
+        prompt: "Two users edit the same record at the same time. Explain pessimistic versus optimistic locking, and when you would choose each."
+        modelAnswer: "Pessimistic locking takes a lock before changing the data: SELECT ... FOR UPDATE makes other writers wait until the transaction ends. It is safe when the same rows are contended often, but it holds locks and a connection for the whole time, lowers throughput and can cause blocking and deadlocks. Optimistic locking takes no lock while you work. A version column (JPA @Version) is checked at write time with UPDATE ... WHERE id = ? AND version = ?; if no row matched, someone else committed first, so you retry or report a conflict to the user. I choose optimistic when conflicts are rare or the user has a long think time (an edit form open for minutes), and pessimistic when the conflict rate is high or a retry is expensive. Both are application-level protection against lost updates that the isolation level alone does not always give you."
+        keyPoints:
+          - point: "Pessimistic: lock up front (SELECT ... FOR UPDATE); other writers wait; costs throughput, held connections and deadlock risk"
+            keywords: ["for update", "lock", "block", "wait", "deadlock"]
+          - point: "Optimistic: no lock while working; a version column is checked on write and a conflict is detected, then retried or reported"
+            keywords: ["version", "@version", "conflict", "retry", "compare"]
+          - point: "Choose by contention: optimistic when conflicts are rare or user think-time is long, pessimistic when conflicts are frequent or retries are expensive"
+            keywords: ["contention", "rare", "frequent", "conflict rate", "think time", "expensive"]
+          - point: "Both guard against lost updates; the isolation level alone does not always do it"
+            keywords: ["lost update", "isolation", "serializ"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "How does `@Version` work in JPA, and what do you do when it fails?"
+            modelAnswer: "Hibernate adds a version column to the entity. Every UPDATE includes `WHERE id = ? AND version = ?` and increments the version. If another transaction committed first, zero rows match and an optimistic locking exception is thrown (Spring wraps it as ObjectOptimisticLockingFailureException). The caller reloads the data and retries the whole unit of work, or shows the user a conflict message."
+            keyPoints:
+              - point: "The UPDATE checks the version in its WHERE clause and increments it"
+                keywords: ["where", "increment", "version column"]
+              - point: "Zero rows updated leads to an optimistic locking exception"
+                keywords: ["exception", "zero rows", "0 rows", "optimistic lock"]
+              - point: "The caller reloads and retries, or reports the conflict"
+                keywords: ["retry", "reload", "conflict message", "report"]
+          - when: covered
+            point: 1
+            prompt: "Two transactions each lock one row and then request the row the other holds. What happens, and how do you reduce the chance of it?"
+            modelAnswer: "That is a deadlock. The database detects the cycle and aborts one transaction as the victim (rolled back with an error), and the other continues. To reduce it, always acquire locks in a consistent order, keep transactions short, avoid user interaction or remote calls while holding locks, and retry the aborted transaction."
+            keyPoints:
+              - point: "A deadlock is detected and one transaction is aborted (rolled back)"
+                keywords: ["deadlock", "abort", "rolled back", "victim"]
+              - point: "Acquire locks in a consistent order"
+                keywords: ["consistent order", "same order", "ordering"]
+              - point: "Keep transactions short and retry the victim"
+                keywords: ["short", "retry", "timeout"]
+
+  - id: data-jpa
+    title: JPA, paging & operations
+    questions:
+      - type: spot
+        prompt: "`Order.items` is a lazy collection, and open-in-view is switched off. Tap the line that touches it after the transaction has already ended."
+        source: |
+          @Service
+          class OrderQuery(private val repo: OrderRepository) {
+              @Transactional(readOnly = true)
+              fun find(id: Long): Order = repo.findById(id).orElseThrow()
+          }
+
+          @RestController
+          class OrderController(private val query: OrderQuery) {
+              @GetMapping("/orders/{id}")
+              fun get(@PathVariable id: Long) = OrderDto(query.find(id).items.map { it.sku })
+          }
+        answers: [10]
+        explanation: "The transaction (and the persistence context) ends when `find` returns, so a lazy collection read in the controller throws LazyInitializationException. With Spring Boot's default open-in-view the line would appear to work, but only because the session stays open for the whole web request: it holds a connection while rendering and fires lazy queries outside any service-level transaction. Better: load what you need inside the transaction (join fetch, entity graph, or a DTO projection) and return a DTO."
+
+      - type: single
+        prompt: "Does this method persist the new name? There is no call to `save`."
+        code:
+          source: |
+            @Transactional
+            fun rename(id: Long, name: String) {
+                val customer = repo.findById(id).orElseThrow()
+                customer.name = name
+            }
+        options:
+          - { id: a, text: "Yes; Hibernate notices the change when it flushes and issues an UPDATE, at the latest at commit" }
+          - { id: b, text: "No; Hibernate writes entities that were explicitly passed to save() or persist() in this transaction" }
+          - { id: c, text: "No; an exception is thrown because the entity is detached outside a session" }
+          - { id: d, text: "Yes; the UPDATE is sent to the database immediately, on the line that assigns the name" }
+        answer: a
+        explanation: "Entities loaded inside a transaction are managed: Hibernate keeps a snapshot and compares it at flush time (dirty checking). Flush happens before a query that could be affected and at commit, not on assignment. `save()` on a managed entity adds nothing. Watch out for `@Transactional(readOnly = true)`: Spring then skips flushing, and the same code would silently lose the change."
+
+      - type: multi
+        prompt: "Select all true statements about keyset (seek) pagination compared with OFFSET pagination."
+        options:
+          - { id: a, text: "Page cost stays about the same however deep you go, given an index on the sort columns" }
+          - { id: b, text: "It does not skip or repeat rows when new rows are inserted between page requests" }
+          - { id: c, text: "The sort needs a unique tie-breaker, such as (created_at, id), to make the cursor unambiguous" }
+          - { id: d, text: "It lets you jump straight to page 500 by number, just like OFFSET pagination does" }
+          - { id: e, text: "It stays fast even when the sort columns have no supporting index, because it only reads one page" }
+        answers: [a, b, c]
+        explanation: "OFFSET n makes the database read and discard n rows, so deep pages get slower, and an insert before the current page shifts everything by one. Keyset remembers the last row seen and asks for rows after it (`WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT 20`), which an index can answer with a seek. The price: next/previous only, no random page numbers, and you do need the supporting index."
+
+      - type: code
+        prompt: "Implement `keysetPage(rows, cursor, limit)` for a feed sorted ascending by (`ts`, `id`). `rows` are `{id, ts}` objects in any order; `cursor` is `null` (first page) or the `{ts, id}` of the last row already seen. Return `{items, next}`: the next `limit` rows strictly after the cursor, and `next` = `{ts, id}` of the last returned item if more rows remain after the page, otherwise `null`."
+        starter: |
+          function keysetPage(rows, cursor, limit) {
+            // your code
+            return { items: [], next: null };
+          }
+        entry: keysetPage
+        tests:
+          - args: [[{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }, { id: 4, ts: 30 }, { id: 5, ts: 30 }], null, 2]
+            expect: { items: [{ id: 1, ts: 10 }, { id: 2, ts: 10 }], next: { ts: 10, id: 2 } }
+          - args: [[{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }, { id: 4, ts: 30 }, { id: 5, ts: 30 }], { ts: 10, id: 2 }, 2]
+            expect: { items: [{ id: 3, ts: 20 }, { id: 4, ts: 30 }], next: { ts: 30, id: 4 } }
+          - args: [[{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }, { id: 4, ts: 30 }, { id: 5, ts: 30 }], { ts: 30, id: 4 }, 2]
+            expect: { items: [{ id: 5, ts: 30 }], next: null }
+          - args: [[{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }, { id: 4, ts: 30 }, { id: 5, ts: 30 }], { ts: 30, id: 5 }, 2]
+            expect: { items: [], next: null }
+          - args: [[{ id: 3, ts: 20 }, { id: 1, ts: 10 }, { id: 2, ts: 10 }], null, 5]
+            expect: { items: [{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }], next: null }
+            hidden: true
+          - args: [[{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }, { id: 4, ts: 30 }, { id: 5, ts: 30 }], { ts: 20, id: 3 }, 2]
+            expect: { items: [{ id: 4, ts: 30 }, { id: 5, ts: 30 }], next: null }
+            hidden: true
+          - args: [[{ id: 1, ts: 10 }, { id: 2, ts: 10 }, { id: 3, ts: 20 }, { id: 4, ts: 30 }, { id: 5, ts: 30 }], { ts: 10, id: 1 }, 1]
+            expect: { items: [{ id: 2, ts: 10 }], next: { ts: 10, id: 2 } }
+            hidden: true
+        solution: |
+          function keysetPage(rows, cursor, limit) {
+            const after = (r) =>
+              cursor === null || r.ts > cursor.ts || (r.ts === cursor.ts && r.id > cursor.id);
+            const rest = [...rows]
+              .sort((a, b) => a.ts - b.ts || a.id - b.id)
+              .filter(after);
+            const items = rest.slice(0, limit);
+            const hasMore = rest.length > limit && items.length > 0;
+            const last = items[items.length - 1];
+            return { items, next: hasMore ? { ts: last.ts, id: last.id } : null };
+          }
+        kotlin: |
+          data class Row(val id: Long, val ts: Long)
+          data class Page(val items: List<Row>, val next: Row?)
+
+          fun keysetPage(rows: List<Row>, cursor: Row?, limit: Int): Page {
+              val rest = rows.sortedWith(compareBy({ it.ts }, { it.id }))
+                  .filter { cursor == null || it.ts > cursor.ts || (it.ts == cursor.ts && it.id > cursor.id) }
+              val items = rest.take(limit)
+              val hasMore = rest.size > limit && items.isNotEmpty()
+              return Page(items, if (hasMore) items.last() else null)
+          }
+        explanation: "The tie-breaker matters: many rows can share a timestamp, so comparing the pair (ts, id) gives a strict total order and a cursor that never skips or repeats. In SQL, ask for `limit + 1` rows to learn whether another page exists without a count query. Note that the cursor is an opaque position, not a page number, so it stays valid when rows are inserted earlier in the feed."
+
+      - type: single
+        prompt: "A teammate fixes a typo inside `V12__add_invoice_status.sql`, which already ran in production, and deploys. With Flyway's default validation on, what happens at startup?"
+        options:
+          - { id: a, text: "Validation fails with a checksum mismatch; the fix belongs in a new versioned migration (e.g. V13)" }
+          - { id: b, text: "Flyway re-runs V12 with the corrected text and replaces the effect of the old version in the schema history" }
+          - { id: c, text: "Flyway silently ignores the edit, because applied migrations are never looked at again" }
+          - { id: d, text: "Flyway drops the schema and rebuilds it from the migrations, including the corrected V12" }
+        answer: a
+        explanation: "Flyway stores a checksum for every applied versioned migration and compares it on startup; Liquibase does the same with changeset checksums. Applied migrations are history and must be immutable. Make corrections in a new migration. `repair` exists for deliberate, understood cases, not to paper over edits."
+
+      - type: order
+        kind: steps
+        prompt: "Rename a column with zero downtime (expand and contract). Put the steps in order."
+        lines:
+          - "Add the new nullable column in a migration; the running code ignores it"
+          - "Deploy code that writes to both the old and the new column"
+          - "Backfill the new column for existing rows, in batches"
+          - "Deploy code that reads and writes only the new column"
+          - "Drop the old column in a later migration"
+        explanation: "Dual writes start before the backfill so no row can be changed in the gap, and the old column stays until no running version reads or writes it. Every step is compatible with the previous app version, which matters during rolling deployments where old and new instances run side by side. A single `ALTER TABLE ... RENAME COLUMN` breaks the instances that are still running the old code."
+
+      - type: single
+        prompt: "Cache-aside: a reader misses and loads the OLD row from the database. Before it stores that value in the cache, a writer updates the row and deletes the cache key. Then the reader stores the old value. What is the state now, and what bounds the damage?"
+        options:
+          - { id: a, text: "The cache holds a stale value until it expires or is evicted; a TTL (or versioned entries) bounds it" }
+          - { id: b, text: "Both are consistent, because the delete happened last and wins over the reader's store, which is then rejected" }
+          - { id: c, text: "The reader's store fails because the key was deleted, so the next read reloads the row" }
+          - { id: d, text: "The cache automatically detects the conflicting store and rolls back the database update to stay consistent" }
+        answer: a
+        explanation: "Deleting after the database commit is the usual pattern, but a slow reader can still re-populate the key with data read earlier. Typical mitigations: a TTL as a safety net, writing versions and refusing older ones, a short delayed second delete, or accepting brief staleness for data where it is harmless. Caches never make things strictly consistent; they trade freshness for load."
+        difficulty: hard
+
+      - type: single
+        prompt: "40 service instances each run a connection pool of up to 25 connections against one PostgreSQL primary whose `max_connections` is 500. What is the problem, and the sensible direction?"
+        options:
+          - { id: a, text: "At peak the fleet can ask for 1,000 connections (40 x 25), over the server's 500; budget pool sizes fleet-wide or use PgBouncer" }
+          - { id: b, text: "There is no problem; pools open connections lazily and instances rarely peak together, so the server limit does not matter in practice" }
+          - { id: c, text: "Raise max_connections to 10,000 so that every instance can always get its full pool" }
+          - { id: d, text: "Raise each pool to 100 so that threads wait less for a connection, and let the database queue the rest" }
+        answer: a
+        explanation: "Pool size is a fleet-wide budget: instances x pool size (plus admin tools and migrations) must fit under the server's limit, and each connection costs the database memory and a backend process, so simply raising limits makes it worse. Far fewer active connections than that is usually faster, since a database can only run about as many queries at once as it has cores and disks. Pools open connections as demand rises, so peaks (and deployments, where old and new instances overlap) do hit the limit. Autoscaling multiplies the problem, so deploy-time pool sizes need to be thought through together with the instance maximum."
+
+      - type: open
+        prompt: "Your team proposes moving order data from PostgreSQL to a document database 'because it scales better'. How do you evaluate that proposal?"
+        modelAnswer: "I start from access patterns and requirements, not labels. Orders are relational and need multi-row transactions and constraints (order, lines, payments, stock) and ad-hoc reporting with joins, which a relational database provides natively, and one well-indexed Postgres node with read replicas and partitioning goes a long way. A document store fits when data is read and written as one aggregate, the schema varies, or you need to scale writes horizontally by partitioning on a key; the price is denormalised duplicated data, weaker cross-document transactions and joins, and consistency you manage yourself. I would first measure the real bottleneck (queries, indexes, locks), consider using a second store only for the workloads that do not fit (search, cache, time series), and weigh migration cost, team skills and operations."
+        keyPoints:
+          - point: "Decide from access patterns and requirements (consistency, transactions, query needs), not from hype"
+            keywords: ["access pattern", "requirement", "workload", "query pattern"]
+          - point: "Relational strengths: ACID multi-row transactions, constraints, joins and ad-hoc queries"
+            keywords: ["acid", "transaction", "join", "constraint", "integrity"]
+          - point: "NoSQL strengths and costs: horizontal scaling by partition key and flexible schema, but denormalisation and weaker cross-entity consistency"
+            keywords: ["horizontal", "partition", "shard", "flexible", "denormali"]
+          - point: "Measure the real bottleneck first; relational scales a long way; mix stores where needed and count migration cost"
+            keywords: ["measure", "bottleneck", "replica", "polyglot", "migration", "benchmark"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "Suppose the store only guarantees atomicity within a single document or partition. How do you place an order that must reserve stock in three separate products?"
+            modelAnswer: "I would use conditional, atomic updates on each product document to reserve stock, and tie the three reservations together with a saga: if one fails, run compensating actions that release the reservations already made, with every step idempotent so retries are safe. If the business really needs all three or none at once, that is a sign the data wants a transactional store."
+            keyPoints:
+              - point: "Atomic conditional update per document or partition"
+                keywords: ["conditional", "atomic", "single document", "per document", "per-document"]
+              - point: "A saga with compensating actions that release earlier reservations"
+                keywords: ["saga", "compensat", "release"]
+              - point: "Idempotent steps, or recognising the need for a transactional store"
+                keywords: ["idempotent", "transactional", "relational"]
+          - when: covered
+            point: 4
+            prompt: "You keep Postgres, but one table has two billion rows and queries on recent data are slow. What do you try before leaving the database?"
+            modelAnswer: "Partition the table by time so queries touch only recent partitions and old ones can be detached or archived, make sure the indexes match the real access path (or use a partial index on recent rows), move cold data to an archive, and add read replicas for reporting. Only after that would I consider sharding by key."
+            keyPoints:
+              - point: "Partition by time so queries touch only recent partitions"
+                keywords: ["partition"]
+              - point: "Indexes matching the access path, possibly partial indexes"
+                keywords: ["index"]
+              - point: "Archive cold data and use read replicas; shard only as a last step"
+                keywords: ["archive", "replica", "shard"]

@@ -1,7 +1,8 @@
 import type { CodeRunResult } from '@trainer/shared';
+import { Icon } from './icons';
 
 export function TestResults({ result }: { result: CodeRunResult }) {
-  if (result.fatal) return <p className="test-fatal" role="alert">{result.fatal}</p>;
+  if (result.fatal) return <p className="test-fatal" role="alert"><Icon name="x" strokeWidth={2.5} /><span>{result.fatal}</span></p>;
   const passed = result.results.filter((r) => r.passed).length;
   return (
     <div className="tests" role="status">
@@ -9,17 +10,20 @@ export function TestResults({ result }: { result: CodeRunResult }) {
       <ul>
         {result.results.map((r, i) => (
           <li key={i} className={r.passed ? 'pass' : 'fail'}>
-            <b aria-hidden="true">{r.passed ? '✓' : '✗'}</b>{' '}
+            <Icon name={r.passed ? 'check' : r.hidden ? 'eye-off' : 'x'} />
             {r.hidden ? (
-              <span>Hidden test {r.passed ? 'passed' : 'failed'}</span>
+              <span><b className="t-state" aria-hidden="true">{r.passed ? 'Pass' : 'Fail'}</b><span className="sr-only">Hidden test {r.passed ? 'passed' : 'failed'}</span><span aria-hidden="true"> hidden test</span></span>
             ) : (
               <span>
+                <b className="t-state" aria-hidden="true">{r.passed ? 'Pass' : 'Fail'}</b>
+                <span className="sr-only">{r.passed ? 'Passed: ' : 'Failed: '}</span>
                 <code>{r.call}</code>
                 {!r.passed && (
-                  <>
-                    <br />
-                    <small>expected <code>{r.expected}</code>{r.got !== undefined && <> · got <code>{r.got}</code></>}{r.note && <> · {r.note}</>}</small>
-                  </>
+                  <dl className="diff">
+                    <dt>expected</dt><dd><code>{r.expected}</code></dd>
+                    {r.got !== undefined && <><dt>got</dt><dd><code>{r.got}</code></dd></>}
+                    {r.note && <><dt>note</dt><dd>{r.note}</dd></>}
+                  </dl>
                 )}
               </span>
             )}

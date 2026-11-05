@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod/v4';
-import { SYSTEM_PROMPT, buildUserPrompt, type GradeResponse, type OpenQ } from '@trainer/shared';
+import { ImplausibleVerdictError, SYSTEM_PROMPT, buildUserPrompt, checkVerdict, type GradeResponse, type OpenQ } from '@trainer/shared';
 
 export { SYSTEM_PROMPT, buildUserPrompt, sanitizeAnswer } from '@trainer/shared';
 
@@ -45,14 +45,14 @@ export class AnthropicGrader implements Grader {
     if (response.stop_reason === 'refusal') throw new Error('The model declined to grade this answer');
     const parsed = response.parsed_output;
     if (!parsed) throw new Error('The model returned an unparseable verdict');
-    if (parsed.points.length !== q.keyPoints.length)
-      throw new Error(`Expected ${q.keyPoints.length} rubric verdicts, got ${parsed.points.length}`);
-
-    const covered = parsed.points.map((p) => p.covered);
+    // A well-shaped verdict can still be junk (every point false with empty feedback, text that echoes an injected instruction):
+    // it is refused here, and the app asks the learner to check the answer themselves instead of showing a confident grade.
+    const verdict = checkVerdict(q, answer, parsed);
+    if (!verdict.ok) throw new ImplausibleVerdictError(verdict.reason);
     return {
-      score: covered.filter(Boolean).length / covered.length,
-      covered,
-      feedback: parsed.feedback.trim(),
+      score: verdict.covered.filter(Boolean).length / verdict.covered.length,
+      covered: verdict.covered,
+      feedback: verdict.feedback,
       graded_by: 'ai',
     };
   }

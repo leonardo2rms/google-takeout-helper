@@ -1,0 +1,36 @@
+/* Second UX round: goal-met Home, tomorrow bridge, compact data-safety bar. Tokens only (no new colours). */
+
+/* Goal ring: "8/8", with whatever was done beyond the goal named as a bonus beside it. */
+.goal-bonus { font: 500 var(--fs-12)/1 var(--mono); color: var(--graphite); font-variant-numeric: tabular-nums slashed-zero; }
+
+/* Goal met: the hero is calm (outline tile, quiet button) and offers one optional next step. */
+.card.hero.done { border-color: var(--edge); }
+.cta.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
+.card.up-next, .card.hero + .card.up-next { margin: 0 0 var(--s2); }
+
+/* Daily challenge, finished: the action sits under the text instead of squeezing the title. */
+.card.challenge.done .hero-text b { overflow-wrap: anywhere; }
+.inline-action { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin-top: 2px; color: var(--cobalt); font-weight: 600; font-size: var(--fs-14); text-decoration: none; }
+.inline-action:hover { text-decoration: underline; }
+
+/* Summary: what happens next, and one quiet offer. */
+.tomorrow { margin: var(--s3) 0; padding: 12px 14px; border: 1px solid var(--edge); border-radius: var(--r2); background: var(--sheet); display: grid; gap: 6px; }
+.tomorrow p { margin: 0; }
+.tomorrow .tomorrow-offer { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tomorrow .btn.small { min-height: 44px; }
+
+/* Data-safety bar: compact (one line + Details), never taller than a couple of lines until opened. */
+.safety-bars .notice.compact { display: block; padding: 8px 10px; margin-bottom: 8px; }
+.safety-bars .notice.compact p { margin: 0; }
+.safety-main { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 8px; }
+.safety-line { display: flex; gap: 6px; align-items: flex-start; flex: 1 1 14rem; min-width: 0; font-size: var(--fs-14); }
+.safety-line .i { flex: none; margin-top: 2px; color: var(--vermilion); }
+.safety-main .safety-actions { flex: none; gap: 0; }
+.safety-details { display: grid; gap: 8px; padding: 6px 0 4px; font-size: var(--fs-14); }
+.safety-mark { display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; color: var(--vermilion); }
+
+/* Settings: reset is a plain button in its own section, not a small link. */
+.btn.danger-btn { color: var(--vermilion); border-color: var(--vermilion); }
+.more-mocks { margin: 4px 0 0; }
+.more-mocks > summary { color: var(--graphite); font-weight: 500; }
+.tip .tip-note { display: block; margin-top: 6px; font-size: var(--fs-13); }

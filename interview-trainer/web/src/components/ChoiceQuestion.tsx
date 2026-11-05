@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import { seededShuffle, type MultiQ, type SingleQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 import { Inline } from './Inline';
+import { ResultCue, type ResultState } from './ResultCue';
+
+/** The marker says whose answer it is; the verdict itself is said once, in the feedback panel. */
+const TAG = { correct: 'Your answer', wrong: 'Your answer', missed: 'Answer' } as const;
 
 interface Props {
   q: SingleQ | MultiQ;
@@ -25,10 +30,22 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
     else onAnswer(multi ? { type: 'multi', selected: next } : { type: 'single', selected: next[0]! });
   }
 
+  // A radio group is operated with the arrow keys: the next or previous option is focused and chosen (wrapping at the ends).
+  function arrows(e: KeyboardEvent<HTMLDivElement>) {
+    if (multi || checked || !['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'].includes(e.key)) return;
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="radio"]'));
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (at === -1) return;
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+    const target = buttons[(at + step + buttons.length) % buttons.length]!;
+    target.focus();
+    target.click();
+  }
+
   return (
-    <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label="Answer options">
-      {multi && <p className="hint">Select all that apply</p>}
-      {options.map((o) => {
+    <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label={multi ? 'Answer options, select all that apply' : 'Answer options'} onKeyDown={arrows}>
+      {options.map((o, index) => {
         const isSel = selected.includes(o.id);
         let state = '';
         if (checked) {
@@ -45,11 +62,27 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
             disabled={checked}
             onClick={() => toggle(o.id)}
           >
-            <span className="marker" aria-hidden="true">{isSel ? (multi ? '✓' : '●') : ''}</span>
-            <span className="option-text"><Inline text={o.text} /></span>
+            <span className="marker" aria-hidden="true">
+              {state === 'wrong' ? <Icon name="x" size={15} strokeWidth={2.75} /> : state || isSel ? <Icon name="check" size={15} strokeWidth={2.75} /> : String.fromCharCode(65 + index)}
+            </span>
+            <span className="option-text"><Inline text={o.text} /><ResultCue state={state as ResultState} /></span>
+            {state && <span className="tagtxt" aria-hidden="true">{TAG[state as 'correct' | 'wrong' | 'missed']}</span>}
           </button>
         );
       })}
+      {checked && multi && <p className="hint multi-count" data-testid="multi-count">{countLine(selected, correct)}</p>}
     </div>
   );
+}
+
+/** "Right: 2 of 3 · Missed: 1 · Not an answer: 1": what the colours alone would leave the learner to count. */
+function countLine(selected: readonly string[], correct: ReadonlySet<string>): string {
+  const right = selected.filter((id) => correct.has(id)).length;
+  const wrong = selected.length - right;
+  const missed = correct.size - right;
+  if (wrong === 0 && missed === 0) return `All ${correct.size} correct answers chosen.`;
+  const parts = [`Right: ${right} of ${correct.size}`];
+  if (missed > 0) parts.push(`Missed: ${missed}`);
+  if (wrong > 0) parts.push(`Not an answer: ${wrong}`);
+  return parts.join(' · ');
 }

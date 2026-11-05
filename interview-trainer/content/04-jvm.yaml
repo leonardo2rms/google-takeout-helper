@@ -1,13 +1,13 @@
 id: jvm
 title: JVM Internals
-emoji: "☕"
-color: "#ff9600"
+icon: cpu
 description: Memory layout, garbage collection, the JIT, the memory model and virtual threads.
 lessons:
   - id: jvm-memory
     title: Memory & garbage collection
     questions:
       - type: single
+        hint: "Think about which memory areas are per-thread and which are shared."
         prompt: Which memory area is shared by all threads and managed by the garbage collector?
         options:
           - { id: a, text: "The heap" }
@@ -18,6 +18,7 @@ lessons:
         explanation: "Objects live on the heap. Each thread's stack holds frames with local primitives and references, and is freed automatically when frames pop (no GC involved)."
 
       - type: single
+        hint: "It moved out of the Java heap in Java 8. Where does non-heap memory live?"
         prompt: Since Java 8, where is class metadata (the PermGen replacement) stored?
         options:
           - { id: a, text: "Metaspace, in native memory" }
@@ -28,7 +29,7 @@ lessons:
         explanation: "Metaspace lives outside the Java heap and grows up to the available native memory unless capped with `-XX:MaxMetaspaceSize`. Classloader leaks (e.g. repeated redeploys) are the classic way to exhaust it."
 
       - type: multi
-        prompt: Select ALL statements that are true for generational garbage collection on the JVM.
+        prompt: Select all statements that are true for generational garbage collection on the JVM.
         options:
           - { id: a, text: "It relies on the observation that most objects die young" }
           - { id: b, text: "Young-generation collections are usually frequent and short" }
@@ -39,6 +40,7 @@ lessons:
         explanation: "Modern collectors (G1, ZGC, Shenandoah) do much of the old-gen work concurrently. G1 allocates humongous objects (>= half a region) directly into dedicated humongous regions in the old generation."
 
       - type: single
+        hint: "Think about collectors that do almost all of their work concurrently with the application."
         prompt: "Your latency SLO needs GC pauses well under a millisecond even with a multi-GB heap. Which collector is designed for that?"
         options:
           - { id: a, text: "ZGC" }
@@ -49,6 +51,7 @@ lessons:
         explanation: "ZGC does marking, relocation and reference processing concurrently, with pauses that don't grow with heap size. Parallel favours throughput; Serial is for tiny heaps; CMS was removed in Java 14. G1 (the default) targets pause *goals* in the tens to hundreds of ms."
 
       - type: single
+        hint: "Who still holds a reference to those listeners?"
         prompt: Why does the heap keep growing here?
         code:
           lang: kotlin
@@ -60,23 +63,25 @@ lessons:
             // components call Registry.add(this) when created and never remove themselves
         options:
           - { id: a, text: "Listeners stay reachable from a static root, so the GC can never collect them" }
-          - { id: b, text: "mutableListOf is not thread safe" }
-          - { id: c, text: "Kotlin objects are allocated off-heap" }
-          - { id: d, text: "The GC doesn't collect objects stored in a List" }
+          - { id: b, text: "`mutableListOf` returns a non-thread-safe list, so concurrent adds are lost and memory grows" }
+          - { id: c, text: "A Kotlin `object` is allocated outside the heap, so the GC has no way to shrink it" }
+          - { id: d, text: "The GC never collects objects that are stored inside a collection such as a List" }
         answer: a
-        explanation: "The GC collects what is unreachable from GC roots (statics, thread stacks, JNI refs). A forgotten listener, ThreadLocal or unbounded cache keeps whole object graphs alive. Fix with explicit deregistration, weak references or a bounded cache."
+        explanation: "The GC collects what is unreachable from GC roots (statics, thread stacks, JNI refs). A forgotten listener, ThreadLocal or unbounded cache keeps whole object graphs alive. Thread safety affects correctness, not retention; a Kotlin `object` lives on the heap; and collection elements are collected like any other object once the collection itself is unreachable. Fix with explicit deregistration, weak references or a bounded cache."
 
       - type: single
+        hint: "`-Xmx` limits only one of the memory areas a JVM process uses."
         prompt: "A container is OOMKilled although heap usage was well below `-Xmx`. What is the most likely explanation?"
         options:
-          - { id: a, text: "Non-heap memory (metaspace, thread stacks, direct buffers, code cache) pushed the process over the container limit" }
-          - { id: b, text: "The GC was disabled in containers" }
-          - { id: c, text: "`-Xmx` is ignored when running in Docker" }
-          - { id: d, text: "The kernel counts only heap memory against the limit" }
+          - { id: a, text: "Non-heap memory (metaspace, stacks, direct buffers, code cache) pushed the process over the limit" }
+          - { id: b, text: "The garbage collector is disabled in containers, so garbage piles up beyond `-Xmx`" }
+          - { id: c, text: "`-Xmx` is ignored when running in Docker, so the heap grew past the container limit" }
+          - { id: d, text: "The kernel counts only heap memory against the limit, so the heap metrics must have under-reported its size" }
         answer: a
-        explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
+        explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures; the limit applies to the whole process, and the JVM honours `-Xmx` and runs its GC in containers. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
 
       - type: estimate
+        hint: "MaxRAMPercentage is a share of the container's limit, not of the host's memory."
         prompt: "A container is limited to 2 GiB (2,048 MiB) and the JVM starts with `-XX:MaxRAMPercentage=75`. What is the maximum heap size, in MiB?"
         answer: 1536
         tolerance: 0
@@ -101,10 +106,10 @@ lessons:
             [4.502s][info][gc] GC(22) Pause Full (G1 Compaction Pause) 3955M->3949M(4096M) 2287.9ms
             [6.871s][info][gc] GC(23) Pause Full (G1 Compaction Pause) 3951M->3950M(4096M) 2301.2ms
         options:
-          - { id: a, text: "The live data fills the heap: full GCs reclaim almost nothing, so it is a leak or an undersized heap, not a tuning problem" }
-          - { id: b, text: "It is healthy: the pauses are short" }
-          - { id: c, text: "The young generation is too small, so increase `-Xmn`" }
-          - { id: d, text: "GC threads are starved by a CPU limit" }
+          - { id: a, text: "The live data fills the heap: full GCs reclaim almost nothing, so it is a leak or an undersized heap" }
+          - { id: b, text: "It is healthy: the heap shrinks slightly on each collection, so the GC is keeping up" }
+          - { id: c, text: "The young generation is too small, so objects are promoted early; increase `-Xmn`" }
+          - { id: d, text: "GC threads are starved by a CPU limit, so the pauses are long; raise `-XX:ParallelGCThreads`" }
         answer: a
         explanation: "Read the `before->after(total)` figures: 3,968M -> 3,951M of 4,096M means a 2.3-second full GC freed about 17 MB. Back-to-back full collections with almost nothing reclaimed mean the objects are still reachable. Take a heap dump; don't tune flags."
 
@@ -148,31 +153,33 @@ lessons:
     title: JIT, memory model & threads
     questions:
       - type: single
+        hint: "What does the JVM do with bytecode before it knows which methods are hot?"
         prompt: Why is the first call of a method often much slower than later calls on the JVM?
         options:
-          - { id: a, text: "It starts interpreted; hot code is later compiled by the tiered JIT (C1, then C2) with profile-guided optimisations" }
-          - { id: b, text: "The class has to be downloaded from the network" }
-          - { id: c, text: "The garbage collector runs on first call" }
-          - { id: d, text: "Bytecode is only verified on the first call, which dominates" }
+          - { id: a, text: "It starts interpreted; hot code is later compiled by the tiered JIT (C1, then C2)" }
+          - { id: b, text: "Classes are loaded lazily and have to be downloaded from the network on first use" }
+          - { id: c, text: "A garbage collection runs at the first call to compact the heap layout" }
+          - { id: d, text: "Bytecode is verified on the first call of a method, and that verification dominates the cost" }
         answer: a
-        explanation: "That's why microbenchmarks need warm-up (use JMH, not `System.nanoTime` loops) and why services show a latency bump right after deployment."
+        explanation: "The first calls run in the interpreter while the JVM profiles; hot code is then compiled by the tiered JIT (C1, then C2) with profile-guided optimisations. Class loading and verification are one-off and small by comparison, and no GC is triggered by a first call. That's why microbenchmarks need warm-up (use JMH, not `System.nanoTime` loops) and why services show a latency bump right after deployment."
 
       - type: single
+        hint: "Is `counter++` one operation or several? And what does `volatile` actually promise?"
         prompt: Two threads run `counter++` 1,000,000 times each on this field. What is the likely final value?
         code:
           source: |
             @Volatile
             var counter = 0
         options:
-          - { id: a, text: "Often less than 2,000,000: volatile gives visibility but `++` is not atomic" }
-          - { id: b, text: "Exactly 2,000,000, because volatile makes operations atomic" }
-          - { id: c, text: "Exactly 1,000,000" }
-          - { id: d, text: "Always 0: volatile blocks writes from other threads" }
+          - { id: a, text: "Often less than 2,000,000: volatile gives visibility, but `++` is not atomic" }
+          - { id: b, text: "Exactly 2,000,000, because volatile makes each read-modify-write operation atomic" }
+          - { id: c, text: "Exactly 1,000,000, because the second thread's volatile writes overwrite the first's" }
+          - { id: d, text: "Always 0, because volatile blocks writes coming from other threads" }
         answer: a
         explanation: "`counter++` is read-modify-write. Use `AtomicInteger`/`LongAdder` (or a lock). `volatile` guarantees visibility and ordering of single reads/writes, not compound actions."
 
       - type: multi
-        prompt: Select ALL true statements about `synchronized` and `ReentrantLock`.
+        prompt: Select all true statements about `synchronized` and `ReentrantLock`.
         options:
           - { id: a, text: "`synchronized` is reentrant" }
           - { id: b, text: "`ReentrantLock` supports `tryLock` with a timeout" }
@@ -183,36 +190,39 @@ lessons:
         explanation: "With `ReentrantLock` you must `unlock()` in a `finally` block. Multiple conditions are a `Lock` feature (`newCondition()`); a monitor has a single wait set."
 
       - type: single
+        hint: "Virtual threads make waiting cheap. Which workloads mostly wait?"
         prompt: Virtual threads (Java 21) give the biggest win for which workload?
         options:
           - { id: a, text: "Many concurrent tasks that mostly block on I/O (HTTP calls, JDBC)" }
-          - { id: b, text: "Tight CPU-bound numeric loops" }
-          - { id: c, text: "A single long-running batch job" }
-          - { id: d, text: "Code that holds `synchronized` blocks around network calls" }
+          - { id: b, text: "Tight CPU-bound numeric loops that keep each core busy for minutes" }
+          - { id: c, text: "A single long-running batch job that reads one big file sequentially" }
+          - { id: d, text: "Code that holds `synchronized` blocks around slow network calls on JDK 21" }
         answer: a
-        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and the last option is a pinning hazard (next question)."
+        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and holding a `synchronized` block around network calls is a pinning hazard (next question)."
 
       - type: single
         prompt: "In JDK 21, a virtual thread blocks on I/O while inside a `synchronized` block. What is the effect, and the usual remedy?"
         options:
-          - { id: a, text: "The carrier thread is pinned (can't be reused); prefer `ReentrantLock` around blocking code" }
-          - { id: b, text: "The JVM throws IllegalMonitorStateException; wrap in try/catch" }
-          - { id: c, text: "The virtual thread is converted to a platform thread permanently; nothing to do" }
-          - { id: d, text: "No effect at all; monitors are fully supported by virtual threads" }
+          - { id: a, text: "The carrier thread is pinned and cannot be reused; use a `ReentrantLock` around blocking code" }
+          - { id: b, text: "The JVM throws IllegalMonitorStateException on blocking I/O; wrap the call in a try/catch" }
+          - { id: c, text: "The virtual thread is converted into a platform thread permanently; nothing can be done" }
+          - { id: d, text: "No effect at all; monitors are fully supported by virtual threads and never pin a carrier" }
         answer: a
         explanation: "Pinning limits scalability because the carrier is stuck. It's been largely addressed in later JDKs for `synchronized`, but on 21 it is a real tuning concern (`-Djdk.tracePinnedThreads`)."
 
       - type: single
+        hint: "Compile time and run time can see different classpaths."
         prompt: "At runtime you get `NoClassDefFoundError` for a class that was present at compile time. What does that usually mean?"
         options:
-          - { id: a, text: "The class was on the compile classpath but is missing at runtime (or its static initialiser failed earlier)" }
-          - { id: b, text: "The code called `Class.forName` with a typo" }
-          - { id: c, text: "A syntax error in the class" }
-          - { id: d, text: "The class is deprecated" }
+          - { id: a, text: "The class was on the compile classpath but is missing at runtime (or failed to initialise)" }
+          - { id: b, text: "The code called `Class.forName` with a misspelled class name, so the loader gave up" }
+          - { id: c, text: "A compile error in the class that the build tool ignored, so the class file on disk is incomplete" }
+          - { id: d, text: "The class is deprecated, so the JVM refuses to load it unless a flag is set" }
         answer: a
         explanation: "`ClassNotFoundException` is thrown by explicit reflective loading (`Class.forName`); `NoClassDefFoundError` is a linkage error when the JVM can't find or initialise a class it needs. Typical causes: `provided`/`compileOnly` dependency, version conflicts, or an `ExceptionInInitializerError` first."
 
       - type: spot
+        hint: "Look for a check followed by an action, with no lock around the pair."
         prompt: Two threads call `get()` at the same time and `init()` runs twice. Tap the two lines that form the race.
         source: |
           class Lazy<T : Any>(private val init: () -> T) {
@@ -240,14 +250,15 @@ lessons:
                 waiting to lock <0x000000076b2a1f30> (a java.lang.Object)
                 which is held by "worker-1"
         options:
-          - { id: a, text: "A deadlock: each thread waits for a lock the other holds. Fix it with a consistent lock order or `tryLock` with a timeout" }
-          - { id: b, text: "Thread pool starvation: add more worker threads" }
-          - { id: c, text: "A long GC pause: increase the heap" }
-          - { id: d, text: "Normal contention: both threads will proceed shortly" }
+          - { id: a, text: "A deadlock: each thread waits for a lock the other holds. Fix it with a consistent lock order or `tryLock`" }
+          - { id: b, text: "Thread pool starvation: the workers are busy, so add more worker threads" }
+          - { id: c, text: "A long GC pause: both threads are stopped, so increase the heap" }
+          - { id: d, text: "Normal contention on a hot lock: both threads will proceed as soon as the holder is done" }
         answer: a
         explanation: "worker-1 waits for worker-2's lock and worker-2 waits for worker-1's: a cycle, so neither can ever proceed. `jstack` and `jcmd Thread.print` report deadlocks explicitly. Acquire locks in one global order, or use `tryLock` with a timeout and back off."
 
       - type: open
+        hint: "It is a guarantee about visibility between threads, not about wall-clock time. Then list ways to establish it."
         prompt: "Explain \"happens-before\" in the Java Memory Model and give two ways to safely publish an object to another thread."
         modelAnswer: "Happens-before is the JMM's guarantee that if action A happens-before action B, then A's effects (writes) are visible to B and ordered before it. Without such an edge, the compiler, CPU and caches may reorder or delay writes so another thread can see stale or partially constructed state. Edges come from volatile write/read, monitor unlock/lock, Thread.start/join, and final-field semantics. Safe publication means establishing that edge: for example store the object in a volatile field, publish via synchronized/locks, put it in a concurrent collection or queue, hand it over through a static initialiser, or make its fields final."
         keyPoints:
@@ -257,3 +268,144 @@ lessons:
             keywords: ["volatile", "synchronized", "lock", "start", "join", "final"]
           - point: "Names at least two safe-publication mechanisms (volatile field, locks, concurrent collections, static initialiser, final fields)"
             keywords: ["safe publication", "concurrenthashmap", "blockingqueue", "queue", "static initial", "volatile field", "final field", "atomicreference"]
+
+  - id: jvm-advanced
+    title: JIT, class loading & diagnostics
+    questions:
+      - type: single
+        prompt: "After the JIT has warmed up, what may happen to the allocation of `d` in this hot method?"
+        code:
+          source: |
+            data class Vec(val x: Double, val y: Double)
+
+            fun length(x1: Double, y1: Double, x2: Double, y2: Double): Double {
+                val d = Vec(x2 - x1, y2 - y1)
+                return Math.sqrt(d.x * d.x + d.y * d.y)
+            }
+        options:
+          - { id: a, text: "C2 may prove that `d` never escapes the method and eliminate the allocation (scalar replacement), keeping `x` and `y` in registers" }
+          - { id: b, text: "The JVM always allocates such short-lived objects on the thread stack instead of the heap" }
+          - { id: c, text: "Escape analysis moves `d` into Metaspace so that the garbage collector never has to see it" }
+          - { id: d, text: "Nothing can change: the JIT is not allowed to remove an allocation, because the garbage collector needs to see each object" }
+        answer: a
+        explanation: "Escape analysis asks whether an object can be seen outside the method (stored in a field, passed to a non-inlined call, returned). If not, HotSpot's optimising compiler can replace the object by its fields and skip the allocation entirely. It is an optimisation, never a guarantee, and it depends on inlining: once `d` is passed to a call that is not inlined, it escapes and is allocated normally."
+
+      - type: single
+        prompt: "The call `it.area()` is hot. With one `Shape` implementation in production it is fast; when all five implementations flow through it, it gets noticeably slower. Why?"
+        code:
+          source: |
+            interface Shape { fun area(): Double }
+            // Circle, Square, Triangle, Rect and Hexagon implement Shape
+
+            fun total(shapes: List<Shape>): Double = shapes.sumOf { it.area() }
+        options:
+          - { id: a, text: "With one or two receiver types the JIT inlines the target behind a type check; with more (megamorphic) it uses real virtual dispatch" }
+          - { id: b, text: "Interface calls are always slower than calls on a concrete class, and the JIT cannot inline them whatever it sees" }
+          - { id: c, text: "Each additional implementation adds a new vtable slot, so the memory footprint of `Shape` grows" }
+          - { id: d, text: "The JIT is disabled for call sites that see more than one class, so they run interpreted" }
+        answer: a
+        explanation: "HotSpot records which receiver types each call site sees. A monomorphic or bimorphic site is inlined with a guard, and inlining opens the door to further optimisations (escape analysis, constant folding). A site that sees many types needs a real virtual or interface call. This is why the same code can behave differently in a benchmark with one implementation and in production with many."
+
+      - type: multi
+        prompt: Select all true statements about class loading on the JVM.
+        options:
+          - { id: a, text: "A class is identified by its name and its defining class loader: the same bytes loaded by two loaders give two incompatible types" }
+          - { id: b, text: "By default a class loader first asks its parent and loads the class itself only if the parent cannot" }
+          - { id: c, text: "Classes can only be unloaded when their defining class loader is unreachable and has been collected" }
+          - { id: d, text: "All classes that the main class references are loaded and initialised eagerly at JVM startup, before `main` runs" }
+          - { id: e, text: "Metaspace is limited by default by `-Xmx`, so raising the heap limit also raises the Metaspace limit" }
+        answers: [a, b, c]
+        explanation: "Loading is lazy (on first use), and Metaspace is a separate native-memory area that is unbounded unless `-XX:MaxMetaspaceSize` is set. Because classes live as long as their loader, a leaked reference to a webapp's class loader (a ThreadLocal, a static in a shared library, a registered JDBC driver, a live thread) keeps every class of the old deployment alive: the classic Metaspace leak on redeploys. The same class name loaded by two loaders is also the reason for puzzling `ClassCastException: X cannot be cast to X`."
+
+      - type: single
+        prompt: "What does this safepoint log line tell you? (Simplified: the exact set of fields varies by JDK version, and some releases add extra ones such as Cleanup.)"
+        code:
+          lang: text
+          source: |
+            [41.208s][info][safepoint] Safepoint "G1CollectForAllocation", Time since last: 1204563800 ns, Reaching safepoint: 1812004300 ns, At safepoint: 19800100 ns, Total: 1831804400 ns
+        options:
+          - { id: a, text: "The GC work took ~20 ms; the JVM waited ~1.8 s for threads to reach the safepoint, so look for a thread slow to poll, not collector tuning" }
+          - { id: b, text: "The collection itself took about 1.8 s of the pause, so the heap should be enlarged or another collector chosen to shorten it, as the log shows" }
+          - { id: c, text: "The JVM spent 1.8 s resizing Metaspace while holding each application thread stopped" }
+          - { id: d, text: "This is normal: the 'Reaching safepoint' phase is the longest part of a pause, so ignore it" }
+        answer: a
+        explanation: "A safepoint pause has two parts: time to safepoint (waiting until every Java thread has stopped at a poll) and the work done while stopped. All threads that already stopped sit idle during the first part, so the application sees the whole 1.8 s. GC logs that report only the collection time hide this; `-Xlog:safepoint` shows it. Tools that sample stacks or async-profiler help find the thread that was slow to arrive."
+
+      - type: spot
+        prompt: "Another thread sometimes calls `onPrice` and prints \"null\" as the currency. Tap the line that lets the object be seen too early."
+        source: |
+          class PriceListener(bus: EventBus) {
+              val currency: String
+
+              init {
+                  bus.register(this)
+                  currency = "EUR"
+              }
+
+              fun onPrice(p: Price) = println("${p.value} $currency")
+          }
+        answers: [5]
+        explanation: "`this` escapes from the constructor before `currency` is assigned: once registered, the bus (and another thread) can call `onPrice` on a half-built object. The Java Memory Model's guarantee for final fields (everyone who sees the reference sees the constructor-time values) only holds if `this` does not escape during construction. Finish construction first and register afterwards, for example in a factory function or a `start()` method."
+
+      - type: match
+        prompt: Match each diagnostic tool to what it is for.
+        pairs:
+          - { left: "JFR (Java Flight Recorder)", right: "Low-overhead recording of CPU samples, allocations, locks and GC events from a running JVM into a file" }
+          - { left: "Heap dump (`jcmd <pid> GC.heap_dump`)", right: "Snapshot of the live objects, to find what retains memory in a tool such as Eclipse MAT" }
+          - { left: "Thread dump (`jcmd <pid> Thread.print`)", right: "The stack of every thread at one instant, showing blocked threads and deadlocks" }
+          - { left: "async-profiler", right: "Sampling profiler that produces flame graphs without safepoint bias" }
+        explanation: "Pick the tool by the question: 'where is the CPU going or what is allocating' (JFR or async-profiler), 'who holds all this memory' (heap dump), 'why is everything stuck' (thread dump, ideally several a few seconds apart). JFR is designed to be safe to leave running in production; a heap dump pauses the JVM and can be large."
+
+      - type: estimate
+        prompt: "A service allocates about 500 MB per second. The eden space of the young generation is 2,000 MB. Roughly how many seconds pass between young collections, if eden fills completely each time?"
+        answer: 4
+        tolerance: 0
+        unit: seconds
+        explanation: "2,000 MB / 500 MB per second = 4 s between young GCs. The frequency is only half of the story: a young collection copies the survivors, so its cost grows with the amount of live data, not with the garbage. That is why a bigger eden usually reduces GC overhead (fewer collections, more time for objects to die) without a proportionally longer pause."
+
+      - type: multi
+        prompt: Select all true statements about virtual threads (JDK 21).
+        options:
+          - { id: a, text: "They are scheduled by the JVM onto a small pool of carrier threads, a `ForkJoinPool` sized by default to the number of processors" }
+          - { id: b, text: "You should keep them in a fixed-size pool and reuse them, like platform threads, to avoid creation cost" }
+          - { id: c, text: "`ThreadLocal` works in virtual threads, but big per-thread caches times many threads get expensive" }
+          - { id: d, text: "To limit use of a scarce resource such as a database, use a `Semaphore` or bounded pool, not the thread count" }
+          - { id: e, text: "They let CPU-bound code use more cores than there are carrier threads, because there are millions of them" }
+        answers: [a, c, d]
+        explanation: "Virtual threads are cheap, so you create one per task (`Executors.newVirtualThreadPerTaskExecutor()`) and never pool them; pooling was a way to ration expensive platform threads. Rationing moves to the resource that is actually scarce, which a semaphore expresses directly. Parallelism for CPU-bound work is still limited by the carrier threads, hence by the cores."
+
+      - type: open
+        prompt: "You benchmark two implementations with a simple loop and `System.nanoTime()`, and one looks 10x faster. Why might the result be misleading, and how do you measure properly?"
+        modelAnswer: "A hand-rolled loop measures the wrong thing. The JVM starts in the interpreter and the tiered JIT compiles hot code later, so the early iterations measure interpreted or C1 code, not steady state, and you need warm-up. The JIT may also remove the work altogether: if the result is never used it can eliminate the computation as dead code, and constant inputs can be folded at compile time, so you end up timing an empty loop. Allocation, GC and the type profile left by earlier code distort results further. A harness such as JMH handles this: it runs warm-up iterations before measuring, forks a fresh JVM per benchmark so profiles are not polluted, keeps inputs in non-final @State fields so they are not constants, and uses a Blackhole (or returns the result) to defeat dead-code elimination. Even then I would sanity-check the numbers against a profile and a realistic workload, because a microbenchmark can differ from production behaviour."
+        keyPoints:
+          - point: "Warm-up: the tiered JIT (interpreter, C1, C2) means early iterations are not steady state"
+            keywords: ["warm-up", "warmup", "tiered", "interpret"]
+          - point: "The JIT can eliminate unused work (dead-code elimination) and fold constants"
+            keywords: ["dead-code", "dead code", "constant", "eliminat"]
+          - point: "Use a harness such as JMH: forks, warm-up iterations, @State inputs, Blackhole"
+            keywords: ["jmh", "blackhole", "fork"]
+          - point: "Validate against realistic workloads and profiles; microbenchmarks can mislead"
+            keywords: ["realistic", "production", "profile", "workload"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "What is dead-code elimination in a benchmark, and how does JMH protect you from it?"
+            modelAnswer: "If the result of a computation is never used, the JIT is free to drop the computation, so the benchmark times an empty loop and reports absurdly fast numbers. JMH defends against this by letting the benchmark method return its result, which JMH consumes, or by passing values to a Blackhole. It also reads inputs from non-final @State fields so the compiler cannot constant-fold them."
+            keyPoints:
+              - point: "An unused result lets the JIT drop the whole computation"
+                keywords: ["never used", "unused", "drop", "empty"]
+              - point: "Return the value or pass it to a Blackhole"
+                keywords: ["blackhole", "return"]
+              - point: "Inputs come from non-final @State fields, so they cannot be constant-folded"
+                keywords: ["@state", "constant", "fold"]
+          - when: covered
+            point: 3
+            prompt: "Why does JMH run each benchmark in a freshly forked JVM?"
+            modelAnswer: "The JIT's decisions depend on the profile collected so far, for example which receiver types were seen at a call site. Code from earlier benchmarks in the same JVM pollutes that profile and can turn a monomorphic call site megamorphic, so results would depend on the order in which benchmarks ran. A fresh fork gives each benchmark clean state, and running several forks also averages out run-to-run variance."
+            keyPoints:
+              - point: "JIT decisions depend on the collected profile"
+                keywords: ["profile"]
+              - point: "Earlier benchmarks pollute it, for example turning a call site megamorphic"
+                keywords: ["pollut", "megamorphic", "receiver types"]
+              - point: "A fresh JVM gives clean state and averages out variance"
+                keywords: ["fresh", "clean state", "variance"]

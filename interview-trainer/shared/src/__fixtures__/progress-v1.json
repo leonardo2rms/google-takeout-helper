@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "xp": 320,
+  "streak": 4,
+  "lastDay": "2026-10-30",
+  "lessons": {
+    "kotlin-null-types": { "bestAccuracy": 1, "completions": 2, "lastDay": "2026-10-29" },
+    "kotlin-idioms": { "bestAccuracy": 0.7142857142857143, "completions": 1, "lastDay": "2026-10-30" },
+    "coroutines-basics": { "bestAccuracy": 0.5, "completions": 1, "lastDay": "2026-10-30" }
+  },
+  "missed": ["kotlin-idioms/3", "coroutines-basics/2", "coroutines-basics/5", "removed-lesson/1"]
+}

@@ -1,0 +1,304 @@
+id: system-design
+title: System Design Essentials
+icon: ruler
+description: Back-of-envelope numbers, rate limiting, partitioning, replication, caching and designing for failure.
+lessons:
+  - id: sd-estimation-traffic
+    title: Estimation and traffic control
+    questions:
+      - type: estimate
+        prompt: "A service handles 1 billion requests per day, spread evenly. Using 86,400 seconds per day, what is the average load in requests per second (QPS)?"
+        answer: 11574
+        tolerance: 0.03
+        unit: "req/s"
+        explanation: "1,000,000,000 / 86,400 is about 11,600 req/s. A handy rule: one million requests per day is roughly 12 req/s. That is the average; traffic is never flat, so size for the peak (often 2 to 5 times the average, more for spiky products)."
+
+      - type: estimate
+        prompt: "Peak traffic is 6,000 req/s. One instance sustains 500 req/s when saturated, but you plan to run instances at 60% of that. How many instances do you need to carry the peak (before adding spares for failures)?"
+        answer: 20
+        tolerance: 0
+        unit: instances
+        explanation: "Usable capacity per instance is 500 x 0.6 = 300 req/s, so 6,000 / 300 = 20. Running below saturation leaves room for latency spikes and uneven balancing. Then add headroom so that losing one instance or one zone (N+1, or N+2) still carries the peak."
+
+      - type: single
+        prompt: "A token bucket has capacity 10 and refills 5 tokens per second. A client has been idle for a minute. Which statement is true?"
+        options:
+          - { id: a, text: "It can send 10 requests at once, then roughly 5 per second: a burst plus a sustained rate" }
+          - { id: b, text: "It can send no more than 5 requests in a single second, since 5 is the refill rate" }
+          - { id: c, text: "It must wait one full second between any two requests, because tokens arrive once per second" }
+          - { id: d, text: "It can send unlimited requests for a minute, because a full bucket does not run empty" }
+        answer: a
+        explanation: "The bucket size bounds the burst and the refill rate bounds the long-run average. After a quiet period the bucket is full, so 10 requests pass immediately (even 15 within that first second, counting refill). Once it is empty, only about 5 per second get through."
+
+      - type: match
+        prompt: Match each rate-limiting algorithm to its main characteristic.
+        pairs:
+          - { left: "Fixed window counter", right: "Cheapest, but a client can send up to twice the limit around a window boundary" }
+          - { left: "Sliding window log", right: "Exact, but stores a timestamp for every request in the window" }
+          - { left: "Sliding window counter", right: "Approximates a sliding window by weighting the previous window's count" }
+          - { left: "Token bucket", right: "Allows short bursts up to the bucket size while enforcing an average rate" }
+          - { left: "Leaky bucket", right: "Drains requests at a constant rate, smoothing out bursts" }
+        explanation: "The choice is a trade-off between accuracy, memory and how you want bursts treated. Token bucket is a common default for APIs because bursts are usually harmless. The sliding window log is exact but costs memory per client."
+
+      - type: order
+        prompt: "Arrange the token bucket check. A rejected call must still advance the clock, so refill is never counted twice."
+        lines:
+          - "fun allow(nowMs: Long): Boolean {"
+          - "    tokens = minOf(capacity, tokens + (nowMs - lastMs) / 1000.0 * refillPerSec)"
+          - "    lastMs = nowMs"
+          - "    if (tokens < 1.0) return false"
+          - "    tokens -= 1.0"
+          - "    return true"
+          - "}"
+        explanation: "Refill first (capped at the bucket size), then record the time, then spend a token if one is available. If `lastMs` were updated only on success, the same elapsed time would be credited again on the next call. Lazy refill on each call avoids running a timer per client."
+
+      - type: code
+        prompt: "Write `slidingWindowAllow(timestamps, limit, windowMs)`. `timestamps` are request times in milliseconds, in ascending order. Return an array of booleans: a request at time `t` is allowed if fewer than `limit` ALLOWED requests happened in the window `(t - windowMs, t]`. Rejected requests do not count."
+        starter: |
+          function slidingWindowAllow(timestamps, limit, windowMs) {
+            // your code
+          }
+        entry: slidingWindowAllow
+        tests:
+          - { args: [[0, 100, 200, 300], 2, 1000], expect: [true, true, false, false] }
+          - { args: [[0, 500, 1000, 1001], 2, 1000], expect: [true, true, true, false] }
+          - { args: [[], 3, 1000], expect: [] }
+          - { args: [[0, 1, 2], 1, 10], expect: [true, false, false] }
+          - { args: [[5, 6, 7], 0, 100], expect: [false, false, false], hidden: true }
+          - { args: [[0, 1000, 2000, 3000], 1, 1000], expect: [true, true, true, true], hidden: true }
+          - { args: [[0, 10, 20, 1005], 2, 1000], expect: [true, true, false, true], hidden: true }
+        solution: |
+          function slidingWindowAllow(timestamps, limit, windowMs) {
+            const allowed = [];
+            return timestamps.map((t) => {
+              while (allowed.length > 0 && allowed[0] <= t - windowMs) allowed.shift();
+              if (allowed.length < limit) {
+                allowed.push(t);
+                return true;
+              }
+              return false;
+            });
+          }
+        kotlin: |
+          fun slidingWindowAllow(timestamps: List<Long>, limit: Int, windowMs: Long): List<Boolean> {
+              val allowed = ArrayDeque<Long>()
+              return timestamps.map { t ->
+                  while (allowed.isNotEmpty() && allowed.first() <= t - windowMs) allowed.removeFirst()
+                  if (allowed.size < limit) { allowed.addLast(t); true } else false
+              }
+          }
+        explanation: "Keep a queue of the allowed timestamps, evict those that fell out of the window, then compare the size to the limit. The window is half-open, so a request exactly `windowMs` after an earlier one no longer sees it. Only allowed requests are stored: counting rejected ones would punish a client for retrying while limited."
+
+      - type: single
+        prompt: "Requests to a service vary wildly in cost (some take 10 ms, some 10 s). With plain round robin, a few instances end up overloaded while others idle. Which balancing strategy adapts to this?"
+        options:
+          - { id: a, text: "Least outstanding requests: send the next request to the instance with the fewest in flight" }
+          - { id: b, text: "Strict round robin, but with more instances so each one gets a smaller share of the traffic and the load evens out" }
+          - { id: c, text: "Hash the client IP so each client lands on the same instance, which spreads load evenly" }
+          - { id: d, text: "Send to the first healthy instance in the list, and fail over when it is down" }
+        answer: a
+        explanation: "Round robin assumes every request costs the same. Counting in-flight requests naturally steers new work away from instances stuck on slow ones. IP hashing gives stickiness, not balance, and can pile many clients behind one NAT onto one instance."
+
+      - type: single
+        prompt: "A CDN sits in front of this API. What is wrong with this response?"
+        code:
+          lang: text
+          source: |
+            GET /api/account        (logged in as alice)
+
+            HTTP/1.1 200 OK
+            Cache-Control: public, max-age=3600
+            Content-Type: application/json
+
+            {"email":"alice@example.com","plan":"pro"}
+        options:
+          - { id: a, text: "`public` lets shared caches like the CDN serve Alice's data to other users; use `private` or `no-store`" }
+          - { id: b, text: "`max-age` is given in milliseconds, so the response expires after 3.6 seconds and is useless" }
+          - { id: c, text: "CDNs do not cache JSON responses, just static files such as images, scripts and stylesheets" }
+          - { id: d, text: "A response without a `Content-Length` header can never be cached, so the CDN will refuse it" }
+        answer: a
+        explanation: "`max-age` is in seconds. `public` explicitly allows shared caches to keep and reuse the response, which for per-user data leaks it to others. Cache static and public content at the edge; mark per-user responses `private` or `no-store`, or make the cache key include the user (and test it)."
+
+      - type: open
+        prompt: "Design a rate limiter for a public API that runs on 20 instances behind a load balancer."
+        modelAnswer: "Choose the algorithm for the behaviour you want: a token bucket allows bursts while enforcing an average rate, a sliding window is stricter but costs more memory. With 20 instances the counters must be shared, typically in Redis, and updated atomically (INCR with an expiry, or a Lua script) so concurrent requests cannot race; a local limit of limit/20 per instance is a cheap but uneven approximation. Limit per API key or user (and per IP for anonymous traffic), with different tiers per plan. Reject with HTTP 429 and a Retry-After header. Decide how it behaves when the limiter store is down: usually fail open to protect availability, with a coarse local fallback and an alert, but fail closed for sensitive endpoints such as login."
+        keyPoints:
+          - point: "Chooses an algorithm and explains the trade-off (token bucket for bursts, sliding window for accuracy)"
+            keywords: ["token bucket", "sliding window", "leaky bucket", "fixed window"]
+          - point: "Shares state across instances (for example Redis) and updates it atomically"
+            keywords: ["redis", "shared", "atomic", "lua", "centralized", "centralised"]
+          - point: "Limits per key or user, and rejects with 429 and Retry-After"
+            keywords: ["429", "retry-after", "api key", "per user", "per-user", "per client", "tier"]
+          - point: "Decides the failure behaviour when the limiter is unavailable (fail open or fail closed)"
+            keywords: ["fail open", "fail-open", "fail closed", "fail-closed", "is down", "unavailable"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "Two requests from the same client reach two different instances at the same moment. How do you keep the shared counter correct?"
+            modelAnswer: "A separate read and write is a race condition: both requests read 9, both write 10, and the limit is exceeded. Make the update one atomic operation in the store: Redis INCR on a key that has an expiry for a fixed window, or a Lua script (or transaction) that checks and updates a token bucket or sliding window in a single step. Use one key per client and window, and set a TTL so old counters expire on their own."
+            keyPoints:
+              - point: "Names the race: a separate read and write lets two requests both pass"
+                keywords: ["race", "read-modify-write", "both read", "concurrent"]
+              - point: "Uses an atomic operation such as INCR or a Lua script or transaction"
+                keywords: ["atomic", "incr", "lua", "transaction"]
+              - point: "Sets a TTL or expiry so counters clean themselves up"
+                keywords: ["ttl", "expir"]
+          - when: covered
+            point: 4
+            prompt: "Your limiter's Redis goes down at peak traffic. What should the API do, and does the answer depend on the endpoint?"
+            modelAnswer: "It depends on what the limit protects. For most public endpoints, fail open: keep serving, fall back to a coarse local per-instance limit and raise an alert, because a limiter outage should not become an API outage. For sensitive endpoints where abuse is costly, such as login, password reset or sending SMS, fail closed or apply a strict local limit. Give the limiter call a short timeout so it never adds much latency, and monitor the limiter as a dependency of its own."
+            keyPoints:
+              - point: "Fail open for most endpoints to protect availability"
+                keywords: ["fail open", "fail-open"]
+              - point: "Fail closed or use a stricter local limit for sensitive endpoints"
+                keywords: ["fail closed", "fail-closed", "login", "sensitive"]
+              - point: "Use a short timeout and monitor the limiter"
+                keywords: ["timeout", "monitor", "alert"]
+
+  - id: sd-data-failure
+    title: Data, consistency and failure
+    questions:
+      - type: single
+        prompt: "What does PACELC add to the CAP theorem?"
+        options:
+          - { id: a, text: "Even with no partition (Else), you still trade latency against consistency, e.g. waiting for acks" }
+          - { id: b, text: "Partitions can be avoided if there is enough redundancy, so CAP's trade-off disappears" }
+          - { id: c, text: "Consistency and availability can both be fully kept during a partition if replicas are synchronous" }
+          - { id: d, text: "A fourth guarantee, durability, which has to be traded off against partition tolerance and latency" }
+        answer: a
+        explanation: "PACELC reads: if there is a Partition choose Availability or Consistency, Else choose Latency or Consistency. It captures the everyday cost of replication: a synchronous write is safer and slower, a nearby asynchronous replica is faster and may be stale."
+
+      - type: estimate
+        prompt: "A cache cluster picks the node for a key with `hash(key) % N`. You grow from N = 4 to N = 5 nodes. Assuming uniformly distributed hashes, what percentage of keys now map to a different node?"
+        answer: 80
+        tolerance: 0.03
+        unit: "%"
+        explanation: "A key keeps its node only if `h % 4 == h % 5`. In every block of 20 consecutive hash values that holds for just 4 (0, 1, 2, 3), so 20% stay and 80% move, which is a near-total cache flush. Consistent hashing moves only about 1/5 = 20% of the keys, the share the new node should own."
+
+      - type: code
+        prompt: "Write `ringLookup(ring, h)` for a consistent-hash ring. `ring` is an array of `[position, node]` pairs sorted by position. Return the node at the first position that is greater than or equal to `h`, wrapping around to the first entry if `h` is beyond the last. Return `null` for an empty ring."
+        starter: |
+          function ringLookup(ring, h) {
+            // your code
+          }
+        entry: ringLookup
+        tests:
+          - { args: [[[10, "A"], [50, "B"], [90, "C"]], 30], expect: "B" }
+          - { args: [[[10, "A"], [50, "B"], [90, "C"]], 50], expect: "B" }
+          - { args: [[[10, "A"], [50, "B"], [90, "C"]], 95], expect: "A" }
+          - { args: [[[10, "A"], [50, "B"], [90, "C"]], 5], expect: "A" }
+          - { args: [[], 7], expect: null }
+          - { args: [[[10, "A"]], 11], expect: "A", hidden: true }
+          - { args: { js: "[Array.from({ length: 100000 }, (_, i) => [i * 10, 'n' + i]), 999985]" }, expect: "n99999", hidden: true }
+        solution: |
+          function ringLookup(ring, h) {
+            if (ring.length === 0) return null;
+            let lo = 0;
+            let hi = ring.length;
+            while (lo < hi) {
+              const mid = (lo + hi) >> 1;
+              if (ring[mid][0] >= h) hi = mid;
+              else lo = mid + 1;
+            }
+            return ring[lo % ring.length][1];
+          }
+        kotlin: |
+          fun ringLookup(ring: java.util.TreeMap<Long, String>, h: Long): String? =
+              if (ring.isEmpty()) null else (ring.ceilingEntry(h) ?: ring.firstEntry()).value
+        explanation: "A sorted structure plus binary search gives O(log n) lookups; `TreeMap.ceilingEntry` does exactly that on the JVM. The `% ring.length` is the wrap-around that makes it a ring. Real deployments place each node at many positions (virtual nodes) so load is even and a removed node's keys spread over many neighbours."
+
+      - type: single
+        prompt: "A sharded cache stores `product:42` (a viral item) on one node, which now takes 40% of all traffic and is saturating. Adding more shards barely helps. Which fix addresses the cause?"
+        options:
+          - { id: a, text: "Spread that key's reads: a short-lived near cache in every app instance, or several copies under suffixed keys" }
+          - { id: b, text: "Add more shards, since consistent hashing then divides the hot key's data across the new nodes" }
+          - { id: c, text: "Switch the shard function to modulo hashing, which distributes the keys more evenly across nodes" }
+          - { id: d, text: "Lengthen the TTL of each key in the cluster, so that fewer reads reach the saturated node and the cache stays warm" }
+        answer: a
+        explanation: "One key lives on one shard, so more shards cannot split it: this is a hot key, not a capacity problem. Replicate the hot item (local caches, key suffixes `product:42#0..#7`, or a dedicated replica set) and detect hot keys with per-key metrics. Writes then have to update or expire every copy."
+
+      - type: single
+        prompt: "A user saves a new display name, the page reloads and still shows the old one. Which fix gives this user read-your-writes without sending all traffic to the primary?"
+        code:
+          lang: text
+          source: |
+            t=0.0s  POST /profile {"name":"Alice"}  -> primary    200 OK
+            t=0.4s  GET  /profile                   -> replica-2   200 OK {"name":"Alicia"}
+                                                       (replica-2 is about 2 s behind the primary)
+        options:
+          - { id: a, text: "For a short time after a user's write, serve that user's reads from the primary (or a caught-up replica)" }
+          - { id: b, text: "Switch the whole system to eventual consistency, so that stale reads become acceptable to everyone" }
+          - { id: c, text: "Let the browser cache the profile response for five minutes, so the user never has to wait for a replica to catch up" }
+          - { id: d, text: "Add more replicas, so that the load balancer can find one of them that is already current" }
+        answer: a
+        explanation: "The cause is asynchronous replication lag. Read-your-writes only needs to hold for the writer: pin their reads to the primary, or to a replica that has applied their write's log position, for a few seconds. Everybody else can keep reading replicas. More replicas do not shorten lag, and the system is already eventually consistent."
+
+      - type: multi
+        prompt: Select all true statements about caching strategies and their failure modes.
+        options:
+          - { id: a, text: "In cache-aside, the app reads the cache first and on a miss loads from the database and fills the cache" }
+          - { id: b, text: "A cache stampede happens when many requests miss on the same expired hot key and all hit the database" }
+          - { id: c, text: "Write-through updates the cache and the database in the same write, so recently written keys are rarely stale" }
+          - { id: d, text: "Write-behind (write-back) is the safest strategy against data loss, because the cache absorbs and buffers every write" }
+          - { id: e, text: "Setting a TTL guarantees that clients never see stale data, because every entry expires on time and is reloaded" }
+        answers: [a, b, c]
+        explanation: "Write-behind acknowledges before the database has the data, so a cache crash loses recent writes: it buys speed, not safety. A TTL only bounds how long data can be stale. Stampedes are tamed with request coalescing (one loader per key), jittered TTLs or early refresh."
+
+      - type: spot
+        prompt: "A crash in the middle of processing silently loses messages. Tap the line responsible."
+        source: |
+          while (running) {
+              val records = consumer.poll(Duration.ofMillis(500))
+              consumer.commitSync()
+              for (record in records) {
+                  process(record)
+              }
+          }
+        answers: [3]
+        explanation: "Committing the offsets before processing marks the batch as done: if the process dies during the loop, those records are never redelivered (at-most-once). Process first, then commit, and accept at-least-once delivery with idempotent processing. Order is only guaranteed within a partition, so key messages that must stay in order to the same partition."
+
+      - type: match
+        prompt: Match each consistency term to what it guarantees.
+        pairs:
+          - { left: "Read-your-writes", right: "After you write a value, your own later reads see it or something newer" }
+          - { left: "Monotonic reads", right: "Successive reads never return older data than an earlier read did" }
+          - { left: "Linearizability", right: "Every operation appears to happen at one instant, in real-time order, as if there were a single copy" }
+          - { left: "Eventual consistency", right: "If writes stop, all replicas eventually converge on the same value" }
+          - { left: "Quorum overlap", right: "With R + W > N, every read set shares at least one replica with the latest write set" }
+        explanation: "These are different strengths, not a ladder you pick once. Many systems give session guarantees (read-your-writes, monotonic reads) cheaply while keeping the rest eventually consistent. Quorum overlap alone does not make a store linearizable, because failures and concurrent writes still need care."
+
+      - type: open
+        prompt: "Your user-profile service is read-heavy (about 100 reads per write) and the single primary database is the bottleneck. How do you scale it?"
+        modelAnswer: "First measure where the pressure is (hot queries, cache hit rate) and fix cheap things such as missing indexes. Then add layers in order of cost. A cache in front, cache-aside with a TTL and explicit invalidation on writes, plus protection against stampedes on hot keys. Then read replicas for what is left, remembering replication lag, so a user's reads right after their own write may need to go to the primary (read-your-writes). Only when write volume or data size exceeds one primary, shard by a key with even distribution, using consistent hashing or many small virtual partitions so adding nodes moves little data, and watch for hot keys and cross-shard queries. Each step adds consistency and operational cost, so take them in that order."
+        keyPoints:
+          - point: "Measures first and does cheap fixes (indexes, query tuning) before adding architecture"
+            keywords: ["measure", "index", "bottleneck", "hit rate", "profil"]
+          - point: "Adds a cache layer and addresses invalidation, stampedes or staleness"
+            keywords: ["cache", "invalidat", "ttl", "stampede"]
+          - point: "Uses read replicas and handles replication lag (read-your-writes)"
+            keywords: ["replica", "replication lag", "read-your-writes", "lag"]
+          - point: "Shards only when needed, with a well-chosen key, aware of hot keys and cross-shard queries"
+            keywords: ["shard", "partition", "hot key", "consistent hashing"]
+        followUps:
+          - when: missed
+            point: 3
+            prompt: "A user updates their display name, reloads, and still sees the old one. What is happening, and how do you fix it without sending all reads to the primary?"
+            modelAnswer: "Replication is asynchronous, so the replica that served the read has not applied the write yet: replication lag. Give that user read-your-writes: for a short window after their write, route their reads to the primary, or to a replica that has caught up to the write's log position, or return the updated value from the write response. Other users can keep reading from replicas because eventual consistency is acceptable for them."
+            keyPoints:
+              - point: "Identifies asynchronous replication lag on the replica as the cause"
+                keywords: ["lag", "asynchronous", "replica"]
+              - point: "Routes the writer's reads to the primary or a caught-up replica for a short window"
+                keywords: ["primary", "caught up", "log position", "short window"]
+              - point: "Other readers can stay on replicas because eventual consistency is acceptable"
+                keywords: ["eventual", "other users", "acceptable"]
+          - when: covered
+            point: 4
+            prompt: "Which shard key would you choose for the profile table, and what can go wrong with it?"
+            modelAnswer: "Shard by user id, hashed: almost every query is by user, so a request touches one shard and load spreads evenly. Hashing with consistent hashing or many small virtual partitions avoids hot ranges and avoids a mass reshuffle when nodes are added. The risks: queries that are not by user id (search, reports) must fan out to every shard or use a secondary index or another store; a single very active user or tenant can still be a hot key; and changing the shard key later means migrating all the data."
+            keyPoints:
+              - point: "Picks a key matching the main access pattern (user id), hashed for even spread"
+                keywords: ["user id", "hash", "access pattern", "even"]
+              - point: "Mentions cross-shard queries and fan-out as a cost"
+                keywords: ["cross-shard", "fan out", "fan-out", "every shard", "secondary index"]
+              - point: "Mentions hot keys or tenants, or the cost of resharding later"
+                keywords: ["hot key", "reshard", "migrat", "rebalanc", "virtual"]

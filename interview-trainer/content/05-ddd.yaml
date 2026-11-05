@@ -1,13 +1,13 @@
 id: ddd
 title: Domain-Driven Design
-emoji: "🏛️"
-color: "#ce82ff"
+icon: blocks
 description: Aggregates, value objects, bounded contexts and how DDD shapes service boundaries.
 lessons:
   - id: ddd-tactical
     title: Tactical design
     questions:
       - type: single
+        hint: "Ask whether two instances with equal fields are interchangeable."
         prompt: "Which of these is best modelled as a Value Object?"
         options:
           - { id: a, text: "Money(amount, currency)" }
@@ -18,7 +18,8 @@ lessons:
         explanation: "Value objects have no identity: two Money(10, EUR) are interchangeable, they're immutable, and equality is by attributes. Entities (customer, order, account) are tracked by identity across changes."
 
       - type: multi
-        prompt: Select ALL rules that good aggregate design follows.
+        hint: "Think about transaction boundaries and how one aggregate refers to another."
+        prompt: Select all rules that good aggregate design follows.
         options:
           - { id: a, text: "Reference other aggregates by identity (id), not by object reference" }
           - { id: b, text: "Modify one aggregate per transaction" }
@@ -29,6 +30,7 @@ lessons:
         explanation: "An aggregate is a consistency boundary. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events. Repositories exist per aggregate root, not per entity."
 
       - type: single
+        hint: "Where do the business rules live, and what do the entities themselves do?"
         prompt: What design smell does this show?
         code:
           source: |
@@ -45,11 +47,11 @@ lessons:
             }
         options:
           - { id: a, text: "Anemic domain model: the rules live in a service while the domain object is just data" }
-          - { id: b, text: "Primitive obsession is the only issue; the structure is fine" }
-          - { id: c, text: "A God Class" }
-          - { id: d, text: "Shotgun surgery" }
+          - { id: b, text: "Primitive obsession: the status should be an enum or value type, and nothing else is wrong" }
+          - { id: c, text: "A God Class: `Order` does too much and should be split into smaller classes" }
+          - { id: d, text: "Shotgun surgery: one change to the status rules would touch many classes at once" }
         answer: a
-        explanation: "Behaviour should live with the data it protects: `order.ship()` enforces the invariant, and the status can't be set to arbitrary strings from outside. (The raw String status is also primitive obsession.)"
+        explanation: "Behaviour should live with the data it protects: `order.ship()` enforces the invariant, and the status can't be set to arbitrary strings from outside. (The raw String status is also primitive obsession, but it is not the only problem.) `Order` is tiny, so it is no God Class, and nothing here fans a change out across many classes."
 
       - type: fill
         prompt: Make the aggregate protect its own invariant, with a strongly-typed id.
@@ -67,26 +69,29 @@ lessons:
         explanation: "`require` validates arguments (IllegalArgumentException); `check` validates object state (IllegalStateException), which is what a state-machine guard is. `assert` is disabled unless the JVM runs with `-ea`."
 
       - type: single
+        hint: "Which layer coordinates the steps and the transaction without containing business rules?"
         prompt: "Where should \"load the order, call `order.pay()`, save it, then publish `OrderPaid`\" live?"
         options:
-          - { id: a, text: "An application service (use case), which orchestrates and owns the transaction" }
-          - { id: b, text: "Inside the Order entity" }
-          - { id: c, text: "In the REST controller" }
-          - { id: d, text: "In the repository implementation" }
+          - { id: a, text: "An application service (use case), which orchestrates the steps and owns the transaction" }
+          - { id: b, text: "Inside the Order entity, so the aggregate can load, pay and persist itself in one method" }
+          - { id: c, text: "In the REST controller, which already receives the request and can call each step directly" }
+          - { id: d, text: "In the repository implementation, which is the only place that can see the database transaction" }
         answer: a
-        explanation: "Domain logic belongs to entities/value objects/domain services; orchestration, transactions and I/O belong to application services. Controllers only translate HTTP to a use-case call."
+        explanation: "Domain logic belongs to entities/value objects/domain services; orchestration, transactions and I/O belong to application services. Controllers only translate HTTP to a use-case call, an entity should not load or save itself, and a repository only loads and stores aggregates."
 
       - type: single
+        hint: "Think about dependency direction: who is allowed to know about whom?"
         prompt: "In a hexagonal/DDD layout, where does the `OrderRepository` *interface* belong?"
         options:
-          - { id: a, text: "The domain layer; the JPA implementation lives in infrastructure" }
-          - { id: b, text: "Infrastructure, next to the JPA implementation" }
-          - { id: c, text: "The web layer" }
-          - { id: d, text: "A shared 'common' module used by all services" }
+          - { id: a, text: "The domain layer, so the domain defines the contract and JPA implements it elsewhere" }
+          - { id: b, text: "Infrastructure, next to the JPA implementation, because that code uses it" }
+          - { id: c, text: "The web layer, because controllers are the main callers of repositories" }
+          - { id: d, text: "A shared 'common' module so that each service reuses one repository contract" }
         answer: a
         explanation: "The domain declares what it needs in domain terms (`save(order)`, `findById(id)`), and infrastructure implements it. That's the dependency inversion that keeps the domain free of Spring/JPA."
 
       - type: spot
+        hint: "Look for lines that change something the aggregate owns from the outside."
         prompt: The Order aggregate's rules can be bypassed here. Tap the two lines that reach into its internals.
         source: |
           class OrderService(private val orders: OrderRepository) {
@@ -101,6 +106,7 @@ lessons:
         explanation: "The service edits the aggregate's state directly, so nothing stops cancelling a shipped order. The aggregate root should expose `order.cancel()` and enforce its invariants itself; callers shouldn't be able to touch `items` or `status`."
 
       - type: code
+        hint: "Return a new object rather than changing either input, and think about what must match before you add."
         prompt: "Model `Money` as a value object: write `addMoney(a, b)` for `{ amount, currency }` values (amount in cents). Return a NEW object with the summed amount, and throw an error mentioning \"currency\" if the currencies differ. Don't change the arguments."
         starter: |
           function addMoney(a, b) {
@@ -129,6 +135,7 @@ lessons:
         explanation: "A value object is immutable, compares by value and protects its own invariant (you can't add euros to dollars). Returning a new object instead of mutating `a` is what makes it safe to share; the hidden test passes frozen inputs to catch mutation. Keep money in integer cents to avoid floating-point drift."
 
       - type: open
+        hint: "Think about identity versus equality by value, and what validating at construction buys you."
         prompt: "What is a Value Object, and why model `Email` or `Money` as one instead of using `String` or `BigDecimal`?"
         modelAnswer: "A Value Object has no identity and is defined purely by its attributes; it's immutable and compared by value. Modelling Email or Money as one lets the type enforce its invariants at construction (a valid email, a non-negative amount with a currency), so an invalid instance can't exist anywhere in the system. It also removes primitive obsession (you can't pass an Email where a UserName is expected), documents domain language in signatures, and gives a natural home for behaviour such as Money.plus rejecting mixed currencies."
         keyPoints:
@@ -145,27 +152,29 @@ lessons:
     title: Strategic design
     questions:
       - type: single
+        hint: "Does the same word need to mean exactly the same thing in both teams' language?"
         prompt: "In Sales, a \"Customer\" has credit limits and discounts. In Shipping, a \"Customer\" is just a delivery address and phone number. What does DDD recommend?"
         options:
-          - { id: a, text: "Separate bounded contexts, each with its own model of Customer, linked by an identifier" }
-          - { id: b, text: "One shared Customer class containing every field for every team" }
-          - { id: c, text: "A single global database table" }
-          - { id: d, text: "Rename one of them to avoid the clash and keep one model" }
+          - { id: a, text: "Separate bounded contexts, each with its own Customer model, linked by an identifier" }
+          - { id: b, text: "One shared Customer class holding each field, so that all teams use the same definition" }
+          - { id: c, text: "A single global Customer table that each context reads and writes directly" }
+          - { id: d, text: "Rename one of the two concepts to avoid the clash, and keep one canonical model for the whole company" }
         answer: a
         explanation: "A model is only valid within a boundary. Trying to build one canonical model forces every team to couple to every other team's concerns."
 
       - type: single
+        hint: "Picture a legacy model whose concepts you do not want leaking into yours."
         prompt: What problem does an Anti-Corruption Layer (ACL) solve?
         options:
-          - { id: a, text: "It translates between an external/legacy model and your own so the foreign concepts don't leak into your domain" }
-          - { id: b, text: "It encrypts traffic between services" }
-          - { id: c, text: "It prevents SQL injection" }
-          - { id: d, text: "It caches calls to third parties" }
+          - { id: a, text: "It translates between a foreign model and your own, so foreign concepts don't leak in" }
+          - { id: b, text: "It encrypts and authenticates the traffic between your services and external systems" }
+          - { id: c, text: "It validates and sanitises incoming data so that injection attacks cannot corrupt the domain" }
+          - { id: d, text: "It caches responses from third-party APIs so the domain is shielded from their downtime" }
         answer: a
-        explanation: "Typically an adapter + translator in front of a legacy system or third-party API, so your domain keeps speaking its own language."
+        explanation: "Typically an adapter + translator in front of a legacy system or third-party API, so your domain keeps speaking its own language. It is a modelling boundary, not a security, validation or caching mechanism."
 
       - type: multi
-        prompt: Select ALL valid context-mapping relationships.
+        prompt: Select all valid context-mapping relationships.
         options:
           - { id: a, text: "Shared Kernel" }
           - { id: b, text: "Conformist" }
@@ -181,27 +190,28 @@ lessons:
           - { id: a, text: "An integration event published across bounded contexts" }
           - { id: b, text: "An internal domain event raised and handled inside one aggregate" }
           - { id: c, text: "Neither; events have no schema" }
-          - { id: d, text: "Any event, since all events are public" }
+          - { id: d, text: "Each event, since all events are public" }
         answer: a
         explanation: "Domain events are internal facts and may change freely. An integration event is a published contract: design it deliberately, version it, and don't leak your internal model through it."
 
       - type: single
+        hint: "Make the two writes one write: what can share a single database transaction?"
         prompt: "A service saves an order to its DB and then publishes `OrderPlaced` to Kafka. The process crashes between the two steps. Which pattern fixes the inconsistency?"
         options:
-          - { id: a, text: "Transactional outbox: write the event to an outbox table in the same DB transaction, and relay it afterwards" }
-          - { id: b, text: "Publish first, then save" }
-          - { id: c, text: "Wrap both in a try/catch and retry the save" }
-          - { id: d, text: "Use a bigger Kafka cluster" }
+          - { id: a, text: "Transactional outbox: write the event to an outbox table in the same transaction, then relay it" }
+          - { id: b, text: "Publish first and save afterwards, so that a crash leaves at worst an unsaved order" }
+          - { id: c, text: "Wrap both calls in a try/catch and retry the failed step when the process restarts" }
+          - { id: d, text: "Use a bigger Kafka cluster with acks=all so that the broker never loses the message" }
         answer: a
-        explanation: "A DB and a broker can't share a transaction (the dual-write problem). The outbox makes the event part of the local atomic commit, and a relay or CDC process delivers it at-least-once."
+        explanation: "A DB and a broker can't share a transaction (the dual-write problem). The outbox makes the event part of the local atomic commit, and a relay or CDC process delivers it at-least-once. Swapping the order only moves the gap (an event for an order that was never saved), a try/catch does not run when the process dies and nothing durable says which step to retry, and broker settings such as acks=all cannot help when the crash happens before the publish."
 
       - type: single
         prompt: "What is the best starting heuristic for drawing microservice boundaries?"
         options:
-          - { id: a, text: "Align with bounded contexts / business capabilities" }
-          - { id: b, text: "One service per database table" }
-          - { id: c, text: "One service per Java package" }
-          - { id: d, text: "One service per developer" }
+          - { id: a, text: "Align with bounded contexts and the business capabilities they serve" }
+          - { id: b, text: "One service per database table, so each service owns exactly one set of rows" }
+          - { id: c, text: "One service per Java package, since packages already group related code" }
+          - { id: d, text: "One service per developer, so each service has a clear owner" }
         answer: a
         explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is cheaper than merging prematurely split services."
 
@@ -215,6 +225,7 @@ lessons:
         explanation: "They differ in how much you control: ACL protects your model at the cost of a translation layer; Conformist accepts the upstream's model when you have no leverage; Shared Kernel needs close coordination; Open Host Service scales to many consumers."
 
       - type: open
+        hint: "Table boundaries and transaction boundaries are rarely the same thing. What should each service own?"
         prompt: "Your team proposes one microservice per database table. What do you say, and what do you propose instead?"
         modelAnswer: "That boundary follows the data schema rather than the business, so almost every use case would need several services: chatty synchronous calls, distributed transactions or sagas, and a 'distributed monolith' where services must be deployed together. Instead identify subdomains and bounded contexts, for example with Event Storming, and size services around business capabilities and aggregates: an aggregate is the unit of transactional consistency and should never be split across services. Aim for high cohesion, loose coupling and clear team ownership, and start with fewer, larger services that you split when there's evidence."
         keyPoints:
@@ -249,3 +260,130 @@ lessons:
                 keywords: ["by id", "identity", "eventual", "event"]
               - point: "Large aggregates cause contention and slow loading"
                 keywords: ["contention", "large", "big", "slow"]
+
+  - id: ddd-advanced
+    title: CQRS, events & boundaries
+    questions:
+      - type: match
+        prompt: Match each kind of message to what it is.
+        pairs:
+          - { left: "Command", right: "A request to do something, addressed to one handler, which may reject it" }
+          - { left: "Query", right: "A request for data that does not change any state" }
+          - { left: "Domain event", right: "A fact that happened inside one bounded context, named in the past tense and free to change with the model" }
+          - { left: "Integration event", right: "A published, versioned contract that other bounded contexts or services rely on" }
+        explanation: "CQRS starts from this vocabulary: commands change state through the write model, queries read from a model shaped for the screen. Keeping domain events (internal facts) apart from integration events (public contracts) lets you refactor the domain without breaking every subscriber."
+
+      - type: single
+        prompt: "In an event-sourced system a bug stored `PriceChanged(sku, 90)` when the price should have been 99. What is the right way to correct the history?"
+        options:
+          - { id: a, text: "Append a correcting event (a new `PriceChanged(sku, 99)` or a `PriceCorrected`); stored events are immutable facts" }
+          - { id: b, text: "Edit or delete the wrong event, so the history shows the right price from the start" }
+          - { id: c, text: "Fix the read model and leave the event stream as it is, since projections are disposable" }
+          - { id: d, text: "Drop the event store and rebuild it from the current database tables, which hold the right price" }
+        answer: a
+        explanation: "The event log is the source of truth and the audit trail, so you add to it rather than rewrite it: the wrong event stays visible, and the correction says what changed and why. Editing history silently invalidates every projection and snapshot built from it. Patching only a read model leaves the source of truth wrong, so the next rebuild would bring the bug back."
+
+      - type: single
+        prompt: "A CQRS system updates its read model asynchronously from events. After placing an order, the user is redirected to 'My orders' and the order is missing. Which fix keeps the benefit of the asynchronous read model?"
+        options:
+          - { id: a, text: "Return the order from the command and show it right away, or have the query wait for the projection's version (read-your-writes)" }
+          - { id: b, text: "Make each command sleep for a couple of seconds before it returns, so that the projection always has time to catch up under load" }
+          - { id: c, text: "Read from the write model's tables again and drop the asynchronous read model" }
+          - { id: d, text: "Accept it, because eventual consistency means a UI can never show recent changes" }
+        answer: a
+        explanation: "Eventual consistency is a UX design problem as well as a technical one. Typical answers: optimistic UI using the command's response, a pending state, or a version token that lets the read side wait (briefly, with a timeout) for the projection to catch up. A fixed sleep is a race that is wrong under load, and querying the write model gives up the reason for having a read model."
+
+      - type: multi
+        prompt: Select all true statements about sagas.
+        options:
+          - { id: a, text: "In orchestration, a central coordinator tells each participant what to do next and tracks the state of the saga" }
+          - { id: b, text: "In choreography, each service reacts to events and emits its own, with no central coordinator" }
+          - { id: c, text: "Choreography keeps the whole process visible in one place, so it is easier to follow than orchestration" }
+          - { id: d, text: "Compensating actions restore the earlier state exactly as if the steps had never happened" }
+          - { id: e, text: "Sagas lack isolation: other transactions can see intermediate states, so designs add countermeasures such as pending states or semantic locks" }
+        answers: [a, b, e]
+        explanation: "Choreography is loosely coupled but the flow is spread across services (hard to see and to debug); orchestration makes the flow explicit at the price of a coordinator, which should be a durable state machine. A compensation is a semantic undo (a refund, a cancellation), not a rollback: the original effect existed for a while and others may have seen it, hence the need for countermeasures."
+
+      - type: spot
+        prompt: This handler publishes events to other teams. Tap the line with two design problems.
+        source: |
+          @Service
+          class PlaceOrderHandler(private val orders: OrderRepository, private val kafka: KafkaTemplate<String, Any>) {
+              @Transactional
+              fun handle(cmd: PlaceOrder) {
+                  val order = Order.place(cmd)
+                  orders.save(order)
+                  order.pullEvents().forEach { kafka.send("orders", it) }
+              }
+          }
+        answers: [7]
+        explanation: "First, it sends the aggregate's internal domain events straight to a public topic, so every refactoring of the domain model breaks subscribers; map them to deliberately designed, versioned integration events. Second, it is a dual write: the broker send is not part of the database transaction, so a crash or rollback leaves the two out of sync. Write the integration event to an outbox table in the same transaction and let a relay publish it."
+
+      - type: fill
+        prompt: "Compose two business rules into one that holds only when both hold, and that evaluates the second rule only if the first one holds (short-circuit)."
+        template: |
+          fun interface Specification<T> {
+              fun isSatisfiedBy(candidate: T): Boolean
+          }
+
+          infix fun <T> Specification<T>.[[1]](other: Specification<T>): Specification<T> =
+              Specification { isSatisfiedBy(it) [[2]] other.isSatisfiedBy(it) }
+
+          val eligible = isAdult and hasVerifiedEmail
+        bank: ["and", "or", "&&", "||", "not", "xor"]
+        answers: ["and", "&&"]
+        explanation: "The Specification pattern turns a business rule into an object that can be named, tested alone and combined (`and`, `or`, `not`), so rules such as 'eligible for credit' read like the domain language instead of being buried in `if` chains. `&&` short-circuits, so the second rule is evaluated only when the first holds."
+
+      - type: multi
+        prompt: Select all practices that keep a modular monolith modular.
+        options:
+          - { id: a, text: "Each module exposes a small public API and keeps its internals, including its entities and tables, private" }
+          - { id: b, text: "Modules may join each other's tables directly when that is faster than calling the other module's API" }
+          - { id: c, text: "Modules communicate through that public API or through events, not through each other's repositories" }
+          - { id: d, text: "Module boundaries are verified automatically, for example with architecture tests (ArchUnit) or Spring Modulith's module verification" }
+          - { id: e, text: "Each module needs its own deployable and its own service discovery, otherwise it is not really a module" }
+        answers: [a, c, d]
+        explanation: "A modular monolith gets most of the benefit of service boundaries (clear ownership, independent change, a path to extract a module later) without network calls. The boundaries only last if they are enforced: package-private visibility, separate Gradle modules or tests that fail the build on illegal dependencies. Shared tables are the usual way they erode."
+
+      - type: estimate
+        prompt: "An aggregate has 2,300 events. Snapshots are stored every 1,000 events (after events 1,000 and 2,000). The repository loads the latest snapshot and replays only the events after it. How many events are replayed?"
+        answer: 300
+        tolerance: 0
+        unit: events
+        explanation: "The latest snapshot covers events 1 to 2,000, so events 2,001 to 2,300 are replayed: 300. Snapshots are a pure optimisation (you can always replay from the start), so they can be dropped and rebuilt, and the interval trades storage and snapshot work against load time."
+
+      - type: open
+        prompt: "A team wants to use event sourcing for the whole system, \"because we need an audit log\". What is your take?"
+        modelAnswer: "Event sourcing stores the sequence of domain events as the source of truth and derives the current state by replaying them. It fits where the history itself is valuable: audit, temporal queries (what did we know last Tuesday), complex workflows, and building new projections from past events. It also has real costs: events are immutable, so evolving their schema needs versioning and upcasting; long streams need snapshots; read models are eventually consistent, which affects the UI; the complexity and learning curve are significant; and erasing personal data (GDPR) conflicts with immutability, usually solved by keeping personal data out of the events or encrypting it per subject and deleting the key (crypto-shredding). Needing an audit log alone is not a reason: an append-only audit table or change-data-capture gives that far more cheaply. I would apply event sourcing selectively, to the aggregates or bounded contexts where history drives the business, and use plain state-based persistence elsewhere."
+        keyPoints:
+          - point: "Fits where history matters: audit, temporal queries, rebuilding projections, complex workflows"
+            keywords: ["audit", "temporal", "history", "projection"]
+          - point: "Costs: event schema evolution (versioning, upcasting), snapshots, eventual consistency, complexity"
+            keywords: ["upcast", "schema", "snapshot", "eventual", "complexity"]
+          - point: "Privacy and deletion conflict with immutability: keep personal data out or use crypto-shredding"
+            keywords: ["gdpr", "crypto-shredding", "personal data", "privacy"]
+          - point: "Apply selectively per aggregate or context; an audit table can cover audit-only needs"
+            keywords: ["selective", "bounded context", "audit table", "not everywhere"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "How do you change the schema of events that are already stored?"
+            modelAnswer: "Stored events are never rewritten in place. You version them and add upcasters that translate an old version into the current one when events are read, so the aggregate code only deals with the latest shape. Prefer additive, backward-compatible changes such as new optional fields. For a breaking change you can introduce a new event type, and as a last resort migrate the stream into a new store by copying and transforming it."
+            keyPoints:
+              - point: "Events are versioned, never rewritten in place"
+                keywords: ["version"]
+              - point: "Upcasters translate old versions when events are read"
+                keywords: ["upcast"]
+              - point: "Prefer additive, backward-compatible changes or a new event type"
+                keywords: ["additive", "backward", "new event type"]
+          - when: covered
+            point: 3
+            prompt: "How would you handle a request to erase a customer's personal data when events are immutable?"
+            modelAnswer: "Keep personal data out of the events where possible, storing only a reference to data held in a deletable store. If it must be in the events, encrypt it with a key per data subject and delete the key when asked (crypto-shredding), so the events remain but the data is unreadable. Projections, snapshots and caches must be cleaned up as well."
+            keyPoints:
+              - point: "Keep personal data out of events, using a reference to a deletable store"
+                keywords: ["reference", "out of the event", "deletable"]
+              - point: "Otherwise encrypt per subject and delete the key (crypto-shredding)"
+                keywords: ["crypto", "key"]
+              - point: "Clean projections, snapshots and caches too"
+                keywords: ["projection", "cache", "snapshot"]

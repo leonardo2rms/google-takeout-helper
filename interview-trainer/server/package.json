@@ -10,8 +10,13 @@
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "@trainer/shared": "*",
+    "compression": "^1.8.2",
     "express": "^5.0.0",
     "zod": "^3.25.0"
   },
-  "devDependencies": { "@types/express": "^5.0.0", "@types/node": "^22.0.0" }
+  "devDependencies": {
+    "@types/compression": "^1.8.1",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0"
+  }
 }

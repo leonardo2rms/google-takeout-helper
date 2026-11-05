@@ -16,12 +16,17 @@
     "test": "vitest run",
     "typecheck": "npm run typecheck -w shared && npm run typecheck -w server && npm run typecheck -w web && tsc -p e2e",
     "content:check": "tsx scripts/check-content.ts",
+    "content:lint": "tsx scripts/content-lint.ts",
     "build:standalone": "node scripts/build-standalone.mjs",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "coverage": "vitest run --coverage"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "1.56.1",
+    "@vitest/coverage-v8": "^5.1.0",
     "concurrently": "^9.0.0",
+    "fast-check": "^4.10.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^5.0.0"

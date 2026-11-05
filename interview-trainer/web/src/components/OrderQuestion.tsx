@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { shuffleDifferent, type OrderQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
+import { ResultCue, type ResultState } from './ResultCue';
 
 interface Props {
   q: OrderQ;
@@ -21,9 +23,8 @@ export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
 
   return (
     <>
-      <p className="hint">{q.kind === 'steps' ? 'Tap the steps in the right order' : 'Tap the lines in the right order'}</p>
-      <div className={`order-slot ${q.kind} ${placed.length === 0 ? 'empty' : ''}`} aria-label="Your arrangement">
-        {placed.length === 0 && <span className="placeholder">{q.kind === 'steps' ? 'Your sequence goes here' : 'Your code goes here'}</span>}
+      <div className={`order-slot ${q.kind === 'steps' ? 'steps' : ''} ${placed.length === 0 ? 'empty' : ''}`} role="group" aria-label="Your arrangement">
+        {placed.length === 0 && <span className="placeholder">{q.kind === 'steps' ? 'Tap the steps below in order' : 'Tap the lines below in order'}</span>}
         {placed.map((poolIndex, pos) => {
           const line = pool[poolIndex]!;
           const state = checked ? (line === q.lines[pos] ? 'correct' : 'wrong') : '';
@@ -35,12 +36,16 @@ export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
               disabled={checked}
               onClick={() => commit(placed.filter((p) => p !== poolIndex))}
             >
+              <span className="sr-only">Position {pos + 1}: </span>
               {line}
+              {checked ? <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} /> : <span className="sr-only"> (tap to remove)</span>}
+              {checked && <Icon name={state === 'correct' ? 'check' : 'x'} className="vmark" strokeWidth={2.5} />}
             </button>
           );
         })}
       </div>
-      <div className={`order-pool ${q.kind}`}>
+      <p className="sr-only" role="status" aria-live="polite">{checked ? '' : `${placed.length} of ${pool.length} placed`}</p>
+      <div className={`order-pool ${q.kind === 'steps' ? 'steps' : ''} ${placed.length === pool.length ? 'all-placed' : ''}`} role="group" aria-label="Lines to place">
         {pool.map((line, i) => (
           <button
             key={i}

@@ -83,7 +83,7 @@ test.describe('wrong answers are marked, explained and come back', () => {
       await expectNoHorizontalOverflow(page);
       await check(page);
       await expect(page.locator('.feedback')).toHaveClass(/bad/);
-      await expect(page.locator('.feedback h2')).toHaveText('Not quite');
+      await expect(page.locator('.feedback h2')).toHaveText('Incorrect'); // the verdict is said once
       await page.screenshot({ path: `${SHOTS}/${type}-3-wrong.png` });
 
       // The question comes back at the end of the lesson; here: finish the rest, then it reappears.
@@ -92,7 +92,9 @@ test.describe('wrong answers are marked, explained and come back', () => {
       await expect(page.locator('.kicker')).toContainText('Try again');
       await solveAndContinue(page, q);
       // First attempt missed, so the lesson is not perfect, but it completes with a recovered answer.
-      await expect(page.locator('.summary h1')).toHaveText('Lesson complete!');
+      await expect(page.locator('.summary h1')).toHaveText('Lesson complete');
+      // and it says what "complete" means after a miss, instead of a bare first-try percentage
+      await expect(page.getByTestId('ending-line')).toContainText('answered right by the end');
     });
   }
 });
@@ -138,6 +140,29 @@ test.describe('code questions run in a sandboxed worker', () => {
     await runTests(page);
     // Tests fail (wrong return value), and the "got" column shows what the sandbox exposed.
     await expect(page.locator('.tests')).toContainText('undefined,undefined,undefined,undefined,undefined');
+  });
+
+  for (const [name, body] of [
+    ['posts a forged verdict', 'postMessage({ ok: true, results: [] }); return 0;'],
+    ['rewrites built-ins the verdict depends on', 'Object.is = () => true; Array.prototype.every = () => true; JSON.stringify = () => "x"; return 0;'],
+  ] as const) {
+    test(`code that ${name} does not pass (S2-12)`, async ({ page }) => {
+      await openIt(page);
+      await writeCode(page, `function ${q.entry}(...a) { ${body} }`);
+      await check(page);
+      await expect(page.locator('.feedback')).toHaveClass(/bad/);
+      await expect(page.locator('.lesson-bar')).toHaveClass(/bad/);
+    });
+  }
+
+  test('a test result is marked as stale as soon as the code is edited, and fresh again after a new run', async ({ page }) => {
+    await openIt(page);
+    await runTests(page);
+    await expect(page.getByTestId('stale-results')).toHaveCount(0);
+    await writeCode(page, `function ${q.entry}() { return null; }`);
+    await expect(page.getByTestId('stale-results')).toBeVisible();
+    await runTests(page);
+    await expect(page.getByTestId('stale-results')).toHaveCount(0);
   });
 
   test('the symbol bar inserts characters at the cursor', async ({ page }) => {
@@ -216,9 +241,9 @@ test.describe('every lesson can be completed perfectly', () => {
       await page.locator('.prompt').waitFor();
       for (const q of lesson.questions) await solveAndContinue(page, q);
 
-      await expect(page.locator('.summary h1')).toHaveText('Perfect lesson!');
+      await expect(page.locator('.summary h1')).toHaveText('Clean run');
       await expect(page.locator('.tile.acc')).toContainText('100%');
-      await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      await page.getByRole('button', { name: 'Back home', exact: true }).click();
       await expect(page.locator('.stat').first()).toContainText('1'); // streak started
     });
   }

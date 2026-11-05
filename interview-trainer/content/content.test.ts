@@ -63,6 +63,16 @@ describe('course content', () => {
     }
   });
 
+  it('prose is in one spelling: British, like the interface (behaviour, not behavior)', () => {
+    const american = /\b(behavior\w*|favorite\w*|customiz\w*|organiz\w*|recogniz\w*|minimiz\w*|summariz\w*)\b/i;
+    for (const q of questions) {
+      const prose = q as unknown as Record<string, unknown>;
+      for (const field of ['prompt', 'explanation', 'hint', 'modelAnswer'])
+        if (typeof prose[field] === 'string') expect(prose[field], `${q.id} ${field}`).not.toMatch(american);
+      expect(q.prompt, q.id).not.toMatch(/Select ALL/); // no shouting; the kicker already says what to do
+    }
+  });
+
   it('every follow-up applies to at least one outcome of its main question (no dead branches)', () => {
     for (const q of questions.filter((x): x is OpenQ => x.type === 'open')) {
       for (const f of q.followUps) expect(f.point, `${q.id} -> "${f.prompt}"`).toBeLessThanOrEqual(q.keyPoints.length);

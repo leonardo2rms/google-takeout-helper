@@ -1,0 +1,296 @@
+id: security-observability
+title: Security & Observability
+icon: shield-check
+description: Web security basics, authentication and authorization, secrets, plus logs, metrics, traces, SLOs and incident debugging.
+lessons:
+  - id: security-web
+    title: Web security essentials
+    questions:
+      - type: spot
+        prompt: "Tap the line that makes this endpoint vulnerable to SQL injection."
+        source: |
+          @GetMapping("/orders")
+          fun orders(@RequestParam status: String): List<Order> {
+              val sql = "SELECT * FROM orders WHERE status = '$status'"
+              return jdbc.query(sql, orderMapper)
+          }
+        answers: [3]
+        explanation: "User input is pasted into the SQL text, so a value like `x' OR '1'='1` changes the meaning of the query. Pass it as a bound parameter (`jdbc.query(\"... WHERE status = ?\", orderMapper, status)`), which the driver sends separately from the SQL, so it can never be parsed as SQL."
+
+      - type: multi
+        prompt: Select all sound defences against SQL injection (including limiting the damage).
+        options:
+          - { id: a, text: "Parameterized queries (prepared statements) with bound values" }
+          - { id: b, text: "Allowlisting dynamic identifiers, such as a sort column, instead of concatenating user text" }
+          - { id: c, text: "Connecting with a database account that has only the privileges the application needs" }
+          - { id: d, text: "Removing single quotes from the input with a `replace` call" }
+          - { id: e, text: "Blocklisting words like DROP and UNION in the input" }
+        answers: [a, b, c]
+        explanation: "Bound parameters are the real fix. Identifiers cannot be bound, so they need an allowlist. A least-privilege account limits the damage if something slips through. Escaping and blocklists are fragile: attackers use other encodings, other quote styles and other keywords."
+
+      - type: single
+        prompt: "Alice is logged in and can read Bob's invoice just by changing the id in the URL. What is the flaw and the right fix?"
+        code:
+          lang: text
+          source: |
+            GET /api/invoices/1042
+            Authorization: Bearer <token issued to alice>
+
+            HTTP/1.1 200 OK
+            {"id": 1042, "customer": "bob", "total": 920.00}
+        options:
+          - { id: a, text: "Broken access control (IDOR): Alice is authenticated but never authorised for this invoice; check ownership on each access" }
+          - { id: b, text: "SQL injection: the id is concatenated into a query, so the fix is to switch to prepared statements" }
+          - { id: c, text: "Cross-site scripting: the JSON response is returned unescaped, so HTML-encode each field before sending it" }
+          - { id: d, text: "Weak token generation: Alice's token is guessable, so issue longer random tokens" }
+        answer: a
+        explanation: "Authentication answered 'who are you?'; authorization must still answer 'may you do this to that record?'. Broken access control tops the OWASP Top 10. The token worked and nothing was injected or reflected into a page: the server simply returned another user's record. Hard-to-guess ids are not a fix, only obscurity. Scope the query by the caller (`WHERE id = ? AND customer_id = ?`) or check the permission centrally."
+
+      - type: match
+        prompt: Match each web risk to its standard defence.
+        pairs:
+          - { left: "SQL injection", right: "Bind user input as query parameters instead of concatenating it into SQL" }
+          - { left: "Cross-site scripting (XSS)", right: "Encode output for its context and restrict scripts with a Content-Security-Policy" }
+          - { left: "Cross-site request forgery (CSRF)", right: "Anti-forgery tokens and SameSite cookies, so another site cannot trigger actions with the user's cookies" }
+          - { left: "Server-side request forgery (SSRF)", right: "Allowlist the destinations the server may fetch and block internal and cloud-metadata addresses" }
+          - { left: "Credential brute force", right: "Rate limiting, backoff or lockout, and multi-factor authentication" }
+        explanation: "CSRF matters when the browser attaches credentials automatically (cookies); an API using a bearer token in a header is not affected in the same way. SSRF is dangerous because the server can reach networks and metadata endpoints that the attacker cannot."
+
+      - type: single
+        prompt: "Which practice best reduces the supply-chain risk of third-party dependencies?"
+        options:
+          - { id: a, text: "Pin exact versions with a lockfile or checksums, scan automatically, and upgrade through reviewed changes" }
+          - { id: b, text: "Declare dynamic version ranges such as `latest.release` so that fixes arrive without delay and without manual review" }
+          - { id: c, text: "Trust any library with many downloads, and skip reviewing its updates because the community already did" }
+          - { id: d, text: "Scan the dependencies once at project start and then freeze the list, since they do not change afterwards" }
+        answer: a
+        explanation: "Dependencies are code you run with your privileges. Floating versions let an unreviewed (possibly malicious) release in, and new vulnerabilities are published against old versions all the time, so scanning must be continuous. An SBOM and signed or verified artifacts help you answer 'are we affected?' quickly."
+
+      - type: multi
+        prompt: Select all true statements about using JWTs for authentication.
+        options:
+          - { id: a, text: "The payload of a signed JWT is only Base64URL-encoded, so anyone holding the token can read the claims" }
+          - { id: b, text: "The verifier should pin the algorithms it accepts instead of trusting the token's own `alg` header" }
+          - { id: c, text: "A self-contained access token is hard to revoke before it expires, so keep its lifetime short" }
+          - { id: d, text: "Signing a JWT also encrypts its contents, so sensitive data can safely be stored in the claims" }
+          - { id: e, text: "A valid signature is enough: the expiry (`exp`) and audience (`aud`) checks are optional extras" }
+        answers: [a, b, c]
+        explanation: "A signature gives integrity and authenticity, not secrecy (that needs JWE or simply not putting secrets in claims). Accepting whatever `alg` the token declares, including `none`, has caused real forgeries. Always validate signature, `exp`, issuer and audience."
+
+      - type: single
+        prompt: "Which is the best way to store user passwords?"
+        options:
+          - { id: a, text: "Hash them with a slow, salted, adaptive algorithm such as bcrypt or Argon2 and store only the hash" }
+          - { id: b, text: "Store SHA-256(password) with no salt, so that lookups by hash are fast and simple" }
+          - { id: c, text: "Encrypt them with AES and keep the key in the application config, so support can recover forgotten passwords" }
+          - { id: d, text: "Store SHA-256(salt + password): a per-user salt makes any fast hash safe against offline guessing" }
+        answer: a
+        explanation: "Attackers who steal a hash table try billions of guesses per second against fast hashes; a deliberately slow, memory- or CPU-hard function with a per-user salt makes that expensive and defeats precomputed tables. Reversible encryption means one leaked key exposes every password, and nobody needs to recover a password, only to reset it."
+
+      - type: fill
+        prompt: "Complete the rules: public paths are open, admin paths need the ADMIN role, and everything else needs a logged-in user."
+        template: |
+          http.authorizeHttpRequests {
+              it.requestMatchers("/public/**").permitAll()
+                  .requestMatchers("/admin/**").[[1]]("ADMIN")
+                  .anyRequest().[[2]]()
+          }
+        bank: ["hasRole", "authenticated", "permitAll", "denyAll", "hasIpAddress"]
+        answers: ["hasRole", "authenticated"]
+        explanation: "`authenticated()` is authentication (who are you?), `hasRole` is authorization (what may you do?). Ending the chain with `anyRequest().authenticated()` is secure by default: a new endpoint that nobody listed is protected rather than open. Rules are evaluated in order, so put specific matchers before general ones."
+
+      - type: open
+        prompt: "You are building a new REST API that serves per-user data. How do you secure it?"
+        modelAnswer: "Authenticate every request over TLS, for example OAuth2/OIDC with a JWT that is fully validated (signature, expiry, issuer, audience) and short-lived. Authorize on the server for every object, not just every endpoint: check that the caller owns or may access the record, so that changing an id fails (broken access control is the most common web risk). Treat all input as untrusted: parameterized queries, validation and output encoding, and do not build URLs or file paths from user input. Apply least privilege and manage secrets properly: a database account with minimal rights, secrets in a secrets manager and not in git, with rotation. Add rate limiting, log security events without logging secrets or personal data, and keep dependencies patched with automated scanning."
+        keyPoints:
+          - point: "Authenticates properly: validates tokens fully (signature, expiry, audience) over TLS"
+            keywords: ["jwt", "oauth", "oidc", "tls", "https", "authenticat"]
+          - point: "Authorizes per object on the server (ownership checks), not only per endpoint"
+            keywords: ["ownership", "object-level", "per object", "access control", "authoriz"]
+          - point: "Treats input as untrusted: parameterized queries, validation, encoding"
+            keywords: ["parameteriz", "prepared", "validat", "untrusted", "sanitiz"]
+          - point: "Least privilege, secrets management, safe logging and dependency patching"
+            keywords: ["least privilege", "secrets manager", "rotat", "dependenc", "vault"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "How would you test that one user cannot read another user's invoice, and where in the code should the check live?"
+            modelAnswer: "Write an automated test with two users: user A creates a record, user B requests it and must get 403 or 404; repeat for update and delete, and for list endpoints that must be filtered. Put the check in a central place that cannot be skipped, such as the service or query layer (load by id AND owner, or method security such as @PreAuthorize with an ownership rule), instead of relying on each controller to remember. Deny by default."
+            keyPoints:
+              - point: "A two-user test: B requests A's record and gets 403 or 404 (also update, delete, lists)"
+                keywords: ["two users", "another user", "403", "404", "user b"]
+              - point: "Central enforcement (query scoped by owner, method security), not per-controller memory"
+                keywords: ["central", "preauthorize", "scoped", "service layer", "query"]
+              - point: "Deny by default"
+                keywords: ["deny by default", "default deny", "secure by default"]
+          - when: covered
+            point: 1
+            prompt: "Your access tokens are JWTs valid for 24 hours and a user's laptop is stolen. What can you do?"
+            modelAnswer: "A self-contained JWT stays valid until it expires unless the verifier checks extra state. Shorten the access token lifetime to minutes and use a refresh token the server can revoke; on theft, revoke the refresh token or session so no new access tokens are issued. For an immediate cut-off, keep a denylist of token ids or a per-user not-before timestamp that resource servers check, or use opaque tokens with introspection, accepting the extra lookup."
+            keyPoints:
+              - point: "A self-contained JWT stays valid until it expires"
+                keywords: ["until it expires", "valid until", "stays valid"]
+              - point: "Short-lived access tokens plus revocable refresh tokens"
+                keywords: ["short", "refresh"]
+              - point: "Immediate revocation needs extra state: a denylist, a not-before timestamp, or opaque tokens with introspection"
+                keywords: ["denylist", "blocklist", "introspection", "opaque", "not-before"]
+
+  - id: observability-incidents
+    title: Observability and incidents
+    questions:
+      - type: match
+        prompt: Match each observability concept to its role.
+        pairs:
+          - { left: "Metrics", right: "Cheap numeric time series, ideal for dashboards, trends and alerting" }
+          - { left: "Logs", right: "Timestamped event records with context, best for the details of what happened" }
+          - { left: "Traces", right: "A request's path across services, shown as timed spans" }
+          - { left: "OpenTelemetry", right: "A vendor-neutral standard (APIs, SDKs, OTLP) for producing and exporting traces, metrics and logs" }
+          - { left: "Context propagation", right: "Passing the trace id along each outgoing call, for example in the W3C `traceparent` header, so spans join into one trace" }
+        explanation: "The three signals complement each other: metrics tell you something is wrong, traces show where, logs say why. They only connect if they share identifiers, so put the trace or correlation id on every log line (structured, as key-value fields) and propagate it across every hop."
+
+      - type: single
+        prompt: "Which pairing of method and what it measures is correct?"
+        options:
+          - { id: a, text: "RED is for request-driven services (Rate, Errors, Duration); USE is for resources such as CPU and pools (Utilization, Saturation, Errors)" }
+          - { id: b, text: "RED is for resources such as CPU, disks and connection pools (Rate, Errors, Duration); USE is for services (Utilization, Saturation, Errors)" }
+          - { id: c, text: "RED stands for Reliability, Efficiency and Durability; USE stands for Uptime, Security and Elasticity" }
+          - { id: d, text: "Both methods measure host resources: RED covers CPU and memory, USE covers disks and network" }
+        answer: a
+        explanation: "RED looks at a service from its callers' side; USE looks at a resource from the machine's side. Saturation (work waiting, such as a full pool or a queue) is often the earliest warning. Report duration as percentiles (p95, p99): averages hide the slow tail."
+
+      - type: estimate
+        prompt: "A service has a 99.9% availability SLO over 30 days. How many minutes of complete downtime does the error budget allow?"
+        answer: 43.2
+        tolerance: 0.02
+        unit: minutes
+        explanation: "30 days x 24 h x 60 min = 43,200 minutes; 0.1% of that is 43.2 minutes. The budget turns reliability into a currency: spend it on risky launches, and when it runs out, slow down feature work and fix reliability. 99.99% would leave only about 4.3 minutes."
+
+      - type: code
+        prompt: "Write `burnRate(bad, total, sloPercent)`: how fast the error budget is being consumed. Burn rate = observed error ratio / allowed error ratio, where the allowed ratio is `(100 - sloPercent) / 100`. Return 0 when `total` is 0, and round to 2 decimals."
+        starter: |
+          function burnRate(bad, total, sloPercent) {
+            // your code
+          }
+        entry: burnRate
+        tests:
+          - { args: [14, 1000, 99], expect: 1.4 }
+          - { args: [5, 10000, 99.9], expect: 0.5 }
+          - { args: [36, 1000, 99.9], expect: 36 }
+          - { args: [0, 0, 99.9], expect: 0 }
+          - { args: [1, 100, 99], expect: 1, hidden: true }
+          - { args: [0, 500, 99.9], expect: 0, hidden: true }
+          - { args: [3, 1000, 99.95], expect: 6, hidden: true }
+        solution: |
+          function burnRate(bad, total, sloPercent) {
+            if (total === 0) return 0;
+            const allowed = (100 - sloPercent) / 100;
+            return Math.round((bad / total / allowed) * 100) / 100;
+          }
+        kotlin: |
+          fun burnRate(bad: Long, total: Long, sloPercent: Double): Double {
+              if (total == 0L) return 0.0
+              val allowed = (100.0 - sloPercent) / 100.0
+              return Math.round(bad.toDouble() / total / allowed * 100) / 100.0
+          }
+        explanation: "A burn rate of 1 uses exactly the whole budget by the end of the SLO window; 36 would exhaust a 30-day budget in under a day. Alerting on burn rate (for example 14.4 sustained for an hour, which spends 2% of a 30-day budget) pages on how fast users are being hurt rather than on a raw error count. Rounding hides floating-point noise."
+
+      - type: code
+        prompt: "Write `redact(line)` for a logging filter. Replace the value of any `password`, `token`, `secret` or `apikey` pair written as `key=value` with `***`. Match the key case-insensitively and as a whole word; the value runs up to the next whitespace. Keep the key as written."
+        starter: |
+          function redact(line) {
+            // your code
+          }
+        entry: redact
+        tests:
+          - { args: ["login ok user=ann password=hunter2 ip=10.0.0.1"], expect: "login ok user=ann password=*** ip=10.0.0.1" }
+          - { args: ["no secrets here"], expect: "no secrets here" }
+          - { args: ["Token=abc123 secret=xyz"], expect: "Token=*** secret=***" }
+          - { args: ["apikey=k-1"], expect: "apikey=***" }
+          - { args: ["PASSWORD=Hunter2 next"], expect: "PASSWORD=*** next", hidden: true }
+          - { args: ["password="], expect: "password=***", hidden: true }
+          - { args: ["a=1 b=2"], expect: "a=1 b=2", hidden: true }
+        solution: |
+          function redact(line) {
+            return line.replace(/\b(password|token|secret|apikey)=\S*/gi, '$1=***');
+          }
+        kotlin: |
+          private val SECRET = Regex("""\b(password|token|secret|apikey)=\S*""", RegexOption.IGNORE_CASE)
+
+          fun redact(line: String): String = SECRET.replace(line, "\$1=***")
+        explanation: "Redaction is a safety net, not the plan: the best protection is never to log secrets, personal data or whole request bodies. Pattern-based filters only catch the shapes you thought of, so combine them with structured logging, where sensitive fields are known by name and masked or dropped before they are written."
+
+      - type: single
+        prompt: "Which of these is the best page-worthy alert for a checkout API with a 99.9% availability SLO?"
+        options:
+          - { id: a, text: "The error budget is burning far faster than allowed (high burn rate over a long and a short window)" }
+          - { id: b, text: "CPU on a host exceeds 70% for one minute, because saturation precedes an outage and users feel it later" }
+          - { id: c, text: "A single HTTP 500 response, because a server error is a failed customer request" }
+          - { id: d, text: "A garbage-collection pause longer than 50 ms occurs, because pauses add to checkout latency" }
+        answer: a
+        explanation: "Page on symptoms users feel and that need a human now, tied to the SLO. Causes such as CPU or GC are for dashboards and tickets: they fire without user impact and miss problems that have other causes. The short window makes the alert reset quickly once the problem stops."
+
+      - type: single
+        prompt: "Users complain that checkout is slow. According to this trace, where do you look first?"
+        code:
+          lang: text
+          source: |
+            GET /checkout                              1240 ms
+             |- auth-service    POST /verify             35 ms
+             |- cart-service    GET  /cart               60 ms
+             `- pricing-service POST /quote            1105 ms
+                 |- db          SELECT rates             20 ms
+                 `- fx-service  GET  /rate    TIMEOUT 1050 ms
+        options:
+          - { id: a, text: "The call from pricing-service to fx-service, which took about 1050 ms and timed out" }
+          - { id: b, text: "auth-service (35 ms), because authentication runs first and each later call has to wait for it" }
+          - { id: c, text: "The database query in pricing-service (20 ms), since SQL is the usual cause of slow requests" }
+          - { id: d, text: "cart-service (60 ms), since it is the middle call and carts are usually the slowest part" }
+        answer: a
+        explanation: "Read a trace by finding the span that accounts for most of the time: the fx-service call is nearly the whole 1105 ms of pricing. Next questions: why does it time out (the dependency, the network, a missing deadline?), and should pricing cache rates or fall back to the last known value rather than wait?"
+
+      - type: order
+        kind: steps
+        prompt: "Put the typical steps of handling a production incident in order. (Assume a recent change is the suspected cause, so rolling back is the fastest mitigation.)"
+        lines:
+          - "Confirm the impact: which users, which endpoints, since when"
+          - "Mitigate first: roll back the change, turn off the feature flag or shed load"
+          - "Check that the user-facing metrics have recovered"
+          - "Find the root cause using logs, traces and the change history"
+          - "Write a blameless postmortem with follow-up actions"
+        explanation: "Stabilise before you diagnose in depth: users care that it stops hurting, and a rollback is usually faster than finding the bug. In real incidents these steps overlap (you need some diagnosis to pick the mitigation), but the priority order is impact, mitigation, verification, root cause, learning. The postmortem looks at the system and the process, not at who made the change, and ends with owned, tracked actions."
+
+      - type: open
+        prompt: "Users report that checkout is slow, yet no alert fired. How do you investigate, and what do you change afterwards?"
+        modelAnswer: "Start from symptoms, not guesses: look at the RED metrics for checkout (rate, errors, and duration as percentiles, because averages hide a slow tail), find when it began and compare with deploys, configuration or traffic changes. If a recent change is the likely cause, mitigate first by rolling back or disabling a flag. Use traces to find the slow span or dependency, then logs filtered by the trace or correlation id for the details. Afterwards fix the gap: the missing alert should be based on the SLO, such as a latency percentile or an error budget burn rate, add instrumentation where the trace was blind, and hold a blameless postmortem."
+        keyPoints:
+          - point: "Starts from metrics (latency percentiles, errors) and correlates with recent changes"
+            keywords: ["percentile", "p99", "p95", "deploy", "recent change"]
+          - point: "Uses traces to find the slow span, and logs by correlation id for detail"
+            keywords: ["trace", "span", "correlation id"]
+          - point: "Mitigates first (rollback, flag) before deep root-causing"
+            keywords: ["roll back", "rollback", "flag", "mitigat"]
+          - point: "Fixes the gap afterwards: SLO or burn-rate alert, better instrumentation, blameless postmortem"
+            keywords: ["burn rate", "error budget", "postmortem", "instrumentation"]
+        followUps:
+          - when: missed
+            point: 4
+            prompt: "What would a good alert for this problem look like, and how do you avoid waking people for noise?"
+            modelAnswer: "Alert on a symptom users feel, tied to an SLO: for example the checkout p99 latency or the error budget burn rate, using two windows (a long one to show it matters, a short one to show it is still happening), so it pages only for fast burns and opens a ticket for slow ones. Every page should be actionable and link to a runbook and a dashboard. Remove or downgrade alerts that fire without anyone acting, and review alert noise regularly."
+            keyPoints:
+              - point: "Alerts on a user-visible symptom tied to an SLO (latency percentile or burn rate)"
+                keywords: ["symptom", "burn rate", "p99", "slo"]
+              - point: "Multi-window burn rate: page for fast burns, ticket for slow ones"
+                keywords: ["window", "page", "ticket"]
+              - point: "Actionable with a runbook; prune noisy alerts"
+                keywords: ["runbook", "actionable", "noise", "noisy"]
+          - when: covered
+            point: 2
+            prompt: "Tracing every request is expensive at high volume. How do you decide what to sample?"
+            modelAnswer: "Sampling trades cost against visibility. Head-based sampling decides at the start of the request (say 1%), which is cheap but can drop the rare slow or failed requests you most want. Tail-based sampling decides after the trace completes, usually in a collector, so it can keep all errors and slow traces plus a small share of normal ones, at the cost of buffering and more infrastructure. Always propagate the trace context, even for unsampled requests, so downstream services stay consistent, and keep metrics unsampled so that rates stay accurate."
+            keyPoints:
+              - point: "Head-based sampling is cheap but may drop the interesting traces"
+                keywords: ["head-based", "head based", "at the start"]
+              - point: "Tail-based sampling keeps errors and slow traces but needs buffering or a collector"
+                keywords: ["tail-based", "tail based", "collector", "after the trace"]
+              - point: "Propagate context and keep metrics unsampled"
+                keywords: ["unsampled", "propagate"]

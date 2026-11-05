@@ -1,28 +1,45 @@
+import { SafetyMark } from '../components/DataSafety';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize,
-  type OpenQ, type Question, type SessionSummary,
+  PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize, xpFor,
+  type Confidence, type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
+import { AskWhy } from '../components/AskWhy';
+import { useConfirm } from '../components/ConfirmDialog';
+import { isModalOpen } from '../components/useModal';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
 import { EstimateQuestion } from '../components/EstimateQuestion';
 import { Feedback } from '../components/Feedback';
+import { ConfidenceRow } from '../components/ConfidenceRow';
+import { Icon } from '../components/icons';
+import { Hint } from '../components/Hint';
+import { QuestionTools } from '../components/QuestionTools';
 import { FillQuestion } from '../components/FillQuestion';
 import { Inline } from '../components/Inline';
 import { MatchQuestion } from '../components/MatchQuestion';
 import { OpenQuestion } from '../components/OpenQuestion';
 import { OrderQuestion } from '../components/OrderQuestion';
 import { SpotQuestion } from '../components/SpotQuestion';
+import type { ExplainFn } from '../lib/explain';
+import { describeLearnerAnswer } from '../lib/explain';
+import { scrollIntoViewGently } from '../lib/a11y';
 import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 import { runCodeInWorker } from '../lib/run-code';
+import { useProgress } from '../lib/store';
 
 interface Props {
   title: string;
-  color: string;
   questions: Question[];
   /** Grades open answers with AI; undefined means offline (self-assessment). */
   grade?: GradeFn;
+  /** "Ask why" tutor chat; undefined means unavailable (the button is shown disabled). */
+  explain?: ExplainFn;
+  /** Optional: when a question will come back ("tomorrow", "in 3 days"), shown under the feedback. */
+  reviewHint?: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
+  /** Short vibration on a correct answer (where supported). */
+  haptics?: boolean;
   onExit: () => void;
   onFinish: (summary: SessionSummary) => void;
 }
@@ -53,13 +70,19 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, color, questions, grade, onExit, onFinish }: Props) {
+export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
+  const confirm = useConfirm();
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [phase, setPhase] = useState<Phase>('answer');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [followUp, setFollowUp] = useState<FollowUpStage | null>(null);
+  /** Questions whose hint was revealed (kept across retries; one reveal per question). */
+  const [hinted, setHinted] = useState<ReadonlySet<string>>(() => new Set());
+  /** Optional "How sure are you?" for the question on screen (off unless switched on in Settings). */
+  const confidenceOn = useProgress().progress.settings.confidence;
+  const [sure, setSure] = useState<Confidence | null>(null);
 
   const feedbackRef = useRef<HTMLDivElement>(null);
   const q = currentQuestion(session);
@@ -75,6 +98,9 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
   // With a follow-up, the question counts as passed on the average of both answers.
   const overallScore = followUp && outcome ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 : null;
   const passed = outcome ? (overallScore !== null ? overallScore >= PASS_SCORE : isPass(outcome)) : false;
+
+  // The reward is shown the moment the answer is checked, not one tap later: the bar's XP already includes it.
+  const gain = phase === 'feedback' && q && passed && !pending ? xpFor(attempt + 1, hinted.has(q.id)) : 0;
 
   const check = useCallback(async () => {
     if (!view || !answer || phase !== 'answer') return;
@@ -102,19 +128,39 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
     }
     const pass = followUp ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 >= PASS_SCORE : isPass(outcome);
     setFollowUp(null);
-    const s = submit(session, pass);
+    const s = submit(session, pass, { hinted: hinted.has(q.id), confidence: sure ?? undefined });
+    setSure(null);
     if (currentQuestion(s) === undefined) onFinish(summarize(s));
     else setSession(s);
-  }, [outcome, q, phase, pending, followUp, session, onFinish]);
+  }, [outcome, q, phase, pending, followUp, session, hinted, sure, onFinish]);
+
+  // A tiny tick on a correct answer, if the learner allows it and the device can.
+  useEffect(() => {
+    if (phase === 'feedback' && passed && haptics) navigator.vibrate?.(10);
+  }, [phase, passed, haptics]);
 
   // Bring the feedback into view above the fixed bottom bar; on phones it starts below the fold.
   useEffect(() => {
-    if (phase === 'feedback') feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (phase === 'feedback') scrollIntoViewGently(feedbackRef.current);
+  }, [phase]);
+
+  // Focus follows the flow, so keyboard and screen-reader users never get lost: a new question puts focus on its
+  // prompt; checking an answer moves it to the verdict heading (Tab then reaches the explanation and "Continue").
+  const promptRef = useRef<HTMLHeadingElement>(null);
+  const viewKey = view ? `${view.id}#${attempt}` : '';
+  useEffect(() => {
+    promptRef.current?.focus({ preventScroll: true });
+  }, [viewKey]);
+  useEffect(() => {
+    if (phase === 'feedback') feedbackRef.current?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
   }, [phase]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat) return;
+      if (e.target instanceof Element && e.target.closest('[data-no-lesson-keys]')) return; // the note editor keeps its own Enter
+      if (isModalOpen()) return; // a modal (a sheet, the confirm dialog) owns every key, wherever focus happens to be
+      if (e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"]')) return;
       const inText = e.target instanceof HTMLTextAreaElement;
       if (inText && !(e.ctrlKey || e.metaKey)) return;
       if (e.target instanceof HTMLButtonElement) return; // keep native activation
@@ -132,31 +178,67 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
   const key = `${view.id}#${attempt}`;
 
   return (
-    <div className="lesson" style={{ ['--accent' as string]: color }}>
+    <div className="lesson">
       <header className="lesson-top">
         <button
           type="button"
           className="icon-btn"
           aria-label="Quit lesson"
-          onClick={() => {
-            if (window.confirm('Quit this lesson? Progress in it will be lost.')) onExit();
+          onClick={async () => {
+            // Nothing answered and nothing checked yet means nothing to lose: leave without asking. A checked answer already
+            // shows its XP in the header, and only Continue records it, so leaving then would silently drop it.
+            if (Object.keys(session.attempts).length === 0 && phase === 'answer') return onExit();
+            const ok = await confirm({
+              title: 'Quit this lesson?',
+              body: 'Your answers in it are not saved. You would start again from the first question.',
+              confirmLabel: 'Quit and lose progress',
+              cancelLabel: 'Keep going',
+              tone: 'danger',
+              testId: 'quit-confirm',
+            });
+            if (ok) onExit();
           }}
         >
-          ✕
+          <Icon name="x" />
         </button>
-        <div className="bar" role="progressbar" aria-label={title} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(sessionProgress(session) * 100)}>
-          <div className="bar-fill" style={{ width: `${Math.max(sessionProgress(session) * 100, 3)}%` }} />
+        <div
+          className="bar gauge"
+          style={{ ['--step' as string]: `${100 / Math.max(1, session.total)}%` }}
+          role="progressbar"
+          aria-label={title}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(sessionProgress(session) * 100)}
+        >
+          <div className="fill" style={{ width: `${Math.max(sessionProgress(session) * 100, 2)}%` }} />
         </div>
-        <span className="xp-chip" aria-label={`${session.xp} XP earned`}>⚡ {session.xp}</span>
+        <SafetyMark />
+        <span className="xp-chip" aria-label={`${session.xp + gain} XP earned`}>
+          <span className="label" aria-hidden="true">XP</span> {session.xp + gain}
+          {gain > 0 && <span className="xp-gain" aria-hidden="true">+{gain}</span>}
+        </span>
       </header>
 
-      <main className="lesson-body">
-        <p className="kicker">
-          {attempt > 0 ? '↻ Try again · ' : ''}
-          {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
+      <div className="lesson-body">
+        <p className="where" data-testid="lesson-where">{title}</p>
+        <p className={`kicker ${followUp ? 'follow' : ''}`}>
+          {attempt > 0 && <Icon name="rotate-ccw" size="1.1em" />}
+          {followUp && <Icon name="message-square-quote" size="1.1em" />}
+          <span>
+            {attempt > 0 ? 'Try again · ' : ''}
+            {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
+          </span>
         </p>
-        <h1 className="prompt"><Inline text={view.prompt} /></h1>
+        <h1 className="prompt" ref={promptRef} tabIndex={-1}><Inline text={view.prompt} /></h1>
         {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
+        {!followUp && view.hint && (
+          <Hint
+            text={view.hint}
+            revealed={hinted.has(view.id)}
+            canReveal={phase === 'answer'}
+            onReveal={() => setHinted((h) => new Set(h).add(view.id))}
+          />
+        )}
 
         <div key={key} className="answer-area">
           {(view.type === 'single' || view.type === 'multi') && <ChoiceQuestion q={view} seed={seed} checked={checked} onAnswer={setAnswer} />}
@@ -169,6 +251,10 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
           {view.type === 'open' && <OpenQuestion q={view} checked={checked} aiAvailable={aiAvailable} onAnswer={setAnswer} />}
         </div>
 
+        {confidenceOn && phase === 'answer' && attempt === 0 && !followUp && view.type !== 'open' && view.type !== 'code' && (
+          <ConfidenceRow value={sure} onChange={setSure} />
+        )}
+
         {phase === 'feedback' && outcome && (
           <div ref={feedbackRef} className="feedback-anchor">
             <Feedback
@@ -176,15 +262,37 @@ export function LessonScreen({ title, color, questions, grade, onExit, onFinish 
               outcome={outcome}
               overall={overallScore === null ? undefined : { score: overallScore, pass: passed }}
               onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
+              actions={
+                <AskWhy
+                  key={`${view.id}#${attempt}`}
+                  questionId={view.id}
+                  answer={describeLearnerAnswer(view, answer, Boolean(outcome.skipped))}
+                  correct={passed}
+                  explain={explain}
+                />
+              }
             />
-            {pending && <p className="interviewer-note">🎤 The interviewer has a follow-up question for you.</p>}
+            <QuestionTools q={q} />
+            {sure !== null && !followUp && (passed ? sure === 1 : sure === 3) && (
+              <p className="confidence-note" data-testid="confidence-note">
+                {passed ? 'Right, though you were unsure: this one will come back soon to make it stick.' : 'Worth a closer look: you were sure. A surprise like this is the best moment to learn it, so it comes back soon.'}
+              </p>
+            )}
+            {pending && <p className="interviewer-note"><Icon name="message-square-quote" /><span>Follow-up from the interviewer.</span></p>}
+            {!pending && !followUp && reviewHint && (() => {
+              const hint = reviewHint(view, passed && attempt === 0 ? 'first' : passed ? 'retry' : 'failed');
+              return hint ? <p className="srs-note" data-testid="srs-note">{hint}</p> : null;
+            })()}
           </div>
         )}
-      </main>
+      </div>
+
+      {/* Announces the wait for AI grading / test runs; the verdict itself is announced by moving focus to it. */}
+      <p className="sr-only" role="status" aria-live="polite">{phase === 'grading' ? (view.type === 'code' ? 'Running your code' : 'Checking your answer') : ''}</p>
 
       <footer className={`lesson-bar ${phase === 'feedback' && !pending ? (passed ? 'good' : 'bad') : ''}`}>
         {phase === 'feedback' ? (
-          <button type="button" className="btn primary wide" onClick={next} autoFocus>Continue</button>
+          <button type="button" className="btn primary wide" onClick={next}>Continue</button>
         ) : (
           <>
             <button type="button" className="btn ghost" onClick={skip} disabled={phase === 'grading'}>I don't know</button>

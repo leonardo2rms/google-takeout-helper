@@ -49,7 +49,11 @@ export function FillQuestion({ q, seed, checked, onAnswer }: Props) {
                 type="button"
                 className={`blank ${token !== null ? 'filled' : ''} ${state}`}
                 onClick={() => clear(blank)}
-                aria-label={token ? `Blank ${blank + 1}: ${token}. Tap to remove` : `Blank ${blank + 1}, empty`}
+                aria-label={
+                  checked
+                    ? `Blank ${blank + 1}: ${token ?? 'empty'}${state === 'correct' ? ' (correct)' : state === 'wrong' ? ` (incorrect, the answer is ${q.answers[blank]})` : ''}`
+                    : token ? `Blank ${blank + 1}: ${token}. Tap to remove` : `Blank ${blank + 1}, empty`
+                }
               >
                 {token ?? '    '}
               </button>
@@ -57,7 +61,7 @@ export function FillQuestion({ q, seed, checked, onAnswer }: Props) {
           })}
         </code>
       </pre>
-      <div className="bank" aria-label="Token bank">
+      <div className="bank" role="group" aria-label="Token bank">
         {bank.map((token, i) => (
           <button
             key={i}
