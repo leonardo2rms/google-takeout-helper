@@ -253,7 +253,7 @@ lessons:
         explanation: "The model proposes actions, but your code runs the loop, so the guarantees have to be enforced there: a step and budget cap, a timeout, loop detection and a defined way to give up (return a partial result or hand over to a human). A prompt instruction is a request, not a control. Every tool result should also be bounded in size, or the context fills up with noise."
 
       - type: spot
-        prompt: "The page is attacker-controlled, and summarising it should never be able to leak files. Tap the line that makes a leak possible."
+        prompt: "The page is attacker-controlled, and summarising it should never be able to leak files. Tap the line that hands the model the capability to leak them."
         source: |
           val page = http.get(url)   // attacker-controlled HTML
           val prompt = "Summarise this page:\n$page"
