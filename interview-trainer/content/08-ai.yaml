@@ -238,3 +238,175 @@ lessons:
                 keywords: ["server-side", "server side", "ownership", "cap", "limit", "belong"]
               - point: "Log it and escalate to a human where appropriate"
                 keywords: ["log", "audit", "human", "escalat"]
+
+  - id: ai-advanced
+    title: Agents, evals & RAG in production
+    questions:
+      - type: single
+        prompt: "An agent keeps calling the same `search` tool with the same arguments and never finishes. Where does the fix belong?"
+        options:
+          - { id: a, text: "In the orchestration code: hard limits on steps, tokens and wall-clock time, plus detection of repeated identical tool calls" }
+          - { id: b, text: "In the prompt only: tell the model to stop after five steps" }
+          - { id: c, text: "In the sampling settings: raise the temperature until it stops repeating itself" }
+          - { id: d, text: "Nowhere: a better model will never loop" }
+        answer: a
+        explanation: "The model proposes actions, but your code runs the loop, so the guarantees have to be enforced there: a step and budget cap, a timeout, loop detection and a defined way to give up (return a partial result or hand over to a human). A prompt instruction is a request, not a control. Every tool result should also be bounded in size, or the context fills up with noise."
+
+      - type: spot
+        prompt: "The page is attacker-controlled, and summarising it should never be able to leak files. Tap the line that makes a leak possible."
+        source: |
+          val page = http.get(url)   // attacker-controlled HTML
+          val prompt = "Summarise this page:\n$page"
+          val answer = llm.complete(prompt, tools = listOf(readFile, sendEmail, httpPost))
+          return answer
+        answers: [3]
+        explanation: "Prompt injection is dangerous when three things meet: untrusted content in the context, access to private data (`readFile`) and a channel to send it out (`sendEmail`, `httpPost`). Summarising needs no tools at all, so pass none. When an agent does need tools, give each task only the tools it needs, keep untrusted content away from those with side effects, and require human approval for anything that sends data out."
+
+      - type: multi
+        prompt: Select ALL sound practices for improving the quality of a RAG system.
+        options:
+          - { id: a, text: "Combine keyword search (BM25) with vector search (hybrid retrieval)" }
+          - { id: b, text: "Re-rank the top candidates with a dedicated re-ranking model before building the prompt" }
+          - { id: c, text: "Chunk along the document's structure (sections, headings) and keep titles or metadata with each chunk" }
+          - { id: d, text: "Stuff the whole document collection into every prompt instead of retrieving, whatever its size" }
+          - { id: e, text: "Measure retrieval separately from generation, for example recall@k on labelled questions" }
+          - { id: f, text: "Raise the temperature so the model explores more phrasings of the answer" }
+        answers: [a, b, c, e]
+        explanation: "Most RAG failures are retrieval failures: the right passage was split in half, lost its heading ('EU customers'), or ranked below noise. Hybrid search catches exact terms that embeddings blur, re-ranking sharpens the top results, structure-aware chunks stay self-explanatory, and a retrieval-only metric tells you which half of the pipeline is broken. Context windows are finite and noisy context hurts accuracy and cost."
+
+      - type: multi
+        prompt: Select ALL sound practices when using an LLM as a judge in your evals.
+        options:
+          - { id: a, text: "Calibrate it against human-labelled examples and track how often it agrees with them" }
+          - { id: b, text: "In pairwise comparisons, randomise or swap the order of the two answers to control position bias" }
+          - { id: c, text: "Give it a rubric with specific criteria instead of asking for a vague 1-10 quality score" }
+          - { id: d, text: "Use the same model that wrote the answers as the only judge, because it understands its own output best" }
+          - { id: e, text: "Treat a higher judge score for longer answers as proof that the change is an improvement" }
+        answers: [a, b, c]
+        explanation: "LLM judges are useful but biased: they tend to prefer the first (or last) option, longer answers, and output from their own model family. Counter this with swapped orders, specific rubrics, a different or stronger judge model, and regular spot checks against human labels. Where a deterministic check exists (a schema, a unit test, an exact match) use that instead."
+
+      - type: estimate
+        prompt: "Made-up prices: $1 per million input tokens and $5 per million output tokens. A feature handles 1,000,000 requests per day, each with 3,000 input tokens and 500 output tokens. A response cache answers 30% of the requests without calling the model (ignore the cost of the cache). What is the daily model cost, in dollars?"
+        answer: 3850
+        tolerance: 0
+        unit: dollars
+        explanation: "Per request: 3,000 x $1/1M = $0.003 for input and 500 x $5/1M = $0.0025 for output, so $0.0055. For 1,000,000 requests that is $5,500 per day. Only 70% reach the model: 0.7 x $5,500 = $3,850. Output tokens are priced several times higher than input tokens, so long answers dominate the bill even when prompts are longer. Caching, routing simple requests to a smaller model and trimming the output are the usual levers."
+
+      - type: single
+        prompt: "A unit test calls a model with temperature 0 and asserts that the answer is exactly the same string every time. Why is this test fragile?"
+        options:
+          - { id: a, text: "Providers do not guarantee identical output even at temperature 0 (floating-point and batching effects, model updates), so assert on parsed fields or properties and measure quality with evals" }
+          - { id: b, text: "Temperature 0 is not a valid setting" }
+          - { id: c, text: "Models always randomise the first token of an answer" }
+          - { id: d, text: "Strings returned by an API cannot be compared with equals" }
+        answer: a
+        explanation: "Low temperature makes output more repeatable, not guaranteed identical, and providers update models over time. Design for it: put the model behind an interface and use fakes in unit tests, request structured output and assert on its fields or invariants (valid enum, value within range), and track statistical quality with an eval suite instead of single-run string equality."
+
+      - type: order
+        kind: steps
+        prompt: Put the steps of a robust structured-output pipeline in the right order.
+        lines:
+          - "Request the answer constrained to a JSON schema"
+          - "Parse the response, and on failure retry a bounded number of times or fall back"
+          - "Validate the parsed data against business rules and the caller's permissions"
+          - "Only then perform the side effect, using an idempotency key"
+        explanation: "A schema removes most format errors, but valid JSON can still be wrong or unauthorised, so semantic and permission checks come before anything with side effects. The idempotency key makes a retried or duplicated tool call safe. The model proposes; deterministic code decides."
+
+      - type: code
+        prompt: "Models often wrap JSON in prose or code fences. Write `extractJson(text)`: find the first `{` in the text, take the object that starts there (braces inside JSON strings must be ignored, and quotes inside strings can be escaped with a backslash) and return it parsed with `JSON.parse`. If there is no `{`, or the object is never closed, throw an error whose message mentions \"JSON\"."
+        starter: |
+          function extractJson(text) {
+            // your code
+          }
+        entry: extractJson
+        tests:
+          - { args: ["Sure! Here you go:\n```json\n{\"a\": 1, \"b\": [1, 2]}\n```\nHope that helps!"], expect: { a: 1, b: [1, 2] } }
+          - { args: ['{"s": "}{"}'], expect: { s: "}{" } }
+          - { args: ['x {"a": {"b": 2}} y {"c": 3}'], expect: { a: { b: 2 } } }
+          - { args: ['{"q": "say \"hi\" }"}'], expect: { q: 'say "hi" }' } }
+          - { args: ["no json here"], throws: JSON }
+          - { args: ['{"a": 1'], throws: JSON }
+          - { args: ['prefix {"a": "{"} suffix'], expect: { a: "{" }, hidden: true }
+          - { args: { js: "['x'.repeat(100000) + '{\"a\":' + '1'.repeat(10) + '}' + '}'.repeat(50000)]" }, expect: { a: 1111111111 }, hidden: true }
+        solution: |
+          function extractJson(text) {
+            const start = text.indexOf('{');
+            if (start === -1) throw new Error('no JSON object found');
+            let depth = 0;
+            let inString = false;
+            let escaped = false;
+            for (let i = start; i < text.length; i++) {
+              const c = text[i];
+              if (inString) {
+                if (escaped) escaped = false;
+                else if (c === '\\') escaped = true;
+                else if (c === '"') inString = false;
+              } else if (c === '"') inString = true;
+              else if (c === '{') depth++;
+              else if (c === '}') {
+                depth--;
+                if (depth === 0) return JSON.parse(text.slice(start, i + 1));
+              }
+            }
+            throw new Error('unterminated JSON object');
+          }
+        kotlin: |
+          // returns the JSON text of the first object; parse it with your JSON library
+          fun extractJson(text: String): String {
+              val start = text.indexOf('{')
+              require(start >= 0) { "no JSON object found" }
+              var depth = 0
+              var inString = false
+              var escaped = false
+              for (i in start until text.length) {
+                  val c = text[i]
+                  when {
+                      inString -> when {
+                          escaped -> escaped = false
+                          c == '\\' -> escaped = true
+                          c == '"' -> inString = false
+                      }
+                      c == '"' -> inString = true
+                      c == '{' -> depth++
+                      c == '}' -> if (--depth == 0) return text.substring(start, i + 1)
+                  }
+              }
+              error("unterminated JSON object")
+          }
+        explanation: "Counting braces is not enough: a `}` inside a string value (or an escaped quote) must not close the object, hence the small state machine with `inString` and `escaped`. Taking everything up to the last `}` in the text is the tempting shortcut and breaks as soon as the model adds more text with braces after the object, which the large hidden test checks. Even with extraction, validate the parsed result against your schema before using it."
+
+      - type: open
+        prompt: "Your RAG assistant gives confident but wrong answers in production. How do you find out why and fix it?"
+        modelAnswer: "My first step is to separate the two halves of the pipeline: for a sample of bad answers I log the question, the retrieved chunks and the final prompt, and check whether the right passage was retrieved at all. If it was not, the problem is retrieval, which I measure on its own with labelled questions (recall@k, MRR) and fix with better chunking along the document structure, hybrid keyword plus vector search, metadata filters, query rewriting and re-ranking. If the right chunk was retrieved but the answer is still wrong, it is a generation problem: the prompt must tell the model to answer only from the provided context, cite its sources and say that it does not know when the context is insufficient, and a groundedness check (an LLM judge or citation verification) can flag unsupported claims. I turn the failures into an eval set, so each fix is measured and regressions are caught, and I keep monitoring in production with user feedback and sampled reviews."
+        keyPoints:
+          - point: "Separate retrieval from generation: log the retrieved chunks and check whether the right passage was retrieved"
+            keywords: ["separate", "retrieved chunks", "log"]
+          - point: "Fix retrieval: chunking, hybrid search, filters, query rewriting, re-ranking; measure with recall@k"
+            keywords: ["chunking", "hybrid", "re-rank", "recall@k"]
+          - point: "Fix generation: answer only from the context, cite sources, admit uncertainty; check groundedness"
+            keywords: ["only from", "cite", "groundedness"]
+          - point: "Turn failures into an eval set and monitor production (feedback, sampled reviews)"
+            keywords: ["eval set", "regression", "monitor", "feedback"]
+        followUps:
+          - when: missed
+            point: 1
+            prompt: "How do you measure retrieval quality independently of the LLM?"
+            modelAnswer: "Build a set of real questions, each labelled with the passage or document that contains the answer. Run only the retriever and compute recall@k (is the right chunk among the top k?) and a ranking metric such as MRR or nDCG. This isolates retrieval from generation, so you can compare chunking, embedding or re-ranking changes without any LLM involved."
+            keyPoints:
+              - point: "A set of real questions labelled with the passage that answers them"
+                keywords: ["label"]
+              - point: "Metrics such as recall@k and MRR"
+                keywords: ["recall@k", "recall", "mrr"]
+              - point: "Run the retriever alone, which isolates it from generation"
+                keywords: ["isolat", "retriever alone", "only the retriever"]
+          - when: covered
+            point: 3
+            prompt: "How could you check automatically that an answer is grounded in the retrieved sources?"
+            modelAnswer: "Ask the model to quote the passages that support each claim and verify that the quotes really appear in the retrieved chunks. In addition, an LLM judge, calibrated against human labels, can check whether each claim is supported by the context, and a sample of answers still gets human review."
+            keyPoints:
+              - point: "Require quotes or citations and verify them against the retrieved chunks"
+                keywords: ["quote", "citation"]
+              - point: "A calibrated LLM judge checks that each claim is supported"
+                keywords: ["judge", "calibrat"]
+              - point: "Sampled human review as a backstop"
+                keywords: ["human", "sample"]
