@@ -5,6 +5,7 @@ import {
 } from '@trainer/shared';
 import { AskWhy } from '../components/AskWhy';
 import { useConfirm } from '../components/ConfirmDialog';
+import { isModalOpen } from '../components/useModal';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
@@ -157,7 +158,8 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat) return;
       if (e.target instanceof Element && e.target.closest('[data-no-lesson-keys]')) return; // the note editor keeps its own Enter
-      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return; // a sheet (Ask why) owns its keys
+      if (isModalOpen()) return; // a modal (a sheet, the confirm dialog) owns every key, wherever focus happens to be
+      if (e.target instanceof Element && e.target.closest('[role="dialog"], [role="alertdialog"]')) return;
       const inText = e.target instanceof HTMLTextAreaElement;
       if (inText && !(e.ctrlKey || e.metaKey)) return;
       if (e.target instanceof HTMLButtonElement) return; // keep native activation
@@ -182,8 +184,9 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
           className="icon-btn"
           aria-label="Quit lesson"
           onClick={async () => {
-            // Nothing answered yet means nothing to lose: leave without asking.
-            if (Object.keys(session.attempts).length === 0) return onExit();
+            // Nothing answered and nothing checked yet means nothing to lose: leave without asking. A checked answer already
+            // shows its XP in the header, and only Continue records it, so leaving then would silently drop it.
+            if (Object.keys(session.attempts).length === 0 && phase === 'answer') return onExit();
             const ok = await confirm({
               title: 'Quit this lesson?',
               body: 'Your answers in it are not saved. You would start again from the first question.',

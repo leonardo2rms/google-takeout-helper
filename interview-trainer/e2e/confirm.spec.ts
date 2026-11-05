@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { KEY_V2, SHOTS, lessons, seed, stored, useClock, v2 } from './engage';
-import { solveAndContinue } from './solve';
+import { answerCorrectly, check, solveAndContinue } from './solve';
 
 /**
  * The in-app confirmation dialog replaces window.confirm everywhere. It must look like the app, trap focus, close on Escape,
@@ -68,6 +68,32 @@ test.describe('confirmation dialog', () => {
     await page.getByTestId('quit-confirm-ok').click();
     await expect(page).toHaveURL(/#\/$|\/$/);
     await expect(page.locator('.home')).toBeVisible();
+  });
+
+  test('Enter on the dialog itself does not advance the lesson behind it, and the keys of a modal stay in the modal', async ({ page }) => {
+    await startLessonAndAnswerOne(page);
+    await answerCorrectly(page, lesson.questions[1]!); // an answer is ready: Enter on the page would check it
+    const prompt = await page.locator('.prompt').textContent();
+    await page.getByRole('button', { name: 'Quit lesson' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Quit this lesson?' });
+    await dialog.getByRole('heading').click(); // focus lands on the dialog container, not on a button
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.prompt')).toHaveText(prompt!); // still the same question, nothing was checked behind the dialog
+    await expect(page.locator('.lesson-bar .btn.primary')).toHaveText('Check');
+  });
+
+  test('quitting after Check but before Continue asks first: the XP in the header is not silently dropped', async ({ page }) => {
+    await page.goto(`/#/lesson/${lesson.id}`);
+    await page.locator('.prompt').waitFor();
+    await answerCorrectly(page, lesson.questions[0]!);
+    await check(page);
+    await page.getByRole('button', { name: 'Quit lesson' }).click();
+    await expect(page.getByRole('alertdialog', { name: 'Quit this lesson?' })).toBeVisible();
+    await page.getByTestId('quit-confirm-cancel').click();
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible(); // still on the checked question
   });
 
   test('the backdrop and "Keep going" both keep the lesson', async ({ page }) => {

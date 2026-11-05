@@ -6,6 +6,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), texta
 /** Open modal dialogs, oldest first. Only the last one reacts to the keyboard, so Escape closes one layer at a time. */
 const stack: symbol[] = [];
 
+/** True while any modal dialog is open. Screen-level keyboard shortcuts (Enter in a lesson) must stand down: a modal owns every key. */
+export const isModalOpen = (): boolean => stack.length > 0;
+
 /**
  * The behaviour every modal dialog needs: focus moves in on open (to `initial`, else the dialog itself), Tab and Shift+Tab stay
  * inside, Escape asks to close, and focus returns to whatever opened it. Layered dialogs (a confirmation over a sheet) work:
