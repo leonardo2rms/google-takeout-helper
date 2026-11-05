@@ -6,6 +6,7 @@ export * from './extras';
 export * from './calibration';
 export * from './library';
 export * from './challenge';
+export * from './achievements';
 export * from './api';
 export * from './grading-prompt';
 export * from './code-runner';

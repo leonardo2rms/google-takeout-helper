@@ -9,7 +9,8 @@ import { fetchHealth, gradeOpen } from './lib/api';
 import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
-import { getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
+import { AchievementToasts } from './components/AchievementToasts';
+import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
 import { Library } from './screens/Library';
 import { LessonScreen } from './screens/Lesson';
@@ -37,6 +38,16 @@ const REVIEW_SIZE = 10;
 type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic' | 'one' | 'challenge';
 
 export function App() {
+  useEffect(() => backfillBadges(), []);
+  return (
+    <>
+      <Screens />
+      <AchievementToasts />
+    </>
+  );
+}
+
+function Screens() {
   const route = useHashRoute();
   const { progress, update, reset } = useProgress();
   const [health, setHealth] = useState<HealthResponse | null>(null);

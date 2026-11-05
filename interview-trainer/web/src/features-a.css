@@ -52,3 +52,22 @@
 .card.challenge { margin: 0 0 12px; }
 .card.challenge.done { border-style: dashed; }
 .card.challenge .btn { flex: none; min-height: 44px; }
+
+/* ---------- achievements ---------- */
+.badge-toast-region { position: fixed; z-index: 70; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 8px); display: grid; justify-items: center; padding: 0 16px; pointer-events: none; }
+.badge-toast { pointer-events: none; display: flex; align-items: center; gap: 8px; max-width: 460px; width: 100%; padding: 8px 14px 8px 4px; border-radius: var(--radius); border: 2px solid var(--amber-text); background: var(--amber-bg); color: var(--amber-text); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); animation: badge-in .25s ease-out; }
+.badge-toast .icon-btn { pointer-events: auto; flex: none; color: inherit; }
+.badge-toast-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.badge-toast-text small { font-size: 13px; }
+.badge-emoji { font-size: 28px; flex: none; }
+@keyframes badge-in { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .badge-toast { animation: none; } }
+.trophies { margin: 8px 0 18px; display: grid; gap: 10px; }
+.trophy-group h3 { font-size: 15px; color: var(--muted); margin: 8px 0; }
+.badge-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.badge { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); min-width: 0; }
+.badge.got { border-color: var(--amber-text); background: var(--amber-bg); color: var(--amber-text); }
+.badge.locked { opacity: .6; }
+.badge.locked .badge-emoji { filter: grayscale(1); }
+.badge-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.badge-text small { font-size: 13px; color: inherit; opacity: .85; }
