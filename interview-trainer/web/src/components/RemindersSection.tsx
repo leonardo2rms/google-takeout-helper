@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ICS_FILE_NAME, buildReminderIcs, defaultPrefs, type NotifyPermission, type Progress } from '@trainer/shared';
-import { canDownloadFiles, notificationPermission, requestNotificationPermission, saveTextFile } from '../lib/reminders';
+import { DECLINED_NOTE, saveFile, useCanDownloadFiles } from '../lib/files';
+import { notificationPermission, requestNotificationPermission } from '../lib/reminders';
 
 interface Props {
   progress: Progress;
@@ -23,11 +24,15 @@ export function RemindersSection({ progress, update }: Props) {
     else setReminders({ time: value });
   };
 
-  const download = () => {
+  const canDownload = useCanDownloadFiles(ICS_FILE_NAME);
+
+  const download = async () => {
     if (!time) return;
     const ics = buildReminderIcs({ time, now: new Date(), restDays: progress.profile.restDays });
-    saveTextFile(ICS_FILE_NAME, ics, 'text/calendar');
-    setMessage('Calendar file saved. Open it to add a repeating event to your calendar app.');
+    const result = await saveFile(ICS_FILE_NAME, ics, 'text/calendar');
+    if (result === 'saved') setMessage('Calendar file saved. Open it to add a repeating event to your calendar app.');
+    else if (result === 'declined') setMessage(DECLINED_NOTE);
+    else setMessage('This page cannot save calendar files. Open the installed app to add a repeating event.');
   };
 
   const toggleNotify = async (on: boolean) => {
@@ -68,12 +73,12 @@ export function RemindersSection({ progress, update }: Props) {
         )}
       </div>
 
-      {canDownloadFiles() ? (
-        <button type="button" className="btn secondary wide" onClick={download} disabled={!time} data-testid="reminder-ics">
+      {canDownload ? (
+        <button type="button" className="btn secondary wide" onClick={() => void download()} disabled={!time} data-testid="reminder-ics">
           Add to my calendar (.ics)
         </button>
       ) : (
-        <p className="hint" data-testid="reminder-ics-off">Calendar files cannot be downloaded from this hosted page. Open the installed app to add a repeating event.</p>
+        <p className="hint" data-testid="reminder-ics-off">This hosted page cannot save calendar (.ics) files. Open the installed app to add a repeating event.</p>
       )}
       <p className="muted">
         The event repeats daily{progress.profile.restDays.length ? ', skipping your rest days' : ''} and works while the app is closed.

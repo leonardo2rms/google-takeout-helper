@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { buildShareCard, hasShareableProgress, type Course, type Progress } from '@trainer/shared';
-import { canDownloadFiles } from '../lib/reminders';
+import { DECLINED_NOTE, saveFile, useCanDownloadFiles } from '../lib/files';
 import { CARD_FILE, renderShareCard } from '../lib/share-image';
 import { Sheet } from './Sheet';
 
@@ -48,7 +48,8 @@ function ShareSheet({ course, progress, today, onClose }: Props & { onClose: () 
   const file = useMemo(() => (blob ? new File([blob], CARD_FILE, { type: 'image/png' }) : null), [blob]);
   const canShareFile = Boolean(file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] }) && typeof navigator.share === 'function');
   const canShareText = !canShareFile && typeof navigator.share === 'function';
-  const canDownload = Boolean(blob) && canDownloadFiles();
+  const canSave = useCanDownloadFiles(CARD_FILE);
+  const canDownload = Boolean(blob) && canSave;
   const canCopy = typeof navigator.clipboard?.writeText === 'function';
 
   const share = async () => {
@@ -61,17 +62,12 @@ function ShareSheet({ course, progress, today, onClose }: Props & { onClose: () 
     }
   };
 
-  const download = () => {
+  const download = async () => {
     if (!blob) return;
-    const a = document.createElement('a');
-    const href = URL.createObjectURL(blob);
-    a.href = href;
-    a.download = CARD_FILE;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(href), 1000);
-    setMessage('Image saved to your downloads.');
+    const result = await saveFile(CARD_FILE, blob, 'image/png');
+    if (result === 'saved') setMessage('Image saved to your downloads.');
+    else if (result === 'declined') setMessage(DECLINED_NOTE);
+    else setMessage('This page cannot save files. Press and hold the picture to save it, or copy the text below.');
   };
 
   const copy = async () => {
@@ -96,7 +92,7 @@ function ShareSheet({ course, progress, today, onClose }: Props & { onClose: () 
           <button type="button" className="btn primary wide" onClick={() => void share()} data-testid="share-native">Share</button>
         )}
         {canDownload && (
-          <button type="button" className="btn secondary wide" onClick={download} data-testid="share-download">Download image</button>
+          <button type="button" className="btn secondary wide" onClick={() => void download()} data-testid="share-download">Download image</button>
         )}
         {canCopy && <button type="button" className="btn ghost wide" onClick={() => void copy()} data-testid="share-copy">Copy text</button>}
       </div>

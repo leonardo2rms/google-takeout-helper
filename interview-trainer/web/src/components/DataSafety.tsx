@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { backupFileName, dayKey, importProgress, summarizeProgress, type ParkedCopy } from '@trainer/shared';
-import { copyText, saveTextFile } from '../lib/files';
+import { DECLINED_NOTE, copyText, saveFile } from '../lib/files';
 import { acknowledgeRecovered, exportText, importContext, listParkedCopies, mergeIntoProgress, replaceProgress, useSafetyStatus } from '../lib/store';
 import { useUpdateReady } from '../lib/sw-register';
 
@@ -63,9 +63,11 @@ export function DataSafetyBanners() {
 function ExportActions({ onDismiss }: { onDismiss: () => void }) {
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
-  const download = () => {
+  const download = async () => {
     const t = exportText();
-    if (saveTextFile(backupFileName(dayKey(new Date())), t)) setNote('Backup saved to your downloads.');
+    const result = await saveFile(backupFileName(dayKey(new Date())), t, 'application/json');
+    if (result === 'saved') setNote('Backup saved to your downloads.');
+    else if (result === 'declined') setNote(DECLINED_NOTE);
     else {
       setText(t);
       setNote('Downloads are blocked here. Select the text below and copy it somewhere safe.');
@@ -82,7 +84,7 @@ function ExportActions({ onDismiss }: { onDismiss: () => void }) {
   return (
     <>
       <span className="safety-actions">
-        <button type="button" className="btn small secondary" onClick={download}>Download backup</button>
+        <button type="button" className="btn small secondary" onClick={() => void download()}>Download backup</button>
         <button type="button" className="btn small ghost" onClick={() => void copy()}>Copy backup text</button>
         <button type="button" className="btn small ghost" onClick={onDismiss}>Dismiss</button>
       </span>
@@ -132,7 +134,7 @@ export function RecoveredData() {
                   {sum ? `${sum.xp} XP, ${sum.streak}-day streak, ${sum.lessons} lessons` : 'This version cannot read it, but the text is kept in full.'} ({Math.max(1, Math.round(c.raw.length / 1024))} kB)
                 </p>
                 <span className="safety-actions">
-                  <button type="button" className="btn small secondary" onClick={() => setMessage(saveTextFile(nameOf(c), c.raw) ? 'Saved to your downloads.' : 'Downloads are blocked here. Use "Copy" instead.')}>Download</button>
+                  <button type="button" className="btn small secondary" onClick={() => void saveFile(nameOf(c), c.raw, 'application/json').then((r) => setMessage(r === 'saved' ? 'Saved to your downloads.' : r === 'declined' ? DECLINED_NOTE : 'Downloads are blocked here. Use "Copy" instead.'))}>Download</button>
                   <button type="button" className="btn small ghost" onClick={() => void copyText(c.raw).then((ok) => setMessage(ok ? 'Copied.' : 'Copying is blocked here.'))}>Copy</button>
                   {res.ok && (
                     <>

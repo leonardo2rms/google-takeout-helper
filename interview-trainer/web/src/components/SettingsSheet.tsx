@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
+import { DECLINED_NOTE, saveFile } from '../lib/files';
 import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
 import { useConfirm } from './ConfirmDialog';
 import { RecoveredData } from './DataSafety';
@@ -53,17 +54,11 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
     setError(m);
   };
 
-  const download = () => {
-    const blob = new Blob([exportText()], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = backupFileName(dayKey(new Date()));
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    say('Backup saved to your downloads. Keep it somewhere safe.');
+  const download = async () => {
+    const result = await saveFile(backupFileName(dayKey(new Date())), exportText(), 'application/json');
+    if (result === 'saved') say('Backup saved to your downloads. Keep it somewhere safe.');
+    else if (result === 'declined') say(DECLINED_NOTE);
+    else fail('Downloads are blocked here. Use "Copy backup text" instead.');
   };
 
   const copy = async () => {
@@ -134,7 +129,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
         <h3>Your data</h3>
         <p className="muted">Stored on this device only. A backup file moves you to a new phone and protects you if the browser clears its storage.</p>
         <div className="stack">
-          <button type="button" className="btn secondary wide" onClick={download}>Download backup</button>
+          <button type="button" className="btn secondary wide" onClick={() => void download()}>Download backup</button>
           <button type="button" className="btn secondary wide" onClick={() => void copy()}>Copy backup text</button>
           <label className="btn secondary wide file-btn">
             Import backup file
