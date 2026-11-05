@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { MOCK_WEAK_BELOW, PASS_SCORE, buildReport, clockText, type Course, type MockCredit, type Question } from '@trainer/shared';
 import { isAnswered, mockResults } from '../lib/mock-marking';
 import { outcomeScore, type Answer, type Outcome } from '../lib/evaluate';
@@ -45,12 +45,15 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
   const unitOf = (id: string) => course.units.find((u) => u.id === id);
   const pendingSelf = questions.filter((q) => q.type === 'open' && isAnswered(q, answers[q.id]) && outcomes[q.id]?.open?.needsSelfAssessment);
   const notReached = report.total - report.answered;
+  // When the results replace a running mock (time ran out under an open confirmation), focus must land somewhere meaningful.
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus({ preventScroll: true }), []);
 
   return (
     <div className="home mock-results" data-testid="mock-results">
       <header className="page-top">
         <a className="icon-btn back" href="#/" aria-label="Back to home"><Icon name="arrow-left" /></a>
-        <h1>Mock interview results</h1>
+        <h1 ref={heading} tabIndex={-1} data-modal-return>Mock interview results</h1>
       </header>
 
       <section className="mock-score" aria-labelledby="mock-score-title">
