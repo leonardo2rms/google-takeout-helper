@@ -389,17 +389,17 @@ lessons:
           - { id: c, text: "Timeouts only matter for the first service in the chain" }
           - { id: d, text: "Adding retries at every hop will compensate for the mismatch" }
         answer: a
-        explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC's deadlines are built for this; with plain HTTP you pass the deadline or remaining budget in a header). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
+        explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC deadlines are designed for this: the client sets one, it travels with the call as the remaining time, and servers can propagate it to downstream calls, in some languages through the call context; with plain HTTP you pass the deadline or remaining budget in a header yourself). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
 
       - type: single
         prompt: "With cache-aside, a write must update the database and invalidate the cached entry. Which order is generally safer, and why?"
         options:
-          - { id: a, text: "Update the database first, then delete the cache entry: a reader that repopulates the cache in between loads the new row, and a TTL bounds the rare leftover staleness" }
+          - { id: a, text: "Update the database first, then delete the cache entry: the stale window shrinks to the short gap between commit and delete, and a TTL bounds the rare leftover staleness" }
           - { id: b, text: "Delete the cache entry first, then update the database: this guarantees that no stale value is ever read" }
           - { id: c, text: "Write the new value into the cache first, then the database" }
           - { id: d, text: "The order does not matter, both are equivalent" }
         answer: a
-        explanation: "If you delete first, a concurrent reader can miss, read the old row (the write has not committed yet) and put the old value back into the cache after your delete, where it stays until the TTL. Updating the database first shrinks the window to the moment between commit and delete. No ordering is perfect without extra mechanisms (versioned values, short TTLs, change-data-capture driven invalidation), so always keep a TTL as a safety net."
+        explanation: "If you delete first, a concurrent reader can miss, read the old row (the write has not committed yet) and put the old value back into the cache after your delete, where it stays until the TTL. Updating the database first shrinks the window to the moment between commit and delete (readers still hit the old cached value in that gap). A rare race remains, where a reader that missed before the commit writes its old value into the cache after your delete. No ordering is perfect without extra mechanisms (versioned values, short TTLs, change-data-capture driven invalidation), so always keep a TTL as a safety net."
 
       - type: single
         prompt: "Two regions both accept writes to the same record (active-active). Which design decision can you not avoid?"
@@ -416,7 +416,7 @@ lessons:
         answer: 120
         tolerance: 0
         unit: seconds
-        explanation: "During the spike the queue grows by 1,000 - 400 = 600 per second, so 60 s leaves a backlog of 36,000 requests. Afterwards it shrinks by 400 - 100 = 300 per second: 36,000 / 300 = 120 s. A queue turns a short spike into a longer, flatter load (queue-based load levelling), but the wait for the last queued request is two minutes, so it only suits work that can wait."
+        explanation: "During the spike the queue grows by 1,000 - 400 = 600 per second, so 60 s leaves a backlog of 36,000 requests. Afterwards it shrinks by 400 - 100 = 300 per second: 36,000 / 300 = 120 s. A queue turns a short spike into a longer, flatter load (queue-based load levelling), but the request that arrives at the end of the spike still waits about 90 s (36,000 / 400) and the queue needs 120 s to empty, so it only suits work that can wait."
 
       - type: open
         prompt: Design a rate limiter for a public API that runs on 20 instances behind a load balancer.
