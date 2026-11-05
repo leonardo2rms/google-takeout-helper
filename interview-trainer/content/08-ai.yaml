@@ -17,7 +17,7 @@ lessons:
         explanation: "String-building a query from a parameter is SQL injection. Assistants reproduce common patterns, including insecure ones, and you stay accountable for what you merge: use a parameterised query (`WHERE email = ?`) and review AI output like any other contributor's code."
 
       - type: multi
-        prompt: Select ALL habits that improve the quality of AI-assisted coding.
+        prompt: Select all habits that improve the quality of AI-assisted coding.
         options:
           - { id: a, text: "Provide relevant context: conventions, constraints and the files involved" }
           - { id: b, text: "Work in small steps, with tests or a clear acceptance check for each" }
@@ -108,7 +108,7 @@ lessons:
 
       - type: multi
         hint: "Think about what the model is allowed to DO after reading untrusted text."
-        prompt: Select ALL sound mitigations against prompt injection in an LLM app that reads web pages and emails.
+        prompt: Select all sound mitigations against prompt injection in an LLM app that reads web pages and emails.
         options:
           - { id: a, text: "Treat retrieved and user content as untrusted data: delimit it and never let it act as instructions" }
           - { id: b, text: "Give the model's tools least privilege and require human confirmation for destructive actions" }
@@ -270,7 +270,7 @@ lessons:
         explanation: "Prompt injection is dangerous when three things meet: untrusted content in the context, access to private data (`readFile`) and a channel to send it out (`sendEmail`, `httpPost`). Summarising needs no tools at all, so pass none. When an agent does need tools, give each task only the tools it needs, keep untrusted content away from those with side effects, and require human approval for anything that sends data out."
 
       - type: multi
-        prompt: Select ALL sound practices for improving the quality of a RAG system.
+        prompt: Select all sound practices for improving the quality of a RAG system.
         options:
           - { id: a, text: "Combine keyword search (BM25) with vector search (hybrid retrieval)" }
           - { id: b, text: "Re-rank the top candidates with a dedicated re-ranking model before building the prompt" }
@@ -282,7 +282,7 @@ lessons:
         explanation: "Most RAG failures are retrieval failures: the right passage was split in half, lost its heading ('EU customers'), or ranked below noise. Hybrid search catches exact terms that embeddings blur, re-ranking sharpens the top results, structure-aware chunks stay self-explanatory, and a retrieval-only metric tells you which half of the pipeline is broken. Context windows are finite and noisy context hurts accuracy and cost."
 
       - type: multi
-        prompt: Select ALL sound practices when using an LLM as a judge in your evals.
+        prompt: Select all sound practices when using an LLM as a judge in your evals.
         options:
           - { id: a, text: "Calibrate it against human-labelled examples and track how often it agrees with them" }
           - { id: b, text: "In pairwise comparisons, randomise or swap the order of the two answers to control position bias" }

@@ -39,7 +39,7 @@ lessons:
 
       - type: multi
         hint: "Think about parent and child: what happens to children when the parent is cancelled, and to the parent when a child fails?"
-        prompt: Select ALL guarantees of structured concurrency.
+        prompt: Select all guarantees of structured concurrency.
         options:
           - { id: a, text: "A parent does not complete until all its children complete" }
           - { id: b, text: "Cancelling a parent cancels its children" }
@@ -196,7 +196,7 @@ lessons:
         explanation: "A supervisor's children fail independently. The uncaught exception from a `launch` child goes to the CoroutineExceptionHandler (or the thread's handler); it neither cancels siblings nor is rethrown by the scope. With `coroutineScope`, the sibling would be cancelled and the exception rethrown."
 
       - type: multi
-        prompt: Select ALL true statements about Flow.
+        prompt: Select all true statements about Flow.
         options:
           - { id: a, text: "By default, collection happens in the context of the collector" }
           - { id: b, text: "`flowOn` changes the context of the operators above it (upstream)" }
@@ -284,7 +284,7 @@ lessons:
         explanation: "`flatMapLatest` cancels the running search when a new query arrives, whereas `flatMapConcat` would queue the stale searches. `stateIn` turns the cold flow into a hot `StateFlow` with an initial value; `WhileSubscribed(5_000)` keeps the upstream alive for 5 seconds after the last collector leaves, so a quick re-subscription (for example a screen rotation) does not restart it. `shareIn` would give a `SharedFlow` and needs a replay count instead of an initial value."
 
       - type: multi
-        prompt: Select ALL true statements about Channels and Flows.
+        prompt: Select all true statements about Channels and Flows.
         options:
           - { id: a, text: "Each element sent to a Channel is received by exactly one receiver, so several consumers share the work" }
           - { id: b, text: "A cold Flow runs its producer block again for every collector" }
@@ -295,7 +295,7 @@ lessons:
         explanation: "A channel is a hot hand-off between coroutines, so it needs an explicit `close()` to signal completion. The default capacity of `Channel()` is rendezvous (0): `send` suspends until a receiver is there; `Channel.BUFFERED` (64 by default) is opt-in. A `StateFlow` never completes: collection only ends when the collector is cancelled."
 
       - type: multi
-        prompt: "This CPU-bound loop ignores `cancel()`. Select ALL changes that make it respond to cancellation."
+        prompt: "This CPU-bound loop ignores `cancel()`. Select all changes that make it respond to cancellation."
         code:
           source: |
             suspend fun crunch(items: List<Item>) = withContext(Dispatchers.Default) {

@@ -18,7 +18,7 @@ lessons:
         explanation: "User input is pasted into the SQL text, so a value like `x' OR '1'='1` changes the meaning of the query. Pass it as a bound parameter (`jdbc.query(\"... WHERE status = ?\", orderMapper, status)`), which the driver sends separately from the SQL, so it can never be parsed as SQL."
 
       - type: multi
-        prompt: Select ALL sound defences against SQL injection (including limiting the damage).
+        prompt: Select all sound defences against SQL injection (including limiting the damage).
         options:
           - { id: a, text: "Parameterized queries (prepared statements) with bound values" }
           - { id: b, text: "Allowlisting dynamic identifiers, such as a sort column, instead of concatenating user text" }
@@ -67,7 +67,7 @@ lessons:
         explanation: "Dependencies are code you run with your privileges. Floating versions let an unreviewed (possibly malicious) release in, and new vulnerabilities are published against old versions all the time, so scanning must be continuous. An SBOM and signed or verified artifacts help you answer 'are we affected?' quickly."
 
       - type: multi
-        prompt: Select ALL true statements about using JWTs for authentication.
+        prompt: Select all true statements about using JWTs for authentication.
         options:
           - { id: a, text: "The payload of a signed JWT is only Base64URL-encoded, so anyone holding the token can read its claims" }
           - { id: b, text: "The verifier should pin the algorithms it accepts instead of trusting the token's own `alg` header" }

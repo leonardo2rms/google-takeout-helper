@@ -19,7 +19,7 @@ lessons:
 
       - type: multi
         hint: "Think about transaction boundaries and how one aggregate refers to another."
-        prompt: Select ALL rules that good aggregate design follows.
+        prompt: Select all rules that good aggregate design follows.
         options:
           - { id: a, text: "Reference other aggregates by identity (id), not by object reference" }
           - { id: b, text: "Modify one aggregate per transaction" }
@@ -174,7 +174,7 @@ lessons:
         explanation: "Typically an adapter + translator in front of a legacy system or third-party API, so your domain keeps speaking its own language."
 
       - type: multi
-        prompt: Select ALL valid context-mapping relationships.
+        prompt: Select all valid context-mapping relationships.
         options:
           - { id: a, text: "Shared Kernel" }
           - { id: b, text: "Conformist" }
@@ -294,7 +294,7 @@ lessons:
         explanation: "Eventual consistency is a UX design problem as well as a technical one. Typical answers: optimistic UI using the command's response, a pending state, or a version token that lets the read side wait (briefly, with a timeout) for the projection to catch up. A fixed sleep is a race that is wrong under load, and querying the write model gives up the reason for having a read model."
 
       - type: multi
-        prompt: Select ALL true statements about sagas.
+        prompt: Select all true statements about sagas.
         options:
           - { id: a, text: "In orchestration, a central coordinator tells each participant what to do next and tracks the state of the saga" }
           - { id: b, text: "In choreography, each service reacts to events and emits its own, with no central coordinator" }
@@ -335,7 +335,7 @@ lessons:
         explanation: "The Specification pattern turns a business rule into an object that can be named, tested alone and combined (`and`, `or`, `not`), so rules such as 'eligible for credit' read like the domain language instead of being buried in `if` chains. `&&` short-circuits, so the second rule is evaluated only when the first holds."
 
       - type: multi
-        prompt: Select ALL practices that keep a modular monolith modular.
+        prompt: Select all practices that keep a modular monolith modular.
         options:
           - { id: a, text: "Each module exposes a small public API and keeps its internals, including its entities and tables, private" }
           - { id: b, text: "Modules may join each other's tables directly when it is faster" }

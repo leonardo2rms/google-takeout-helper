@@ -26,7 +26,7 @@ lessons:
         explanation: "Idle CPUs plus rising latency means waiting. Check pool metrics (active/pending/connection-acquire time) before touching anything else. Raising the pool blindly can overload the DB, so find out why connections are held so long first."
 
       - type: multi
-        prompt: Select ALL sensible ways to reduce read load on a hot database.
+        prompt: Select all sensible ways to reduce read load on a hot database.
         options:
           - { id: a, text: "Cache frequently-read, rarely-changed data" }
           - { id: b, text: "Route read-only queries to read replicas" }
@@ -159,7 +159,7 @@ lessons:
         explanation: "The client can't know whether the first attempt succeeded. The server stores the key with the outcome (in the same transaction as the charge) and replays it on duplicates."
 
       - type: multi
-        prompt: Select ALL practices for safe retries.
+        prompt: Select all practices for safe retries.
         options:
           - { id: a, text: "Exponential backoff" }
           - { id: b, text: "Random jitter" }
@@ -374,7 +374,7 @@ lessons:
         explanation: "Under sustained overload a long queue turns every request into one that is served too late: throughput of useful work (goodput) collapses even though the server is busy. Load shedding keeps latency bounded for the requests you accept: small queue, fail fast, drop work whose deadline has passed (some systems even serve newest-first under overload). Retries on top make the overload worse."
 
       - type: multi
-        prompt: "One customer generates 40% of the traffic on a topic keyed by `customerId`, so one partition is overloaded while the others idle. Select ALL sound ways to deal with the hot key."
+        prompt: "One customer generates 40% of the traffic on a topic keyed by `customerId`, so one partition is overloaded while the others idle. Select all sound ways to deal with the hot key."
         options:
           - { id: a, text: "Spread the hot key over several sub-keys (for example the key plus a random suffix or bucket number) and combine the parts when reading" }
           - { id: b, text: "Simply add more partitions; the hot key will then be spread over them" }

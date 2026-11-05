@@ -28,7 +28,7 @@ lessons:
         difficulty: easy
 
       - type: multi
-        prompt: "Ordinary B-tree indexes exist on `email` and on `created_at`. Select ALL predicates that generally stop the database from using the index for an efficient lookup."
+        prompt: "Ordinary B-tree indexes exist on `email` and on `created_at`. Select all predicates that generally stop the database from using the index for an efficient lookup."
         options:
           - { id: a, text: "WHERE lower(email) = 'ana@example.com'" }
           - { id: b, text: "WHERE email LIKE '%@example.com'" }
@@ -112,7 +112,7 @@ lessons:
         difficulty: hard
 
       - type: multi
-        prompt: "Two requests debit the same account: each reads the balance, computes the new value in the application and writes it back. Select ALL changes that prevent a lost update."
+        prompt: "Two requests debit the same account: each reads the balance, computes the new value in the application and writes it back. Select all changes that prevent a lost update."
         options:
           - { id: a, text: "A single statement: UPDATE account SET balance = balance - :amt WHERE id = :id AND balance >= :amt" }
           - { id: b, text: "SELECT ... FOR UPDATE on the row inside the transaction, then update" }
@@ -209,7 +209,7 @@ lessons:
         explanation: "Entities loaded inside a transaction are managed: Hibernate keeps a snapshot and compares it at flush time (dirty checking). Flush happens before a query that could be affected and at commit, not on assignment. `save()` on a managed entity adds nothing. Watch out for `@Transactional(readOnly = true)`: Spring then skips flushing, and the same code would silently lose the change."
 
       - type: multi
-        prompt: "Select ALL true statements about keyset (seek) pagination compared with OFFSET pagination."
+        prompt: "Select all true statements about keyset (seek) pagination compared with OFFSET pagination."
         options:
           - { id: a, text: "The cost of a page stays about the same however deep you go, given an index on the sort columns" }
           - { id: b, text: "It does not skip or repeat rows when new rows are inserted between page requests" }

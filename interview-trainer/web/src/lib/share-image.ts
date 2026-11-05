@@ -112,12 +112,13 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
   ctx.font = mono(52, 500);
   ctx.fillText(card.streak === 1 ? 'day' : 'days', M + 130 + numW + 24, 470);
 
-  // ruled readout: rank, readiness, coverage
+  // ruled readout: rank, lessons, days practised, and readiness once it means something
   const rows: [string, string][] = [
     ['Rank', card.rank],
-    ['Readiness', `${card.readinessScore}  ${card.readinessLabel}`],
-    ['Course seen', `${card.coveragePct}%`],
+    ['Lessons', `${card.lessonsDone} of ${card.lessonsTotal}`],
+    ['Days practised', String(card.daysPracticed)],
   ];
+  if (card.readiness) rows.push(['Readiness', `${card.readiness.score}  ${card.readiness.label}`]);
   let y = 560;
   ctx.fillStyle = C.ink;
   ctx.fillRect(M, y, inner, 3);
@@ -133,14 +134,11 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
     ctx.fillRect(M, y, inner, 2);
   }
 
-  // topics
-  const topics = [
-    card.strongest && { name: card.weakest ? 'Strongest topic' : 'Topic', ...card.strongest },
-    card.weakest && { name: card.strongest ? 'Weakest topic' : 'Topic', ...card.weakest },
-  ].filter((r): r is { name: string; title: string; pct: number } => Boolean(r));
-  y = 892;
-  for (const t of topics) {
-    label(ctx, t.name, M, y, 26);
+  // best topic (only when it is genuinely strong)
+  y = 560 + 84 * rows.length + 64;
+  if (card.bestTopic) {
+    const t = card.bestTopic;
+    label(ctx, 'Best topic', M, y, 26);
     ctx.fillStyle = C.ink;
     ctx.font = mono(44, 600);
     ctx.textAlign = 'right';
@@ -149,7 +147,6 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
     ctx.font = sans(42, 600);
     ctx.fillText(fit(ctx, t.title, inner - 170), M, y + 54);
     gauge(ctx, M, y + 78, inner, 20, t.pct);
-    y += 160;
   }
 
   // footer
@@ -157,7 +154,7 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
   ctx.fillRect(M, CARD_H - 128, inner, 2);
   ctx.fillStyle = C.graphite;
   ctx.font = sans(27, 400);
-  ctx.fillText('Readiness is an estimate of recall, not a prediction of any result.', M, CARD_H - 80);
+  ctx.fillText(card.readiness ? 'Readiness is an estimate of recall, not a prediction of any result.' : 'Practised with Interview Trainer.', M, CARD_H - 80);
 }
 
 /** Waits for the app font so the picture is drawn in Plex Sans, not the fallback (errors and missing support are harmless). */

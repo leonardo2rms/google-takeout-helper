@@ -47,7 +47,7 @@ lessons:
         explanation: "The default rollback keeps tests isolated, but because the transaction never commits, Hibernate may not even send the SQL, so constraint violations can stay hidden unless you flush explicitly. Also by default `@DataJpaTest` replaces the configured DataSource with an embedded database (when one is on the classpath); for production-faithful tests use `@AutoConfigureTestDatabase(replace = NONE)` with a real engine via Testcontainers."
 
       - type: multi
-        prompt: Select ALL of these that are common mocking pitfalls.
+        prompt: Select all of these that are common mocking pitfalls.
         options:
           - { id: a, text: "Verifying the exact sequence of internal calls instead of asserting on observable results" }
           - { id: b, text: "Mocking a third-party library's types directly throughout your code instead of wrapping it in a small adapter you own and testing that adapter against the real thing" }
@@ -160,7 +160,7 @@ lessons:
         explanation: "The chance that all 200 pass is 0.99^200 = 0.134, so at least one fails with probability 1 - 0.134 = 86.6%. Small flake rates compound across a large suite, and a red build people learn to re-run stops carrying information. Quarantine and fix flaky tests, do not retry them forever."
 
       - type: multi
-        prompt: Select ALL common root causes of flaky tests.
+        prompt: Select all common root causes of flaky tests.
         options:
           - { id: a, text: "Tests share mutable state (static fields, a database, files) and depend on execution order" }
           - { id: b, text: "Asserting after a fixed sleep instead of waiting for a condition, so the result depends on timing" }

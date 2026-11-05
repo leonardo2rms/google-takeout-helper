@@ -29,7 +29,7 @@ lessons:
         explanation: "Metaspace lives outside the Java heap and grows up to the available native memory unless capped with `-XX:MaxMetaspaceSize`. Classloader leaks (e.g. repeated redeploys) are the classic way to exhaust it."
 
       - type: multi
-        prompt: Select ALL statements that are true for generational garbage collection on the JVM.
+        prompt: Select all statements that are true for generational garbage collection on the JVM.
         options:
           - { id: a, text: "It relies on the observation that most objects die young" }
           - { id: b, text: "Young-generation collections are usually frequent and short" }
@@ -179,7 +179,7 @@ lessons:
         explanation: "`counter++` is read-modify-write. Use `AtomicInteger`/`LongAdder` (or a lock). `volatile` guarantees visibility and ordering of single reads/writes, not compound actions."
 
       - type: multi
-        prompt: Select ALL true statements about `synchronized` and `ReentrantLock`.
+        prompt: Select all true statements about `synchronized` and `ReentrantLock`.
         options:
           - { id: a, text: "`synchronized` is reentrant" }
           - { id: b, text: "`ReentrantLock` supports `tryLock` with a timeout" }
@@ -307,7 +307,7 @@ lessons:
         explanation: "HotSpot records which receiver types each call site sees. A monomorphic or bimorphic site is inlined with a guard, and inlining opens the door to further optimisations (escape analysis, constant folding). A site that sees many types needs a real virtual or interface call. This is why the same code can behave differently in a benchmark with one implementation and in production with many."
 
       - type: multi
-        prompt: Select ALL true statements about class loading on the JVM.
+        prompt: Select all true statements about class loading on the JVM.
         options:
           - { id: a, text: "A class is identified by its name together with its defining class loader: the same bytes loaded by two loaders give two distinct, incompatible types" }
           - { id: b, text: "By default a class loader first delegates to its parent and only loads the class itself if the parent cannot" }
@@ -364,7 +364,7 @@ lessons:
         explanation: "2,000 MB / 500 MB per second = 4 s between young GCs. The frequency is only half of the story: a young collection copies the survivors, so its cost grows with the amount of live data, not with the garbage. That is why a bigger eden usually reduces GC overhead (fewer collections, more time for objects to die) without a proportionally longer pause."
 
       - type: multi
-        prompt: Select ALL true statements about virtual threads (JDK 21).
+        prompt: Select all true statements about virtual threads (JDK 21).
         options:
           - { id: a, text: "They are scheduled by the JVM onto a small pool of carrier threads, by default a `ForkJoinPool` whose parallelism equals the number of available processors (it can temporarily add carriers while threads are blocked in operations that pin them)" }
           - { id: b, text: "You should keep them in a fixed-size pool and reuse them, like platform threads" }

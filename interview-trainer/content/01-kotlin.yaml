@@ -23,7 +23,7 @@ lessons:
 
       - type: multi
         hint: "What would the JVM need in order to represent \"not assigned yet\" for a primitive? And which keyword allows reassignment?"
-        prompt: Select ALL statements that are true about `lateinit`.
+        prompt: Select all statements that are true about `lateinit`.
         options:
           - { id: a, text: "It can only be applied to `var` properties" }
           - { id: b, text: "It can be used on `Int` properties" }
@@ -149,7 +149,7 @@ lessons:
 
       - type: multi
         hint: "Look at what the compiler generates from the primary-constructor properties, and what a `data class` is not allowed to be."
-        prompt: Select ALL statements that are true about `data class`.
+        prompt: Select all statements that are true about `data class`.
         options:
           - { id: a, text: "`equals`/`hashCode` only use properties from the primary constructor" }
           - { id: b, text: "A data class can be declared `open`" }
@@ -281,7 +281,7 @@ lessons:
         explanation: "On the JVM, type arguments of a normal generic function are erased, so `this is T` cannot be checked. Because an inline function's body is substituted at the call site, the compiler can replace `T` with the concrete type there. That is also why a reified function can't be called with a type argument that is itself a non-reified type parameter."
 
       - type: multi
-        prompt: Select ALL true statements about `inline` functions.
+        prompt: Select all true statements about `inline` functions.
         options:
           - { id: a, text: "A lambda passed to an inline function can use a non-local `return` that returns from the calling function" }
           - { id: b, text: "`noinline` marks a lambda parameter that must stay a real object, for example because you store it or pass it on" }

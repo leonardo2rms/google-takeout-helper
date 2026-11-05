@@ -69,6 +69,7 @@ describe('course content', () => {
       const prose = q as unknown as Record<string, unknown>;
       for (const field of ['prompt', 'explanation', 'hint', 'modelAnswer'])
         if (typeof prose[field] === 'string') expect(prose[field], `${q.id} ${field}`).not.toMatch(american);
+      expect(q.prompt, q.id).not.toMatch(/Select ALL/); // no shouting; the kicker already says what to do
     }
   });
 

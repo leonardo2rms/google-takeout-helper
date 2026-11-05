@@ -234,7 +234,7 @@ lessons:
         explanation: "The cause is asynchronous replication lag. Read-your-writes only needs to hold for the writer: pin their reads to the primary, or to a replica that has applied their write's log position, for a few seconds. Everybody else can keep reading replicas. More replicas do not shorten lag, and the system is already eventually consistent."
 
       - type: multi
-        prompt: Select ALL true statements about caching strategies and their failure modes.
+        prompt: Select all true statements about caching strategies and their failure modes.
         options:
           - { id: a, text: "In cache-aside, the application reads the cache first and on a miss loads from the database and fills the cache" }
           - { id: b, text: "A cache stampede happens when many requests miss on the same expired hot key at once and all go to the database" }

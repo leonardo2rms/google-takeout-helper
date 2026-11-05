@@ -85,7 +85,7 @@ function ShareSheet({ course, progress, today, onClose }: Props & { onClose: () 
 
   return (
     <Sheet title="Share my progress" onClose={onClose}>
-      <p className="muted">Only what you already see on this screen: streak, rank, readiness and your strongest and weakest topic. Nothing else is included, and nothing is uploaded.</p>
+      <p className="muted">Only what you already see in the app: streak, rank, lessons done and days practised, plus your readiness score and best topic once they are worth showing. Nothing else is included, and nothing is uploaded.</p>
       {url ? (
         <img className="share-preview" src={url} alt={card.alt} width={1080} height={1350} data-testid="share-preview" />
       ) : (

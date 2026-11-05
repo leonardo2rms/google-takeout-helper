@@ -249,7 +249,7 @@ lessons:
         explanation: "Appends occasionally trigger a resize-and-copy, but averaged over many appends each is O(1). Use ArrayDeque if you need cheap insertion at both ends."
 
       - type: multi
-        prompt: Select ALL operations that run in O(log n).
+        prompt: Select all operations that run in O(log n).
         options:
           - { id: a, text: "TreeMap.get" }
           - { id: b, text: "PriorityQueue.offer" }
