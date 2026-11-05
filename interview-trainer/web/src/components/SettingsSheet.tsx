@@ -4,6 +4,7 @@ import { DECLINED_NOTE, saveFile } from '../lib/files';
 import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
 import { useConfirm } from './ConfirmDialog';
 import { RecoveredData } from './DataSafety';
+import { Icon } from './icons';
 import { ReadingSection } from './ReadingSection';
 import { RemindersSection } from './RemindersSection';
 import { RestDays } from './RestDays';
@@ -136,8 +137,8 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
             <input ref={fileRef} type="file" accept=".json,application/json,text/plain" data-testid="import-file" onChange={(e) => void onFile(e.target.files?.[0])} />
           </label>
         </div>
-        <details>
-          <summary>Paste backup text instead</summary>
+        <details className="how-calc">
+          <summary><Icon name="chevron-down" className="chev" />Paste backup text instead</summary>
           <label htmlFor="paste-backup" className="sr-only">Backup text</label>
           <textarea id="paste-backup" className="answer-box mono" rows={4} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder="Paste the text you copied" />
           <button type="button" className="btn ghost small" onClick={() => check(pasted)} disabled={pasted.trim() === ''}>Check pasted text</button>
@@ -185,9 +186,11 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
       <RecoveredData />
 
       <section>
+        <h3>Reset</h3>
+        <p className="muted">Erases your progress on this device. Download a backup first if you are unsure.</p>
         <button
           type="button"
-          className="link danger-link"
+          className="btn secondary wide danger-btn"
           onClick={async () => {
             const ok = await confirm({
               title: 'Reset all progress?',

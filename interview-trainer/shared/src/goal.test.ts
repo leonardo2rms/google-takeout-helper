@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, answeredInLast, clampGoal, DAYS_KEPT, emptyProgress, goalToday, GOAL_PRESETS, lastDays, recordDay, setGoalTarget, targetFor, type Progress } from './index';
+import { addDays, answeredInLast, clampGoal, DAYS_KEPT, emptyProgress, goalDisplay, goalToday, GOAL_PRESETS, lastDays, recordDay, setGoalTarget, targetFor, type Progress } from './index';
 
 const today = '2026-11-04';
 const log = (answered: number, target = 8, extra = {}) => ({ xp: answered * 10, answered, firstTry: answered, target, ...extra });
@@ -88,5 +88,13 @@ describe('lastDays', () => {
     const p: Progress = { ...emptyProgress(), days: { [today]: log(3), [addDays(today, -6)]: log(4), [addDays(today, -7)]: log(100) } };
     expect(lastDays(p, today)).toHaveLength(14);
     expect(answeredInLast(p, today, 7)).toBe(7);
+  });
+});
+
+describe('goalDisplay: one rule for exceeded goals', () => {
+  it('never shows more than the target; the extra is a named bonus', () => {
+    expect(goalDisplay({ done: 3, target: 8 })).toMatchObject({ shown: 3, bonus: 0, ratio: '3/8', sentence: '3 of 8 questions today' });
+    expect(goalDisplay({ done: 8, target: 8 })).toMatchObject({ shown: 8, bonus: 0, ratio: '8/8' });
+    expect(goalDisplay({ done: 19, target: 8 })).toMatchObject({ shown: 8, bonus: 11, ratio: '8/8', sentence: '8 of 8 questions today' });
   });
 });

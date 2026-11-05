@@ -4,7 +4,7 @@
  * the browser plumbing honours them (one a day, marked before showing, never throws).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { KEY_V2, allQuestions, emptyProgress, type Course, type Progress } from '@trainer/shared';
+import { KEY_V2, allQuestions, emptyProgress, questionHash, type Course, type Progress } from '@trainer/shared';
 import course from 'virtual:course';
 
 type Cleanup = void | (() => void);
@@ -34,7 +34,9 @@ let workerReg: { showNotification: ReturnType<typeof vi.fn> } | undefined;
 const q1 = allQuestions(course as Course)[0]!;
 const base = (over: Partial<Progress['prefs']['reminders']> = {}, p: Partial<Progress> = {}): Progress => {
   const e = emptyProgress();
-  return { ...e, missed: [q1.id], ...p, prefs: { ...e.prefs, reminders: { time: '09:00', notify: true, lastNotified: null, ...over } } };
+  // one card whose due date has arrived ("due" means exactly that; a missed question that is not due yet does not count)
+  const dueCard = { h: questionHash(q1), ease: 2.3, interval: 1, due: '2026-06-14', reps: 1, lapses: 0, seen: 1, firstTry: 1, last: '2026-06-13' };
+  return { ...e, cards: { [q1.id]: dueCard }, ...p, prefs: { ...e.prefs, reminders: { time: '09:00', notify: true, lastNotified: null, ...over } } };
 };
 const seed = (p: Progress) => store.set(KEY_V2, JSON.stringify(p));
 const saved = (): Progress => JSON.parse(store.get(KEY_V2)!);
@@ -130,7 +132,7 @@ describe('useReminderCheck', () => {
     await startCheck();
     expect(FakeNotification.instances).toHaveLength(1);
     expect(FakeNotification.instances[0]!.title).toBe('Interview Trainer');
-    expect(FakeNotification.instances[0]!.options.body).toMatch(/1 question is ready to review/);
+    expect(FakeNotification.instances[0]!.options.body).toMatch(/1 question is due for review/);
     expect(saved().prefs.reminders.lastNotified).toBe('2026-06-15');
 
     // Coming back to the tab the same day does not show it again.
@@ -157,7 +159,7 @@ describe('useReminderCheck', () => {
     ['no time is chosen', base({ time: null })],
     ['it is too early', base({ time: '11:00' })],
     ['it was already shown today', base({ lastNotified: '2026-06-15' })],
-    ['nothing is due', base({}, { missed: [] })],
+    ['nothing is due (a missed question that is not due yet is not "due")', base({}, { cards: {}, missed: [q1.id] })],
     ['today is a rest day', base({}, { profile: { ...emptyProgress().profile, restDays: [1] } })],
     ['the learner already practised today', base({}, { days: { '2026-06-15': { xp: 5, answered: 3, firstTry: 3, target: 8 } } })],
   ])('stays silent when %s', async (_why, progress) => {

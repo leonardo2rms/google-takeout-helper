@@ -1,4 +1,5 @@
-import type { SessionSummary } from '@trainer/shared';
+import { minutesFor, type ForecastBucket, type SessionSummary } from '@trainer/shared';
+import { forecastText } from './format';
 
 /** What kind of session just ended. Lessons are the curriculum; the rest are practice built from what you have seen. */
 export type SessionKind = 'lesson' | 'review' | 'daily' | 'mix' | 'warmup' | 'topic' | 'one' | 'challenge';
@@ -22,6 +23,29 @@ export function resultHeading(kind: SessionKind, s: Outcomes): string {
   if (failed > 0 && failed / total >= 1 / 3) return 'Another pass needed';
   if (kind === 'lesson') return 'Lesson complete';
   return kind === 'review' ? 'Review done' : 'Practice complete';
+}
+
+/** The first few sessions get the one-time "make tomorrow easy" offer; after that the learner knows the app. */
+export const BRIDGE_SESSIONS = 3;
+
+/** Questions due tomorrow, from the forecast of the session that just ended. */
+export const dueTomorrow = (forecast: readonly ForecastBucket[]): number => forecast.find((b) => b.inDays <= 1)?.count ?? 0;
+
+/**
+ * "Next review: 7 questions tomorrow · about 4 min": what is next and when, concretely. The minutes appear only for
+ * tomorrow, where they help a learner decide to come back; later buckets just say when.
+ */
+export function nextReviewLine(forecast: readonly ForecastBucket[]): string {
+  const tomorrow = dueTomorrow(forecast);
+  return `Next review: ${forecastText(forecast)}${tomorrow > 0 ? ` · about ${minutesFor(tomorrow)} min` : ''}`;
+}
+
+/**
+ * Whether to offer a calendar entry for tomorrow, ONCE: only in the first sessions, never after it was shown, never when a
+ * reminder time already exists, and only when something is scheduled and the platform can hand over a file.
+ */
+export function shouldOfferBridge(i: { sessions: number; nudged: boolean; hasReminder: boolean; scheduled: boolean; canDownload: boolean }): boolean {
+  return i.sessions >= 1 && i.sessions <= BRIDGE_SESSIONS && !i.nudged && !i.hasReminder && i.scheduled && i.canDownload;
 }
 
 /** One line on how the session really ended, only when first-try accuracy alone would mislead ("57%" but everything was learned by the end). */

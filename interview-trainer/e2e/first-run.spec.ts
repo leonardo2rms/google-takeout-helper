@@ -100,7 +100,7 @@ test.describe('the numbers on Home agree with each other', () => {
     await seed(page, { [KEY_V2]: v2({ cards, streak: 2, longestStreak: 2, lastDay: day(-1), stats: { sessions: 3, answered: 24, firstTry: 20, perfect: 1, practiceDays: 2 } }) });
     await page.goto('/');
     await expect(page.getByTestId('daily-card')).toContainText('5 of 24 due');
-    await expect(page.getByTestId('due-count')).toHaveText('24 ready · 10 at a time');
+    await expect(page.getByTestId('due-count')).toHaveText('24 due · 10 per session');
     const seen = Math.round((24 / course.units.flatMap((u) => u.lessons).flatMap((l) => l.questions).length) * 100);
     await expect(page.getByTestId('readiness-line')).toHaveText(`Readiness: not enough data yet (${seen}% of the course seen)`);
     await expectNoOverflow(page);

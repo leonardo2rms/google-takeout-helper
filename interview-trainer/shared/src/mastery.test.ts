@@ -36,7 +36,7 @@ describe('topicStats', () => {
 
 describe('readiness', () => {
   it('empty: score 0, early estimate, no weakest unit', () => {
-    expect(readiness(course, emptyProgress(), today)).toEqual({ score: 0, coverage: 0, label: 'early', enough: false, weakestUnitId: null });
+    expect(readiness(course, emptyProgress(), today)).toEqual({ score: 0, coverage: 0, label: 'early', enough: false, weakestUnitId: null, heldBack: false });
   });
   it('is the mean unit strength x 100 with coverage next to it', () => {
     const r = readiness(course, known(['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4']), today);

@@ -28,8 +28,8 @@ export function ChallengeCard({ course, progress, today }: Props) {
           <small data-testid="challenge-streak">
             {result === 'pass' ? 'Come back tomorrow for a new one' : 'Tomorrow brings a new one'}{streakText}
           </small>
+          <a className="inline-action" href={`#/q/${q.id}`} data-testid="challenge-again">Practise it again <Icon name="arrow-right" size="1.1em" /></a>
         </span>
-        <a className="btn small ghost" href={`#/q/${q.id}`} data-testid="challenge-again">Practise it again</a>
       </div>
     );
   }

@@ -130,10 +130,6 @@ export function Library({ course, progress }: Props) {
               <p className="lib-top">
                 <span className="lib-type">{TYPE_LABEL[e.q.type]}</span>
                 <span className={`pill status-${e.status}`} data-testid="lib-status">{STATUS_LABEL[e.status]}</span>
-                <span className="lib-marks">
-                  {e.bookmarked && <span className="lib-mark" role="img" aria-label="Saved" data-testid="lib-mark-saved"><Icon name="bookmark" size="1.1em" /></span>}
-                  {e.note && <span className="lib-mark" role="img" aria-label="Has your note" data-testid="lib-mark-note"><Icon name="square-pen" size="1.1em" /></span>}
-                </span>
               </p>
               <p className="lib-prompt"><Inline text={e.q.prompt} mark={words} /></p>
               {codePreview(e.q).length > 0 && <pre className="lib-code" aria-label="Code in this question"><code>{codePreview(e.q).join('\n')}</code></pre>}

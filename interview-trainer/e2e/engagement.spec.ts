@@ -31,7 +31,7 @@ test.describe('upgrading from v1', () => {
     await expect(page.getByTestId('rank')).toContainText('Engineer');
     await expect(page.locator('.progress-line')).toContainText(`3 / ${lessons.length} lessons`);
     // the v1 questions that were missed are due straight away; the rest are spread over the week
-    await expect(dueCount(page)).toContainText('ready to review');
+    await expect(dueCount(page)).toContainText('due');
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/home-upgraded-from-v1.png` });
 
@@ -45,7 +45,7 @@ test.describe('upgrading from v1', () => {
     // the welcome gift is announced once, in the next summary, without a retroactive rank-up
     await playLesson(page, LESSON);
     await expect(page.getByTestId('summary-notes')).toContainText('welcome gift');
-    await expect(page.getByTestId('celebration')).not.toContainText('New rank');
+    await expect(page.getByTestId('celebration').filter({ hasText: 'New rank' })).toHaveCount(0);
   });
 
   test('unreadable or newer storage never crashes, is not overwritten on load, and is backed up before the first save', async ({ page }) => {
@@ -92,7 +92,7 @@ test.describe('daily goal ring', () => {
     await setDay(page, day(1));
     await page.reload();
     await expect(goalText(page)).toHaveText('0/8');
-    await expect(dueCount(page)).toHaveText('7 ready to review');
+    await expect(dueCount(page)).toHaveText('7 due');
     await expect(page.getByTestId('streak-chip')).toContainText('1');
 
     // yesterday's bar is in the chart
@@ -171,8 +171,8 @@ test.describe('review queue', () => {
     await expect(page.locator('.summary')).toContainText('1 question to revisit');
     await homeAfterSummary(page);
 
-    // same day: only the missed question is waiting
-    await expect(dueCount(page)).toHaveText('1 ready to review');
+    // same day: only the missed question is waiting (its card is not due until tomorrow, so it is a retry, not a "due")
+    await expect(dueCount(page)).toHaveText('1 missed to retry');
     await page.screenshot({ path: `${SHOTS}/home-review-due.png` });
     await page.getByTestId('due-card').click();
     await expect(page.locator('.prompt')).toBeVisible();
@@ -184,7 +184,7 @@ test.describe('review queue', () => {
     // next day: every question from the lesson comes due; answering them all correctly clears the queue
     await setDay(page, day(1));
     await page.reload();
-    await expect(dueCount(page)).toHaveText(`${LESSON_Q.length} ready to review`);
+    await expect(dueCount(page)).toHaveText(`${LESSON_Q.length} due`);
     await page.getByTestId('due-card').click();
     await playSession(page, LESSON_Q.length);
     await expect(page.locator('.summary h1')).toBeVisible();
@@ -300,7 +300,7 @@ test.describe('Daily Practice', () => {
 
     await expect(page.getByTestId('daily-card')).toContainText('8 questions');
     await expect(page.getByTestId('daily-card')).toContainText('5 of 12 due'); // Today has room for 5 of the 12 that are due
-    await expect(dueCount(page)).toHaveText('12 ready · 10 at a time');
+    await expect(dueCount(page)).toHaveText('12 due · 10 per session');
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/home-daily-card.png` });
 
@@ -312,12 +312,12 @@ test.describe('Daily Practice', () => {
     played.forEach((q, i) => i > 0 && expect(unitOf(q)).not.toBe(unitOf(played[i - 1]!)));
 
     await expect(page.getByTestId('summary-goal')).toContainText('8 of 8 questions today');
-    await expect(page.getByTestId('summary-goal')).toContainText('Goal met');
-    await expect(page.getByTestId('celebration')).toBeVisible();
+    // "Goal met" is said once: by the milestone card when it is the headline (the ring then stays quiet)
+    await expect(page.getByTestId('celebration')).toContainText('Daily goal met');
     await homeAfterSummary(page);
     await expect(goalText(page)).toHaveText('8/8');
     const stillDue = ids.filter((id) => !played.some((q) => q.id === id)).length;
-    await expect(dueCount(page)).toHaveText(stillDue > 10 ? `${stillDue} ready · 10 at a time` : stillDue ? `${stillDue} ready to review` : 'All caught up');
+    await expect(dueCount(page)).toHaveText(stillDue > 10 ? `${stillDue} due · 10 per session` : stillDue ? `${stillDue} due` : 'All caught up');
   });
 
   test('a new learner is invited to start the first lesson, with no fake due items', async ({ page }) => {
@@ -468,7 +468,9 @@ test.describe('export and import', () => {
     await expect(goalText(page)).toHaveText('7/8');
     const after = await stored(page);
     expect(after!.cards).toEqual(before!.cards);
-    expect(after).toEqual(before);
+    // the one-time "make tomorrow easy" flag is a device preference: a reset clears it, an import never restores it
+    const local = (p: typeof before) => ({ ...p!, prefs: { ...p!.prefs, reminders: { ...p!.prefs.reminders, nudged: undefined } } });
+    expect(local(after)).toEqual(local(before));
 
     // restored state survives a reload
     await page.reload();
@@ -543,7 +545,7 @@ test.describe('celebrations', () => {
       await page.locator('.prompt').waitFor();
       for (const q of LESSON_Q) await solveAndContinue(page, q);
       await expect(page.locator('.summary h1')).toHaveText('Clean run');
-      await expect(page.getByTestId('celebration')).toBeVisible();
+      await expect(page.getByTestId('celebration')).toHaveCount(0); // the heading already says it: no second "Perfect lesson" card
       await expect(page.getByTestId('confetti')).toBeAttached();
       await expect(page.getByTestId('confetti')).toHaveAttribute('aria-hidden', 'true');
       await expect(page.getByTestId('confetti')).toHaveCount(0, { timeout: 5000 }); // it removes itself
@@ -554,7 +556,7 @@ test.describe('celebrations', () => {
       await page.goto(`/#/lesson/${LESSON}`);
       await page.locator('.prompt').waitFor();
       for (const q of LESSON_Q) await solveAndContinue(page, q);
-      await expect(page.getByTestId('celebration')).toBeVisible();
+      await expect(page.locator('.summary h1')).toHaveText('Clean run');
       await page.waitForTimeout(300);
       await expect(page.getByTestId('confetti')).toHaveCount(0);
     });
@@ -564,8 +566,7 @@ test.describe('celebrations', () => {
     await page.goto(`/#/lesson/${LESSON}`);
     await page.locator('.prompt').waitFor();
     for (const q of LESSON_Q) await solveAndContinue(page, q);
-    await expect(page.locator('.summary h1')).toHaveText('Clean run');
-    await expect(page.getByTestId('celebration')).toBeVisible();
+    await expect(page.locator('.summary h1')).toHaveText('Clean run'); // the milestone is still told, by the heading
     await page.waitForTimeout(300);
     await expect(page.locator('canvas')).toHaveCount(0);
   });
@@ -610,7 +611,7 @@ test.describe('progress and readiness', () => {
     const expected = readiness(course, p, TODAY);
 
     await expect(page.getByTestId('readiness-score')).toHaveText(String(expected.score));
-    await expect(page.getByTestId('readiness-label')).toHaveText(expected.label === 'early' ? 'Early estimate' : /Building|Solid|Interview-ready/);
+    await expect(page.getByTestId('readiness-label')).toHaveText(expected.label === 'early' ? 'Early estimate' : /Building|Solid|Strong/);
     await expect(page.getByText('not a prediction of any interview result')).toBeVisible();
     await expect(page.locator('.topics li')).toHaveCount(course.units.length);
     await expectNoOverflow(page);

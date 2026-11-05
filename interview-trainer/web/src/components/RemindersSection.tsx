@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Icon } from './icons';
 import { ICS_FILE_NAME, buildReminderIcs, defaultPrefs, type NotifyPermission, type Progress } from '@trainer/shared';
 import { DECLINED_NOTE, saveFile, useCanDownloadFiles } from '../lib/files';
 import { notificationPermission, requestNotificationPermission } from '../lib/reminders';
@@ -85,6 +86,8 @@ export function RemindersSection({ progress, update }: Props) {
       </p>
 
       {canNotify && (
+        <details className="how-calc" data-testid="notify-more" open={notify && permission === 'granted'}>
+          <summary><Icon name="chevron-down" className="chev" />Also notify me when I open the app</summary>
         <label className="toggle-row">
           <input type="checkbox" checked={notify && permission === 'granted'} disabled={!time} onChange={(e) => void toggleNotify(e.target.checked)} data-testid="reminder-notify" />
           <span>
@@ -94,6 +97,7 @@ export function RemindersSection({ progress, update }: Props) {
             </small>
           </span>
         </label>
+        </details>
       )}
 
       {message && <p role="status" className="notice" data-testid="reminder-message">{message}</p>}

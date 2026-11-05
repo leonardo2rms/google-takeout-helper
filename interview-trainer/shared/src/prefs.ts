@@ -14,6 +14,8 @@ export interface RemindersPrefs {
   notify: boolean;
   /** The last day a notification was shown: at most one per day. */
   lastNotified: Day | null;
+  /** The one-time "make tomorrow easy" offer on the first summaries has been shown: it never appears again. Absent = not yet. */
+  nudged?: boolean;
 }
 
 export interface ReadingPrefs {
@@ -50,6 +52,7 @@ export function normalizePrefs(raw: unknown): Prefs {
       // A notification preference without a time makes no sense.
       notify: time !== null && r.notify === true,
       lastNotified: isDay(r.lastNotified) ? r.lastNotified : null,
+      ...(r.nudged === true ? { nudged: true } : {}),
     },
     reading: {
       textSize: TEXT_SIZES.find((s) => s === rd.textSize) ?? d.reading.textSize,

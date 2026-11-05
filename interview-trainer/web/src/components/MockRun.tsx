@@ -133,6 +133,7 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
       ),
       confirmLabel: 'Submit',
       cancelLabel: 'Keep going',
+      tone: unanswered > 0 ? 'danger' : 'neutral', // blank answers count as zero: Keep going is the default then
       testId: 'mock-confirm',
       okTestId: 'mock-submit',
     });

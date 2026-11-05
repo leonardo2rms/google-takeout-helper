@@ -6,6 +6,7 @@ import { registerServiceWorker } from './lib/sw-register';
 import './styles.css';
 import './features-a.css';
 import './safety.css';
+import './ux2.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -54,7 +54,7 @@ export function QuestionTools({ q, startEditing = false, testIdPrefix = 'tools' 
 
       {!editing && saved && (
         <p className="q-note" data-testid={`${testIdPrefix}-note`}>
-          <b>Your note</b> {saved}
+          <b>Your note</b> {saved.trim()}
         </p>
       )}
 

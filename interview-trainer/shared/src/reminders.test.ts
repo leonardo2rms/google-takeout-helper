@@ -111,14 +111,14 @@ describe('reminderDecision', () => {
     const d = reminderDecision(base);
     expect(d).toMatchObject({ show: true, title: 'Interview Trainer' });
     if (d.show) {
-      expect(d.body).toContain('6 questions are ready to review');
+      expect(d.body).toContain('6 questions are due for review');
       expect(d.body).not.toMatch(/!|streak|lose|don't|miss/i);
     }
   });
-  it('caps the count and singularises', () => {
+  it('shows the exact count and singularises', () => {
     const body = (n: number) => { const d = reminderDecision({ ...base, dueCount: n }); return d.show ? d.body : ''; };
-    expect(body(1)).toMatch(/^1 question is ready/);
-    expect(body(80)).toMatch(/^30\+ questions are ready/);
+    expect(body(1)).toMatch(/^1 question is due/);
+    expect(body(80)).toMatch(/^80 questions are due/);
   });
   it('stays quiet in every other case', () => {
     expect(why({ prefs: { ...base.prefs, notify: false } })).toBe('off');

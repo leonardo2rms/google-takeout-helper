@@ -101,7 +101,7 @@ rules we hold ourselves to are in [`docs/engagement.md`](docs/engagement.md).
 **What you see on Home**
 
 - **Today**: one tap to a session of 8 questions, interleaved across topics: up to 5 due reviews, 2 weak spots, the rest new. A brand-new learner is simply invited to start the first lesson.
-- **Review due**: questions whose review date has come, plus anything you missed. Shown as "N ready to review" (capped at "30+").
+- **Review due**: questions whose review date has come, plus anything you missed. Shown as "N due" (the real number; a session takes 10 at a time).
 - **Daily goal ring** (default 8 questions, presets 8 / 16 / 24): tap for a 14-day chart. After a week away the next day's goal is halved once ("Easy restart").
 - **Streak chip**: practising any day keeps it alive. Every 7 days in a row earns a **freeze** (hold up to 2) that covers a missed day automatically; **rest days** you choose (up to 3 weekdays) are covered for free. A freeze is only spent when it covers the whole gap; otherwise you get a fresh start and keep the freeze. Longest streak and total days practised never reset.
 - **Rank** under the title (XP only goes up, so a rank is never lost), and **Progress**: readiness (an estimate of how much of this course you would recall today, with coverage shown, never a prediction of a result), a bar per topic and one tap to practise the weakest.
@@ -154,7 +154,7 @@ Settings -> **Reminders**: pick a daily time, then either or both of:
   needs no VTIMEZONE rules and follows you when you travel. Rest days become `RRULE:FREQ=WEEKLY;BYDAY=...`. This is the reliable option: it works while the app is closed.
 - **Notify me when I open the app**: asks for the Notification permission from the toggle (never on load), and then shows **one** local notification when the app is opened
   after that time with something due. At most one per day (`prefs.reminders.lastNotified`), never on a rest day, never after you practised, never when nothing is due, and the copy is
-  plain ("5 questions are ready to review"). There is no push server, so browsers generally cannot fire it while the app is closed, and the UI says so.
+  plain ("5 questions are due for review"). There is no push server, so browsers generally cannot fire it while the app is closed, and the UI says so.
 
 "Turn reminders off" clears the time and the choice. In the hosted single-file build the viewer's `downloads` capability does not accept `.ics` files, so it replaces the calendar button with a note.
 Stored under `progress.prefs.reminders` (`{ time, notify, lastNotified }`); like other settings it stays local on import/merge.
