@@ -72,8 +72,8 @@ lessons:
             }
         options:
           - { id: a, text: "`value` is a mutable property, so the compiler can't guarantee it is still a String on the next line" }
-          - { id: b, text: "`Any` has no `length`, and `is String` does not change the declared type of `b.value`" }
-          - { id: c, text: "Smart casts work on local variables and parameters only, never on properties of another object" }
+          - { id: b, text: "`Any` has no `length`, and `is String` never narrows a type, so an explicit `as String` is needed" }
+          - { id: c, text: "Smart casts only work inside `when` expressions, never after an `if` check" }
           - { id: d, text: "`Box` must be declared `open` or `data` before its properties can be smart cast" }
         answer: a
         explanation: "Smart casts only work when the value can't change between the check and the use: local `val`s, local `var`s not captured in a modifying lambda, and `val` properties without custom getters in the same module. Copy it to a local `val` (`val v = b.value`) first."
@@ -129,7 +129,7 @@ lessons:
         options:
           - { id: a, text: "`when` can be exhaustive without an `else` branch, because all subtypes are known" }
           - { id: b, text: "Calls on sealed types are devirtualised, so `when` dispatch is faster at runtime" }
-          - { id: c, text: "Subclasses may live in any module, so plugins can extend the hierarchy later" }
+          - { id: c, text: "Subclasses may live in another module, so plugins can extend the hierarchy later" }
           - { id: d, text: "Each subtype automatically gets `copy()` and `componentN()`, like a data class" }
         answer: a
         explanation: "Direct subtypes of a sealed type are known at compile time, so adding a new subtype turns every non-exhaustive `when` expression into a compile error. That is a safety net for evolving domain models. Sealed is a compile-time guarantee, not a performance feature; subclasses must live in the same package and module; and `copy()` comes from `data class`, not from `sealed`."
@@ -195,7 +195,7 @@ lessons:
           - { id: a, text: "Distinct compile-time types (UserId vs OrderId) at little or no allocation cost" }
           - { id: b, text: "It guarantees a `UserId` is never boxed, even inside generics or nullable types" }
           - { id: c, text: "It generates `equals`, `copy` and `componentN` like a `data class` would" }
-          - { id: d, text: "It makes every access to `raw` atomic, so coroutines can share it without locks" }
+          - { id: d, text: "It makes each access to `raw` atomic, so coroutines can share it without locks" }
         answer: a
         explanation: "Value classes are erased to the underlying type where possible, avoiding allocation. They are boxed when used as a nullable, a generic type argument or through an interface, so it's not free everywhere and \"never boxed\" is false. They are not a concurrency tool (a `val` is simply immutable) and do not generate `copy` or `componentN`."
 
@@ -274,9 +274,9 @@ lessons:
             inline fun <reified T> Any?.isA(): Boolean = this is T
         options:
           - { id: a, text: "The body is copied into each call site, where the real type argument is known and `is T` can be checked" }
-          - { id: b, text: "`reified` makes the JVM keep generic type arguments at runtime for every class that declares them" }
-          - { id: c, text: "A non-inline generic function cannot use `is` at all, because the compiler forbids type checks inside generics" }
-          - { id: d, text: "`reified` type arguments are passed as hidden `Class<T>` parameters that only inline functions can read" }
+          - { id: b, text: "`reified` makes the JVM keep generic type arguments at runtime for each class that declares them" }
+          - { id: c, text: "A non-inline generic function has no way to use `is`, because the compiler forbids type checks inside generics" }
+          - { id: d, text: "`reified` type arguments are passed as hidden `Class<T>` parameters that inline functions can read" }
         answer: a
         explanation: "On the JVM, type arguments of a normal generic function are erased, so `this is T` cannot be checked (checks like `is String` on a value are fine). Because an inline function's body is substituted at the call site, the compiler can replace `T` with the concrete type there; no hidden class token is passed and the JVM keeps nothing extra. That is also why a reified function can't be called with a type argument that is itself a non-reified type parameter."
 
@@ -370,9 +370,9 @@ lessons:
             }
         options:
           - { id: a, text: "Compile error: a `when` on a sealed subject must be exhaustive, even when it is used as a statement" }
-          - { id: b, text: "It compiles, because a `when` statement does not need to cover every case; `Clear` is ignored" }
+          - { id: b, text: "It compiles, because a `when` statement does not need to cover each case; `Clear` is ignored" }
           - { id: c, text: "It compiles with a warning only, and `Clear` falls through to a `NoWhenBranchMatchedException`" }
-          - { id: d, text: "It compiles only if `Clear` becomes a `data class`, because objects cannot be matched with `is`" }
+          - { id: d, text: "It compiles if `Clear` becomes a `data class`, because objects cannot be matched with `is`" }
         answer: a
         explanation: "Since Kotlin 1.7, non-exhaustive `when` statements over sealed, enum and Boolean subjects are errors rather than warnings. That is what makes sealed hierarchies a safety net: adding `Clear` breaks every handler that forgot it. Adding an `else` branch silences the compiler and throws that safety away, so avoid `else` on sealed `when`s."
 
