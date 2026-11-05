@@ -307,7 +307,7 @@ lessons:
         explanation: "Loading is lazy (on first use), and Metaspace is a separate native-memory area that is unbounded unless `-XX:MaxMetaspaceSize` is set. Because classes live as long as their loader, a leaked reference to a webapp's class loader (a ThreadLocal, a static in a shared library, a registered JDBC driver, a live thread) keeps every class of the old deployment alive: the classic Metaspace leak on redeploys. The same class name loaded by two loaders is also the reason for puzzling `ClassCastException: X cannot be cast to X`."
 
       - type: single
-        prompt: What does this safepoint log line tell you?
+        prompt: "What does this safepoint log line tell you? (Simplified: the exact set of fields varies by JDK version, and some releases add extra ones such as Cleanup.)"
         code:
           lang: text
           source: |
@@ -355,7 +355,7 @@ lessons:
       - type: multi
         prompt: Select ALL true statements about virtual threads (JDK 21).
         options:
-          - { id: a, text: "They are scheduled by the JVM onto a small pool of carrier threads, by default a `ForkJoinPool` sized to the number of available processors" }
+          - { id: a, text: "They are scheduled by the JVM onto a small pool of carrier threads, by default a `ForkJoinPool` whose parallelism equals the number of available processors (it can temporarily add carriers while threads are blocked in operations that pin them)" }
           - { id: b, text: "You should keep them in a fixed-size pool and reuse them, like platform threads" }
           - { id: c, text: "`ThreadLocal` works in virtual threads, but a large per-thread cache multiplied by hundreds of thousands of threads becomes expensive" }
           - { id: d, text: "To limit concurrent use of a scarce resource such as a database or a rate-limited API, use a `Semaphore` or a bounded resource pool instead of limiting the thread count" }
