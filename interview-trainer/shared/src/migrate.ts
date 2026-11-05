@@ -36,6 +36,13 @@ const int = (x: unknown, min: number, max: number, dflt: number): number =>
   typeof x === 'number' && Number.isFinite(x) ? Math.min(max, Math.max(min, Math.floor(x))) : dflt;
 const bool = (x: unknown, dflt: boolean): boolean => (typeof x === 'boolean' ? x : dflt);
 const BIG = Number.MAX_SAFE_INTEGER;
+/**
+ * Upper bounds on how many records a stored or imported profile may carry (the course has a few hundred questions).
+ * They exist so a hand-made file cannot fill the browser's storage quota; real profiles are far below them.
+ */
+export const MAX_RECORDS = 5000;
+/** Longest id kept in `missed`, cards and lessons. */
+export const MAX_ID_LENGTH = 120;
 
 export function sameJson(a: unknown, b: unknown): boolean {
   if (a === b) return true;
@@ -51,7 +58,8 @@ function normalizeCards(raw: unknown, today: Day): Progress['cards'] {
   const out: Progress['cards'] = {};
   if (!isObj(raw)) return out;
   for (const [id, c] of Object.entries(raw)) {
-    if (!safeKey(id) || !isObj(c) || typeof c.h !== 'string' || c.h === '' || !isDay(c.due)) continue;
+    if (Object.keys(out).length >= MAX_RECORDS) break;
+    if (id.length > MAX_ID_LENGTH || !safeKey(id) || !isObj(c) || typeof c.h !== 'string' || c.h === '' || !isDay(c.due)) continue;
     // A due date far in the future can only come from clock skew: pull it back inside the interval cap.
     const due = daysBetween(today, c.due) > MAX_INTERVAL ? addDays(today, MAX_INTERVAL) : c.due;
     const card: Card = {
@@ -92,7 +100,8 @@ function normalizeLessons(raw: unknown, today: Day): Progress['lessons'] {
   const out: Progress['lessons'] = {};
   if (!isObj(raw)) return out;
   for (const [id, r] of Object.entries(raw)) {
-    if (!safeKey(id) || !isObj(r)) continue;
+    if (Object.keys(out).length >= MAX_RECORDS) break;
+    if (id.length > MAX_ID_LENGTH || !safeKey(id) || !isObj(r)) continue;
     const rec: LessonRecord = {
       bestAccuracy: typeof r.bestAccuracy === 'number' && Number.isFinite(r.bestAccuracy) ? Math.min(1, Math.max(0, r.bestAccuracy)) : 0,
       completions: int(r.completions, 0, BIG, 0),
@@ -126,7 +135,7 @@ export function normalizeProgress(input: unknown, ctx: MigrationContext): Progre
     streak,
     lastDay: isDay(p.lastDay) ? p.lastDay : null,
     lessons: normalizeLessons(p.lessons, ctx.today),
-    missed: Array.isArray(p.missed) ? [...new Set(p.missed.filter((x): x is string => typeof x === 'string' && x !== ''))] : [],
+    missed: Array.isArray(p.missed) ? [...new Set(p.missed.filter((x): x is string => typeof x === 'string' && x !== '' && x.length <= MAX_ID_LENGTH))].slice(0, MAX_RECORDS) : [],
     longestStreak: Math.max(streak, int(p.longestStreak, 0, BIG, 0)),
     freezes: int(p.freezes, 0, MAX_FREEZES, 0),
     cards: normalizeCards(p.cards, ctx.today),

@@ -6,7 +6,8 @@ import {
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
-import { fetchHealth, gradeOpen } from './lib/api';
+import { fetchHealthWithRetry, gradeOpen } from './lib/api';
+import { routeOf } from './lib/route';
 import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
@@ -23,7 +24,7 @@ import { ProgressScreen } from './screens/ProgressScreen';
 import { Summary, type Finished } from './screens/Summary';
 
 function useHashRoute(): string {
-  const read = () => window.location.hash.replace(/^#/, '') || '/';
+  const read = () => routeOf(window.location.hash);
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const onChange = () => setRoute(read());
@@ -101,8 +102,10 @@ function Screens() {
 
   useEffect(() => {
     if (!isStandalone) {
-      void fetchHealth().then(setHealth);
-      return;
+      // A server that is still starting must not switch AI off for the whole session: ask again, a few times.
+      const abort = new AbortController();
+      void fetchHealthWithRetry(abort.signal).then((h) => h && setHealth(h));
+      return () => abort.abort();
     }
     // Hosted single-file build: no API server; grade through the viewer's own Claude when offered.
     void loadSample().then((sample) => {
