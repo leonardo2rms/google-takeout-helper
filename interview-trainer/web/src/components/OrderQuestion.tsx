@@ -11,7 +11,11 @@ interface Props {
   onAnswer: (a: Answer | null) => void;
 }
 
-/** Tap lines from the pool to build the snippet in order; tap a placed line to send it back. */
+/**
+ * Tap lines from the pool to build the snippet in order; tap a placed line to send it back.
+ * The pool shows lines without their indentation, so the nesting does not give the order away (UX-22); a placed line
+ * shows its real indentation. Lines are unique once trimmed (a content test enforces it), so nothing becomes ambiguous.
+ */
 export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
   const pool = useMemo(() => shuffleDifferent(q.lines, seed), [q, seed]);
   const [placed, setPlaced] = useState<number[]>([]); // indexes into `pool`, in answer order
@@ -54,7 +58,7 @@ export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
             disabled={checked || placed.includes(i)}
             onClick={() => commit([...placed, i])}
           >
-            {line}
+            {line.trim()}
           </button>
         ))}
       </div>

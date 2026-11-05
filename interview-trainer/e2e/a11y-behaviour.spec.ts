@@ -154,12 +154,17 @@ test.describe('keyboard operation', () => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     const q = (await gotoQuestion(page, 'order')) as Extract<Question, { type: 'order' }>;
+    // UX-22: the pool does not leak the nesting. Tiles carry no indentation; placed lines get it back.
+    const indented = q.lines.findIndex((l) => /^\s+\S/.test(l));
+    expect(indented, 'the first order question should have indented lines').toBeGreaterThanOrEqual(0);
+    expect((await page.locator('.order-pool .code-line').allTextContents()).sort()).toEqual(q.lines.map((l) => l.trim()).sort());
     for (const line of q.lines) {
       const pool = page.locator('.order-pool .code-line:not([disabled])');
       const texts = await pool.allTextContents();
-      await pool.nth(texts.findIndex((t) => t === line)).focus();
+      await pool.nth(texts.findIndex((t) => t === line.trim())).focus();
       await page.keyboard.press('Enter');
     }
+    await expect(page.locator('.order-slot .code-line').nth(indented)).toContainText(q.lines[indented]!);
     await expect(page.locator('.order-slot .code-line').first()).toContainText('Position 1');
     await expect(page.getByRole('status').filter({ hasText: `${q.lines.length} of ${q.lines.length} placed` })).toBeAttached();
     await check(page);

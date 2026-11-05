@@ -40,7 +40,8 @@ export async function answerCorrectly(page: Page, q: Question): Promise<void> {
       for (const token of q.answers) await clickByText(page, '.bank .chip:not([disabled])', token, false);
       break;
     case 'order':
-      for (const line of q.lines) await clickByText(page, '.order-pool .code-line:not([disabled])', line, true);
+      // The pool shows lines without indentation; they are unique once trimmed.
+      for (const line of q.lines) await clickByText(page, '.order-pool .code-line:not([disabled])', line.trim(), true);
       break;
     case 'spot':
       for (const n of q.answers) await page.locator(`button[data-line="${n}"]`).click();
