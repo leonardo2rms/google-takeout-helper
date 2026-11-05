@@ -351,7 +351,7 @@ lessons:
           - { id: c, text: "`getOrNull` blocks the calling thread until the result is ready, which defeats the point of a suspend function" }
           - { id: d, text: "`Result` cannot be used as a return type in a `suspend` function, only as a parameter" }
         answer: a
-        explanation: "`runCatching` is `try { Result.success(block()) } catch (e: Throwable) { Result.failure(e) }`; since the lambda is inline it may call suspend functions, but it also catches the CancellationException that a cancelled coroutine uses to unwind. Catch specific exceptions, or rethrow cancellation (`.onFailure { if (it is CancellationException) throw it }`), and model expected failures explicitly (a sealed result type) instead of collapsing them all into null."
+        explanation: "`runCatching` is `try { Result.success(block()) } catch (e: Throwable) { Result.failure(e) }`; since the lambda is inline it may call suspend functions, but it also catches the CancellationException that a cancelled coroutine uses to unwind. Catch specific exceptions, or rethrow cancellation (`.onFailure { if (it is CancellationException) throw it }`), and model expected failures explicitly (a sealed result type) instead of collapsing them all into null. `getOrNull` just unwraps the already-computed `Result` (it never blocks), and `Result` is a legal return type since Kotlin 1.5."
 
       - type: single
         prompt: "With a current Kotlin compiler (1.7 or newer), what happens to this code?"
