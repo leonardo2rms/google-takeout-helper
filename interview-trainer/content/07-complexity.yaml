@@ -303,3 +303,261 @@ lessons:
             keywords: ["insertion order", "access order", "accessorder", "lru", "removeeldest", "linkedhashmap"]
           - point: "TreeMap: sorted keys, O(log n), range/navigation queries (floor/ceiling/subMap)"
             keywords: ["sorted", "o(log n)", "range", "floorkey", "ceilingkey", "submap", "navigable", "comparator"]
+
+  - id: complexity-advanced
+    title: Windows, graphs & DP
+    questions:
+      - type: single
+        prompt: "All numbers in `nums` are positive. There is a `while` loop inside a `for` loop: what is the time complexity of this sliding window?"
+        code:
+          source: |
+            fun shortest(nums: IntArray, target: Int): Int {
+                var best = Int.MAX_VALUE
+                var sum = 0
+                var left = 0
+                for (right in nums.indices) {
+                    sum += nums[right]
+                    while (sum >= target) {
+                        best = minOf(best, right - left + 1)
+                        sum -= nums[left++]
+                    }
+                }
+                return if (best == Int.MAX_VALUE) 0 else best
+            }
+        options:
+          - { id: a, text: "O(n): `left` only moves forward, so the inner loop runs at most n times in total across all iterations" }
+          - { id: b, text: "O(n²): a loop inside a loop" }
+          - { id: c, text: "O(n log n)" }
+          - { id: d, text: "O(n x target)" }
+        answer: a
+        explanation: "Count the work per pointer, not per loop nesting: `right` advances n times and `left` advances at most n times, and neither ever moves back. That is amortised analysis, and it is the reason sliding windows and two-pointer techniques turn O(n²) scans into O(n). The positivity of the numbers is what makes shrinking the window safe."
+
+      - type: code
+        prompt: "Write `longestAtMostKDistinct(s, k)`: the length of the longest substring of `s` that contains at most `k` distinct characters. The hidden tests use strings of 200,000 characters, so aim for O(n)."
+        starter: |
+          function longestAtMostKDistinct(s, k) {
+            // your code
+          }
+        entry: longestAtMostKDistinct
+        tests:
+          - { args: ["eceba", 2], expect: 3 }
+          - { args: ["aa", 1], expect: 2 }
+          - { args: ["", 3], expect: 0 }
+          - { args: ["abc", 0], expect: 0 }
+          - { args: ["abcabcabc", 2], expect: 2 }
+          - { args: { js: "['ab'.repeat(100000), 2]" }, expect: 200000, hidden: true }
+          - { args: { js: "['abcdefghij'.repeat(20000), 3]" }, expect: 3, hidden: true }
+        solution: |
+          function longestAtMostKDistinct(s, k) {
+            if (k === 0) return 0;
+            const counts = new Map();
+            let left = 0;
+            let best = 0;
+            for (let right = 0; right < s.length; right++) {
+              const c = s[right];
+              counts.set(c, (counts.get(c) || 0) + 1);
+              while (counts.size > k) {
+                const l = s[left++];
+                const n = counts.get(l) - 1;
+                if (n === 0) counts.delete(l);
+                else counts.set(l, n);
+              }
+              best = Math.max(best, right - left + 1);
+            }
+            return best;
+          }
+        kotlin: |
+          fun longestAtMostKDistinct(s: String, k: Int): Int {
+              if (k == 0) return 0
+              val counts = HashMap<Char, Int>()
+              var left = 0
+              var best = 0
+              for (right in s.indices) {
+                  counts.merge(s[right], 1, Int::plus)
+                  while (counts.size > k) {
+                      val c = s[left++]
+                      if (counts.merge(c, -1, Int::plus) == 0) counts.remove(c)
+                  }
+                  best = maxOf(best, right - left + 1)
+              }
+              return best
+          }
+        explanation: "Grow the window on the right, and when it holds more than `k` distinct characters shrink it from the left until it is valid again. A map of character counts tells you when a character has left the window completely. Each index enters and leaves the window once, so the whole thing is O(n). Checking every substring is O(n²) or worse and times out on the large hidden inputs."
+
+      - type: estimate
+        prompt: "About how many times must a search range of 1 to 1,000,000,000 be halved before a single candidate is left?"
+        answer: 30
+        tolerance: 0
+        unit: halvings
+        explanation: "2^30 = 1,073,741,824 is just above a billion, so log2(10^9) is about 29.9 and 30 halvings are enough. This is why 'binary search on the answer' is so powerful: even for answers up to a billion you need only about 30 feasibility checks, each of which is usually a single O(n) pass."
+
+      - type: code
+        prompt: "Koko has `piles` of bananas (positive integers) and `h` hours, with `h >= piles.length`. Each hour she picks one pile and eats up to `k` bananas from it. Write `minEatingSpeed(piles, h)`: the smallest integer `k` that lets her finish all piles within `h` hours. The hidden tests use piles of up to 10^9 bananas, so a linear search over `k` is too slow."
+        starter: |
+          function minEatingSpeed(piles, h) {
+            // your code
+          }
+        entry: minEatingSpeed
+        tests:
+          - { args: [[3, 6, 7, 11], 8], expect: 4 }
+          - { args: [[30, 11, 23, 4, 20], 5], expect: 30 }
+          - { args: [[30, 11, 23, 4, 20], 6], expect: 23 }
+          - { args: [[5], 5], expect: 1 }
+          - { args: { js: "[Array(100000).fill(1e9), 100000]" }, expect: 1000000000, hidden: true }
+          - { args: { js: "[[1e9], 2]" }, expect: 500000000, hidden: true }
+        solution: |
+          function minEatingSpeed(piles, h) {
+            const hoursAt = (k) => {
+              let hours = 0;
+              for (const p of piles) {
+                hours += Math.floor((p + k - 1) / k);
+                if (hours > h) return hours;
+              }
+              return hours;
+            };
+            let lo = 1;
+            let hi = 1;
+            for (const p of piles) if (p > hi) hi = p;
+            while (lo < hi) {
+              const mid = lo + Math.floor((hi - lo) / 2);
+              if (hoursAt(mid) <= h) hi = mid;
+              else lo = mid + 1;
+            }
+            return lo;
+          }
+        kotlin: |
+          fun minEatingSpeed(piles: IntArray, h: Int): Int {
+              var lo = 1
+              var hi = piles.max()
+              while (lo < hi) {
+                  val mid = lo + (hi - lo) / 2
+                  val hours = piles.sumOf { (it.toLong() + mid - 1) / mid }
+                  if (hours <= h) hi = mid else lo = mid + 1
+              }
+              return lo
+          }
+        explanation: "The question is a yes/no predicate, 'can she finish at speed k?', and it is monotonic: if k works, every larger k works too. So binary search the smallest k that works, between 1 and the largest pile (at that speed every pile takes one hour, so it always works). Each check is O(n), so the total is O(n log max(pile)). The first hidden test is a trap for linear search: it would need up to 10^9 checks of 100,000 piles."
+
+      - type: match
+        prompt: Match each problem to the technique that usually solves it.
+        pairs:
+          - { left: "Shortest subarray with a sum of at least a target, all numbers positive", right: "Sliding window" }
+          - { left: "Smallest capacity for which a yes/no feasibility check passes, and feasibility is monotonic", right: "Binary search on the answer" }
+          - { left: "After adding edges one by one, are two nodes connected?", right: "Union-Find (disjoint set)" }
+          - { left: "Order tasks so every prerequisite comes first, or detect a cycle", right: "Topological sort (Kahn's algorithm)" }
+          - { left: "All words that start with a given prefix", right: "Trie" }
+          - { left: "The k largest items of a large stream", right: "Min-heap of size k" }
+        explanation: "Interviews reward recognising the shape of a problem. Union-Find answers connectivity queries in near-constant amortised time with path compression and union by size; a trie shares prefixes so lookups cost the length of the word, not the number of words; Kahn's algorithm repeatedly removes nodes with no remaining prerequisites, and if nodes remain there is a cycle."
+
+      - type: code
+        prompt: "There are `n` courses numbered `0..n-1`. Each prerequisite `[course, pre]` means you must take `pre` before `course`. Write `canFinish(n, prerequisites)`: true if all courses can be completed, i.e. there is no cycle. The hidden tests include a chain of 100,000 courses, so avoid deep recursion."
+        starter: |
+          function canFinish(n, prerequisites) {
+            // your code
+          }
+        entry: canFinish
+        tests:
+          - { args: [2, [[1, 0]]], expect: true }
+          - { args: [2, [[1, 0], [0, 1]]], expect: false }
+          - { args: [4, [[1, 0], [2, 1], [3, 2]]], expect: true }
+          - { args: [3, []], expect: true }
+          - { args: [1, [[0, 0]]], expect: false }
+          - { args: { js: "[100000, Array.from({ length: 99999 }, (_, i) => [i + 1, i])]" }, expect: true, hidden: true }
+          - { args: { js: "[100000, [...Array.from({ length: 99999 }, (_, i) => [i + 1, i]), [0, 99999]]]" }, expect: false, hidden: true }
+        solution: |
+          function canFinish(n, prerequisites) {
+            const indegree = new Array(n).fill(0);
+            const next = Array.from({ length: n }, () => []);
+            for (const [course, pre] of prerequisites) {
+              next[pre].push(course);
+              indegree[course]++;
+            }
+            const queue = [];
+            for (let i = 0; i < n; i++) if (indegree[i] === 0) queue.push(i);
+            let done = 0;
+            for (let head = 0; head < queue.length; head++) {
+              done++;
+              for (const c of next[queue[head]]) {
+                if (--indegree[c] === 0) queue.push(c);
+              }
+            }
+            return done === n;
+          }
+        kotlin: |
+          fun canFinish(n: Int, prerequisites: List<IntArray>): Boolean {
+              val indegree = IntArray(n)
+              val next = List(n) { mutableListOf<Int>() }
+              for ((course, pre) in prerequisites) {
+                  next[pre].add(course)
+                  indegree[course]++
+              }
+              val queue = ArrayDeque<Int>()
+              for (i in 0 until n) if (indegree[i] == 0) queue.addLast(i)
+              var done = 0
+              while (queue.isNotEmpty()) {
+                  val node = queue.removeFirst()
+                  done++
+                  for (c in next[node]) if (--indegree[c] == 0) queue.addLast(c)
+              }
+              return done == n
+          }
+        explanation: "Kahn's algorithm: start with the courses that have no prerequisites, 'take' them, and decrement the in-degree of the courses that depend on them. If every course ends up taken there is no cycle; if some never reach in-degree 0, they are on or behind a cycle. It is O(n + edges) and iterative. A recursive DFS is also O(n + edges) but needs a recursion depth equal to the longest chain, which overflows the call stack on the 100,000-course chain."
+
+      - type: order
+        prompt: "Arrange the lines of a bottom-up dynamic program that returns the fewest coins needed to make `amount`, or -1 if it is impossible. It runs in O(amount x coins)."
+        lines:
+          - "fun minCoins(coins: IntArray, amount: Int): Int {"
+          - "    val dp = IntArray(amount + 1) { amount + 1 }"
+          - "    dp[0] = 0"
+          - "    for (a in 1..amount) {"
+          - "        for (c in coins) {"
+          - "            if (c <= a) dp[a] = minOf(dp[a], dp[a - c] + 1)"
+          - "        }"
+          - "    }"
+          - "    return if (dp[amount] > amount) -1 else dp[amount]"
+          - "}"
+        explanation: "`dp[a]` is the fewest coins for amount `a`. Every entry starts at 'impossible' (`amount + 1` is larger than any real answer), the base case `dp[0] = 0` comes before the loops, and each amount is built from smaller, already solved amounts: try every coin and take the best `dp[a - c] + 1`. Dynamic programming is recursion with memoisation turned upside down: the same sub-problems, solved in dependency order."
+
+      - type: single
+        prompt: "What are the time and extra space of the standard approach that finds the k largest of n values by scanning them once and keeping a min-heap of size k?"
+        options:
+          - { id: a, text: "O(n log k) time and O(k) extra space" }
+          - { id: b, text: "O(n log n) time and O(n) extra space" }
+          - { id: c, text: "O(n) time and O(1) extra space" }
+          - { id: d, text: "O(k log n) time and O(n) extra space" }
+        answer: a
+        explanation: "Each of the n values is compared with the heap's root (the smallest of the k largest seen so far), which is O(1); only if it is larger does it replace the root, costing O(log k). So the worst case is O(n log k) with a heap of k elements. It beats sorting everything (O(n log n)) when k is much smaller than n, and it works on a stream that does not fit in memory. A min-heap, not a max-heap, because the element you may need to evict is the smallest of the survivors."
+
+      - type: open
+        prompt: "Given a huge log of search queries, you need the 10 most frequent queries. Walk through your approach, from one machine to data that does not fit in memory."
+        modelAnswer: "Count first: one pass with a hash map from query to count is O(n) time and O(d) memory for d distinct queries. Then select the top 10 with a min-heap of size 10: for each of the d entries, compare with the heap's root and replace it if the count is larger, which is O(d log k) and avoids sorting all d entries in O(d log d). If the distinct queries do not fit in memory, partition the log by a hash of the query into shards (files or machines), so that every occurrence of a query lands in the same shard, count each shard separately, take each shard's top 10 and merge them; the global top 10 is among them. If an approximate answer is acceptable, a count-min sketch together with a heap of candidates uses fixed memory, at the price of overestimated counts."
+        keyPoints:
+          - point: "Count with a hash map in one pass: O(n) time, O(distinct) memory"
+            keywords: ["hash map", "hashmap", "o(n)"]
+          - point: "Select the top k with a min-heap of size k (O(d log k)) instead of sorting everything"
+            keywords: ["min-heap", "heap", "log k"]
+          - point: "If it does not fit in memory: partition by hash into shards, count each, merge the shard top-k lists"
+            keywords: ["shard", "partition", "hash of"]
+          - point: "If approximate is acceptable: a count-min sketch with fixed memory"
+            keywords: ["count-min", "sketch", "approximate"]
+        followUps:
+          - when: missed
+            point: 4
+            prompt: "How does a count-min sketch estimate counts, and what kind of error does it have?"
+            modelAnswer: "It keeps a small table of counters with several rows, each row with its own hash function. Adding an item increments one counter in every row, and to estimate an item's count you take the minimum of its counters across the rows. Collisions can only add to a counter, so the estimate is never below the true count and may be above it; more columns and rows reduce the error at the cost of memory."
+            keyPoints:
+              - point: "Several rows of counters, each with its own hash function; an add increments one counter per row"
+                keywords: ["rows", "hash function"]
+              - point: "The estimate is the minimum of the item's counters"
+                keywords: ["minimum"]
+              - point: "Collisions make it overestimate, never underestimate"
+                keywords: ["overestimat", "never below", "collision"]
+          - when: covered
+            point: 3
+            prompt: "Why partition by a hash of the query and not by splitting the log randomly?"
+            modelAnswer: "With a hash partition every occurrence of the same query goes to the same shard, so each shard's counts are complete and its top 10 is exact. If the log were split randomly, the occurrences of one query would be spread over all shards, and a query could be missing from every shard's top 10 although its total is the largest."
+            keyPoints:
+              - point: "The same query always lands in the same shard, so counts are complete"
+                keywords: ["same shard", "complete"]
+              - point: "A random split spreads one query's count and can hide the global winner"
+                keywords: ["spread", "random"]
