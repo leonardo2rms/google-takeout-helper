@@ -318,7 +318,7 @@ lessons:
           - { id: a, text: "The code runs on a hard-coded dispatcher such as `Dispatchers.IO`, so its `delay` uses real time instead of virtual time" }
           - { id: b, text: "`runTest` skips delays in the test body itself, but not in code started with `launch` or `async`" }
           - { id: c, text: "Virtual time only works for delays shorter than a few seconds, so longer ones run in real time" }
-          - { id: d, text: "`delay` is skipped under `runBlocking` with a test dispatcher, so `runTest` waits the full time" }
+          - { id: d, text: "`delay` is only skipped after an explicit `advanceUntilIdle()` call, so without it `runTest` waits in real time" }
         answer: a
         explanation: "`runTest` runs the test body on a `TestScheduler` that advances virtual time whenever all coroutines are idle, so `delay(10_000)` costs nothing. A dispatcher the code creates or hard-codes bypasses that scheduler. Inject the `CoroutineDispatcher` (production: `Dispatchers.IO`; test: `StandardTestDispatcher(testScheduler)`) so the test controls time."
 

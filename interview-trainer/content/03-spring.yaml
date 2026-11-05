@@ -205,7 +205,7 @@ lessons:
           - { id: c, text: "WebFlux, but call JDBC directly on the event loop" }
           - { id: d, text: "Plain servlets, to avoid framework overhead on CPU-bound requests" }
         answer: a
-        explanation: "Reactive stacks pay off for high-concurrency, I/O-bound workloads with non-blocking drivers end to end. Blocking JDBC on a WebFlux event loop is an outage waiting to happen. For CPU-bound work, reactive gives you nothing."
+        explanation: "Reactive stacks pay off for high-concurrency, I/O-bound workloads with non-blocking drivers end to end. Blocking JDBC on a WebFlux event loop is an outage waiting to happen. For CPU-bound work, reactive gives you nothing, and raw servlets only give up Spring's productivity (its overhead is negligible next to CPU-bound work)."
 
       - type: single
         hint: "Look under the `spring.threads` prefix."
@@ -408,10 +408,10 @@ lessons:
         options:
           - { id: a, text: "Each distinct path and user pair creates a new time series, so unbounded tag values blow up memory" }
           - { id: b, text: "`counter()` is not thread-safe, so concurrent increments are lost under load" }
-          - { id: c, text: "Tag keys must be unique across the whole application, so a second registration with other values fails at runtime" }
+          - { id: c, text: "Counters of one name must always be registered with identical tag values, so a second registration with other values fails at runtime" }
           - { id: d, text: "Counters are unable to carry tags, so Micrometer silently drops `path` and `user` from the output" }
         answer: a
-        explanation: "Each unique tag combination is its own series. Keep tag values low-cardinality and bounded: the route template (`/orders/{id}`), the status class, the outcome. Spring's own `http.server.requests` metric tags the URI template, not the raw URI, for exactly this reason. Put per-user detail into logs and traces instead."
+        explanation: "Each unique tag combination is its own series. Keep tag values low-cardinality and bounded: the route template (`/orders/{id}`), the status class, the outcome. Spring's own `http.server.requests` metric tags the URI template, not the raw URI, for exactly this reason. Put per-user detail into logs and traces instead. Counters can carry tags, are thread-safe, and the same name may be registered with many different tag values."
 
       - type: single
         prompt: "`@WebMvcTest(OrderController::class)` fails with `NoSuchBeanDefinitionException: OrderService`. What is the idiomatic fix?"

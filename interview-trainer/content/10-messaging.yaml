@@ -18,7 +18,7 @@ lessons:
         options:
           - { id: a, text: "Records within one partition are ordered, and equal keys go to the same partition, so order holds per key" }
           - { id: b, text: "The records of a topic are globally ordered, because the broker assigns each record a topic-wide sequence number" }
-          - { id: c, text: "Records are ordered across the partitions, but for the consumers inside one consumer group" }
+          - { id: c, text: "Records are ordered across all partitions, but only as seen by the consumers inside one consumer group" }
           - { id: d, text: "Ordering is guaranteed only when the topic has exactly one broker, because replicas can reorder records" }
         answer: a
         explanation: "The partition is the unit of ordering and of parallelism (and keys map to the same partition only while the partition count stays the same). A global order would force a single partition and a single reader; offsets are per partition, and the number of brokers or consumer groups does not change that. So choose a key that carries the ordering you need (for example the order id) and expect no ordering between different keys."
@@ -192,7 +192,7 @@ lessons:
         prompt: "A colleague says: 'Kafka has exactly-once semantics, so our consumers do not need to be idempotent.' What is the best response?"
         options:
           - { id: a, text: "Exactly-once covers read-process-write inside Kafka (idempotent producer plus transactions); external side effects such as database writes can still repeat" }
-          - { id: b, text: "Exactly-once delivery is mathematically out of reach in a distributed system, so Kafka's claim is marketing and consumers have to be idempotent anyway" }
+          - { id: b, text: "Exactly-once is impossible in any distributed system, so Kafka has no such feature and offers only at-least-once delivery" }
           - { id: c, text: "Setting enable.idempotence=true on the producer makes every consumer safe from duplicates, including external side effects" }
           - { id: d, text: "That is correct for a consumer once acks=all and min.insync.replicas are set, because no record is delivered twice then" }
         answer: a

@@ -76,7 +76,7 @@ lessons:
           - { id: a, text: "Non-heap memory (metaspace, stacks, direct buffers, code cache) pushed the process over the limit" }
           - { id: b, text: "The garbage collector is disabled in containers, so garbage piles up beyond `-Xmx`" }
           - { id: c, text: "`-Xmx` is ignored when running in Docker, so the heap grew past the container limit" }
-          - { id: d, text: "The container limit applies to the heap, so a sampling error in the metrics hid the real heap size" }
+          - { id: d, text: "The kernel counts only heap memory against the limit, so the heap metrics must have under-reported its size" }
         answer: a
         explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures; the limit applies to the whole process, and the JVM honours `-Xmx` and runs its GC in containers. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
 
@@ -284,7 +284,7 @@ lessons:
             }
         options:
           - { id: a, text: "C2 may prove that `d` never escapes the method and eliminate the allocation (scalar replacement), keeping `x` and `y` in registers" }
-          - { id: b, text: "The JVM places short-lived objects like this on the thread stack instead of the heap" }
+          - { id: b, text: "The JVM always allocates such short-lived objects on the thread stack instead of the heap" }
           - { id: c, text: "Escape analysis moves `d` into Metaspace so that the garbage collector never has to see it" }
           - { id: d, text: "Nothing can change: the JIT is not allowed to remove an allocation, because the garbage collector needs to see each object" }
         answer: a
