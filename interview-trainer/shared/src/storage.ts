@@ -47,6 +47,8 @@ export interface Loaded {
    */
   protectedRaw: string | null;
   from: 0 | 1 | 2;
+  /** Why KEY_V2 could not be read (only set together with `from: 0` and a `protectedRaw`). */
+  problem?: 'future-version' | 'corrupt';
 }
 
 function safeGet(s: StorageLike, key: string): string | null {
@@ -74,7 +76,7 @@ export function loadProgress(storage: StorageLike, ctx: MigrationContext): Loade
   const raw2 = safeGet(storage, KEY_V2);
   if (raw2 !== null) {
     const res = migrateProgress(raw2, ctx);
-    if (res.problem) return { progress: res.progress, raw: raw2, protectedRaw: raw2, from: 0 };
+    if (res.problem) return { progress: res.progress, raw: raw2, protectedRaw: raw2, from: 0, problem: res.problem };
     let raw = raw2;
     if (res.changed) {
       // Normalising may throw data away (fields this version does not know, malformed values). That is only done once a

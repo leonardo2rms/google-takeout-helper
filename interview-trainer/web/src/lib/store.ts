@@ -143,7 +143,19 @@ function ensure(): Progress {
   return current!;
 }
 
-/** Re-reads storage if another tab wrote since we last looked. Returns true if our copy changed. */
+/** Whether a profile holds anything worth protecting (an empty one can simply be replaced by whatever storage holds). */
+const hasData = (p: Progress): boolean => p.xp > 0 || p.stats.sessions > 0 || Object.keys(p.cards).length > 0;
+
+/**
+ * Re-reads storage if another tab wrote since we last looked. Returns true if our copy (or what we report about it) changed.
+ *
+ * The rule when the other write is not something this tab can read (a newer schema, corrupt text) or storage was emptied:
+ * a tab that holds a profile never swaps it for the near-empty fallback. It keeps its in-memory profile, sets the foreign
+ * value aside as a parked copy (the "recovered data" banner announces it), and writes its own profile back only after that
+ * copy exists (`saveProgress` refuses to overwrite otherwise). A corrupt or emptied key is repaired at once, because this
+ * tab may hold the only good copy; a newer-schema value belongs to a newer tab that holds its own state, so it stays in
+ * place until this tab next changes something.
+ */
 function syncFromStorage(): boolean {
   let raw: string | null;
   try {
@@ -152,8 +164,24 @@ function syncFromStorage(): boolean {
     return false;
   }
   if (current !== null && raw === lastRaw) return false;
-  const unsaved = dirty && current !== null ? current : null;
-  adopt(loadProgress(getStorage(), migrationCtx()));
+  const mine = current;
+  if (mine !== null && hasData(mine) && raw === null) {
+    lastRaw = null; // storage was emptied under us (cleared, evicted): put the profile back
+    commit(mine);
+    return true;
+  }
+  const unsaved = dirty && mine !== null ? mine : null;
+  const loaded = loadProgress(getStorage(), migrationCtx());
+  if (mine !== null && hasData(mine) && loaded.problem) {
+    lastRaw = loaded.raw;
+    const parked = loaded.protectedRaw !== null && parkRaw(getStorage(), loaded.protectedRaw, dayKey(new Date()), 'unreadable') !== null;
+    protectedRaw = parked ? null : loaded.protectedRaw;
+    refreshParked();
+    if (loaded.problem === 'corrupt') commit(mine);
+    else refreshStatus();
+    return true;
+  }
+  adopt(loaded);
   // Changes this tab could not save are not thrown away because another tab wrote: they are merged on top.
   if (unsaved) current = mergeProgress(current!, unsaved, migrationCtx());
   refreshStatus();
