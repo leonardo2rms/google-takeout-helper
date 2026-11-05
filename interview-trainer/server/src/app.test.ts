@@ -107,6 +107,12 @@ describe('prompt construction', () => {
     await expect(new AnthropicGrader({ client: reply([true]) as never }).grade(q, 'y')).rejects.toThrow(/rubric/);
   });
 
+  it('caps runaway feedback from the model (QA S2-5)', async () => {
+    const huge = { messages: { parse: async () => ({ stop_reason: 'end_turn', parsed_output: { points: [{ covered: true }, { covered: true }], feedback: 'x'.repeat(100_000) } }) } };
+    const out = await new AnthropicGrader({ client: huge as never }).grade(q, 'y');
+    expect(out.feedback.length).toBeLessThanOrEqual(1001);
+  });
+
   it('surfaces refusals as errors so the client falls back to self-assessment', async () => {
     const client = { messages: { parse: async () => ({ stop_reason: 'refusal', parsed_output: null }) } };
     await expect(new AnthropicGrader({ client: client as never }).grade(q, 'y')).rejects.toThrow(/declined/);

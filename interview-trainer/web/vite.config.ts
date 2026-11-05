@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 // Relative import on purpose: workspace packages are externalised when bundling this config.
 import { contentFiles, loadCourse } from '../shared/src/load-content';
+import { serviceWorker } from './vite-sw-plugin';
 
 const contentDir = resolve(fileURLToPath(new URL('.', import.meta.url)), '../content');
 
@@ -32,7 +33,8 @@ function courseContent(): Plugin {
 }
 
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), courseContent()],
+  // The service worker is for the installed PWA only: the single-file build has no server to cache from.
+  plugins: [react(), courseContent(), ...(mode === 'standalone' ? [] : [serviceWorker()])],
   // The single-file build must inline the font into the CSS (build-standalone.mjs allows one JS and at most one CSS file).
   build: { assetsInlineLimit: mode === 'standalone' ? 100_000 : 4096 },
   server: { host: true, proxy: { '/api': 'http://localhost:8787' } },

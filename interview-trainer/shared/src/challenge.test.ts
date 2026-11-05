@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CHALLENGE_KEPT, CHALLENGE_WEIGHTS, addDays, challengeQuestion, challengeResult, challengeStreak, emptyProgress, recordChallenge, type Course, type Question,
+  CHALLENGE_KEPT, CHALLENGE_WEIGHTS, CHALLENGE_XP, addDays, challengeQuestion, challengeResult, challengeStreak, emptyProgress, recordChallenge, settleChallenge, type Course, type Question,
 } from './index';
 import { mkCourse } from './fixtures';
 
@@ -37,6 +37,22 @@ describe('challengeQuestion', () => {
     for (const t of types.filter((x) => x !== 'match')) expect(count[t], t).toBeGreaterThan(20);
     expect(count.spot!).toBeGreaterThan(count.single! * 1.3);
     expect(count.estimate!).toBeGreaterThan(count.open! * 1.3);
+  });
+
+  it('gives the same answer whatever order days are asked in (the walk resumes from the nearest known day)', () => {
+    const days = [addDays(today, 400), today, addDays(today, 1), '2023-06-01', addDays(today, 399), '2024-01-01', '2024-01-02', addDays(today, 5000)];
+    const fresh = days.map((d) => challengeQuestion(wideCourse(), d)!.id); // a new course each time: always walks from the start
+    const shared = wideCourse();
+    expect([...days].reverse().map((d) => challengeQuestion(shared, d)!.id).reverse()).toEqual(fresh);
+    expect(days.map((d) => challengeQuestion(shared, d)!.id)).toEqual(fresh);
+  });
+
+  it('S2-22: a far-future clock no longer costs a walk from 2024 for every day', () => {
+    const c = wideCourse();
+    challengeQuestion(c, '2999-01-01'); // the one long walk
+    const t0 = performance.now();
+    for (let i = 1; i <= 30; i++) challengeQuestion(c, addDays('2999-01-01', i));
+    expect(performance.now() - t0).toBeLessThan(250);
   });
 
   it('handles tiny and empty courses', () => {
@@ -82,5 +98,36 @@ describe('challengeStreak', () => {
   it('handles month and year boundaries', () => {
     const p = { challenge: { '2026-12-31': 'pass', '2027-01-01': 'pass', '2027-01-02': 'fail' } as Record<string, 'pass' | 'fail'> };
     expect(challengeStreak(p, '2027-01-02')).toMatchObject({ current: 3, best: 3 });
+  });
+});
+
+describe('settleChallenge: the challenge belongs to the day it was served', () => {
+  const served = '2026-11-04';
+  const nextDay = addDays(served, 1);
+
+  it('a pass earns the bonus once and is recorded against the serving day', () => {
+    const r = settleChallenge(emptyProgress(), served, true);
+    expect(r.bonus).toBe(CHALLENGE_XP);
+    expect(challengeResult(r.progress, served)).toBe('pass');
+  });
+
+  it('a fail earns nothing but still counts as taken', () => {
+    const r = settleChallenge(emptyProgress(), served, false);
+    expect(r.bonus).toBe(0);
+    expect(challengeResult(r.progress, served)).toBe('fail');
+  });
+
+  it('REGRESSION (S1-9): finishing after midnight records the serving day and leaves the new day untouched', () => {
+    const r = settleChallenge(emptyProgress(), served, false);
+    expect(challengeResult(r.progress, nextDay)).toBeNull(); // tomorrow's challenge is still available
+    expect(Object.keys(r.progress.challenge)).toEqual([served]);
+    expect(settleChallenge(r.progress, nextDay, true).bonus).toBe(CHALLENGE_XP);
+  });
+
+  it('a second result for the same served day changes nothing and earns nothing', () => {
+    const first = settleChallenge(emptyProgress(), served, false).progress;
+    const again = settleChallenge(first, served, true);
+    expect(again.progress).toBe(first);
+    expect(again.bonus).toBe(0);
   });
 });

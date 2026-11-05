@@ -3,7 +3,7 @@ import {
   type Course, type ExplainMessage, type ExplainResponse, type Question,
 } from '@trainer/shared';
 import type { Answer } from './evaluate';
-import type { Sample } from './sample-grader';
+import { withTimeout, type Sample } from './sample-grader';
 
 /** Sends the conversation about one question and resolves with the tutor's plain-text reply. */
 export type ExplainFn = (req: { questionId: string; answer: string; correct: boolean; messages: ExplainMessage[] }) => Promise<string>;
@@ -27,7 +27,7 @@ export function createSampleExplainer(course: Course, sample: Sample): ExplainFn
   return async ({ questionId, answer, correct, messages }) => {
     const q = known.get(questionId);
     if (!q) throw new Error('unknown question');
-    const result = await sample(buildExplainPlainPrompt(q, answer, correct, messages), { cache: false });
+    const result = await withTimeout(sample(buildExplainPlainPrompt(q, answer, correct, messages), { cache: false }));
     const text = typeof result === 'string' ? result : result?.text;
     if (typeof text !== 'string' || text.trim() === '') throw new Error('empty reply');
     return cleanReply(text);

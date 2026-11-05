@@ -39,16 +39,42 @@ export function challengeQuestion(course: Course, day: Day): Question | null {
   return byDay.get(day) ?? null;
 }
 
+interface Chain {
+  qs: Question[];
+  distinct: boolean;
+  /** Pool index of the pick on days already walked (from EPOCH on). A later day continues from the nearest one. */
+  at: Map<Day, number>;
+}
+const chains = new WeakMap<Course, Chain>();
+
+function chainOf(course: Course): Chain {
+  let c = chains.get(course);
+  if (!c) {
+    const qs = pool(course);
+    chains.set(course, (c = { qs, distinct: new Set(qs.map((q) => q.id)).size > 1, at: new Map() }));
+  }
+  return c;
+}
+
 function pick(course: Course, day: Day): Question | null {
-  const qs = pool(course);
+  const { qs, distinct, at } = chainOf(course);
   if (qs.length === 0) return null;
-  const distinct = new Set(qs.map((q) => q.id)).size > 1;
-  const span = Math.max(0, daysBetween(EPOCH, day));
-  let i = rawIndex(addDays(day, -span), qs.length);
-  for (let n = span - 1; n >= 0; n--) {
+  if (day < EPOCH) return qs[rawIndex(day, qs.length)]!;
+  // Walk forward from the latest day already known (or from EPOCH), so asking for consecutive days costs one step each
+  // instead of a walk from 2024 every time (a device clock set far in the future used to take seconds).
+  let from: Day = EPOCH;
+  let i = rawIndex(EPOCH, qs.length);
+  for (const [d, idx] of at) {
+    if (d <= day && d >= from) {
+      from = d;
+      i = idx;
+    }
+  }
+  for (let n = daysBetween(from, day) - 1; n >= 0; n--) {
     const next = rawIndex(addDays(day, -n), qs.length);
     i = distinct && qs[next]!.id === qs[i]!.id ? nextDifferent(qs, next) : next;
   }
+  at.set(day, i);
   return qs[i]!;
 }
 
@@ -66,6 +92,16 @@ export function recordChallenge(p: Progress, day: Day, pass: boolean): Progress 
   const challenge: Progress['challenge'] = { ...p.challenge, [day]: pass ? 'pass' : 'fail' };
   for (const d of Object.keys(challenge)) if (daysBetween(d, day) >= CHALLENGE_KEPT) delete challenge[d];
   return { ...p, challenge };
+}
+
+/**
+ * Settles a finished challenge session. The challenge belongs to the day it was SERVED, i.e. the day the screen was
+ * opened, not the day the answer is submitted: a question started at 23:59 and finished at 00:01 is recorded against
+ * the day it was drawn for, and does not use up the new day's (different) challenge. Only the first result of a day
+ * counts, and only a first pass earns the bonus.
+ */
+export function settleChallenge(p: Progress, servedOn: Day, pass: boolean): { progress: Progress; bonus: number } {
+  return { progress: recordChallenge(p, servedOn, pass), bonus: pass && !p.challenge[servedOn] ? CHALLENGE_XP : 0 };
 }
 
 export interface ChallengeStreak {

@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
+  XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
-import { fetchHealth, gradeOpen } from './lib/api';
+import { fetchHealthWithRetry, gradeOpen } from './lib/api';
+import { routeOf } from './lib/route';
 import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { AchievementToasts } from './components/AchievementToasts';
+import { DataSafetyBanners } from './components/DataSafety';
 import { useReminderCheck } from './lib/reminders';
 import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
@@ -22,7 +24,7 @@ import { ProgressScreen } from './screens/ProgressScreen';
 import { Summary, type Finished } from './screens/Summary';
 
 function useHashRoute(): string {
-  const read = () => window.location.hash.replace(/^#/, '') || '/';
+  const read = () => routeOf(window.location.hash);
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const onChange = () => setRoute(read());
@@ -80,6 +82,7 @@ function Shell() {
       >
         Skip to main content
       </a>
+      <DataSafetyBanners />
       <main id="main" tabIndex={-1}>
         <Screens />
       </main>
@@ -99,8 +102,10 @@ function Screens() {
 
   useEffect(() => {
     if (!isStandalone) {
-      void fetchHealth().then(setHealth);
-      return;
+      // A server that is still starting must not switch AI off for the whole session: ask again, a few times.
+      const abort = new AbortController();
+      void fetchHealthWithRetry(abort.signal).then((h) => h && setHealth(h));
+      return () => abort.abort();
     }
     // Hosted single-file build: no API server; grade through the viewer's own Claude when offered.
     void loadSample().then((sample) => {
@@ -111,8 +116,10 @@ function Screens() {
     });
   }, []);
 
-  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => {
+  // `servedOn` is the day the session was opened: the daily challenge is recorded against it, even when the answer comes after midnight.
+  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge', servedOn?: string) => {
     const today = dayKey(new Date());
+    const challengeDay = servedOn ?? today;
     const outcomes = outcomesOf(summary);
     let before: Progress = getProgress();
     let events: SessionEvent[] = [];
@@ -122,14 +129,15 @@ function Screens() {
     let challengeBonus = 0;
     updateProgress((p) => {
       before = p;
-      challengeBonus = kind === 'challenge' && pass && !p.challenge[today] ? CHALLENGE_XP : 0;
+      const settled = kind === 'challenge' ? settleChallenge(p, challengeDay, pass) : null;
+      challengeBonus = settled?.bonus ?? 0;
       const res = applySession(
         p,
         { lessonId, kind: kind ? 'single' : undefined, accuracy: summary.accuracy, xp: baseXp + challengeBonus, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes, hinted: summary.hinted, confidence: summary.confidence },
         { today, course },
       );
       events = res.events;
-      return kind === 'challenge' ? recordChallenge(res.progress, today, pass) : res.progress;
+      return kind === 'challenge' ? settleChallenge(res.progress, challengeDay, pass).progress : res.progress;
     });
     const after = getProgress();
     if (before.stats.sessions === 0) requestPersistence(); // ask the browser to keep our storage once there is something worth keeping
@@ -140,6 +148,7 @@ function Screens() {
     setFinished({
       title,
       summary,
+      xpEarned: baseXp + challengeBonus, // what was really credited (a one-question session earns no perfect-lesson bonus)
       streak: streakStatus(after, today).streak,
       nextLessonId: nextLesson?.id,
       events,
@@ -266,9 +275,10 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
   grade?: GradeFn;
   explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
-  onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => void;
+  onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge', servedOn?: string) => void;
 }) {
   const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
+  const [servedOn] = useState(() => dayKey(new Date())); // same moment the questions were picked
 
   if (questions.length === 0) {
     return (
@@ -289,7 +299,7 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}
-      onFinish={(s) => onFinish(title, s, undefined, kind === 'one' ? 'single' : kind === 'challenge' ? 'challenge' : undefined)}
+      onFinish={(s) => onFinish(title, s, undefined, kind === 'one' ? 'single' : kind === 'challenge' ? 'challenge' : undefined, servedOn)}
     />
   );
 }

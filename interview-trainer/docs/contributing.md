@@ -56,7 +56,7 @@ npm run e2e              # when the UI, content, service worker or server routes
 - [ ] Progress changes follow [the migration rules](architecture.md#the-progress-model-and-its-migrations): additive, validated, merged, covered by the arbitraries.
 - [ ] Anything learners read was fact-checked ([checklist](content-guide.md#fact-checking-checklist)) and works on a 390 px screen; interactive things are keyboard-operable and labelled ([accessibility.md](accessibility.md)).
 - [ ] Docs updated where behaviour, commands or contracts changed. `content/docs.test.ts` fails if a documented `npm run` script or path no longer exists.
-- [ ] If you touched `web/public/sw.js`, the precache list, or what must be fresh for users, bump the cache version ([Releasing](#releasing)).
+- [ ] If you touched the service worker (`web/src/sw/sw.ts`, `web/src/lib/sw-logic.ts`) or `web/vite-sw-plugin.ts`, run `npm run e2e -- e2e/service-worker.spec.ts`; the cache version needs no bump ([Releasing](#releasing)).
 - [ ] Upstream (model/API) errors still never reach the client; user-controlled text still goes through the fenced prompt builders.
 
 ## Adding a question type end to end
@@ -95,20 +95,25 @@ curl -s localhost:8787/api/health           # {"ok":true,"ai":true,...}
 - `npm start` runs the TypeScript directly with `tsx`; there is no separate compile step for the server. It loads `content/*.yaml` once at start-up, so **restart the process to publish content changes** to the rubric lookups.
 - Environment: see the table in [architecture.md](architecture.md#build-variants). Use `/api/health` for the load balancer check; `ai:false` means no credentials were found.
 - Put it behind HTTPS (service workers and notifications require a secure context except on localhost) and ideally behind a reverse proxy that serves both the app and `/api` from **one origin**. The server deliberately sends **no CORS headers**; if you host `web/dist` on a different origin from the API you must add CORS or a proxy rule, and build the web app with `VITE_API_URL` pointing at the API.
-- **Rate limits are per `req.ip`**, and the app does not configure Express's `trust proxy`. Behind a reverse proxy every learner then shares the proxy's address and therefore one bucket (30 gradings and 20 tutor questions per minute). Set the proxy to forward addresses and enable `trust proxy` in `server/src/app.ts` before putting this in front of real traffic.
-- Serve `sw.js` with a short or `no-cache` lifetime so browsers revalidate it (Express does by default). A CDN in front must not cache it for long.
+- **Rate limits are per `req.ip`.** By default Express's `trust proxy` is off and `X-Forwarded-For` is ignored, which is right for a directly exposed server. Behind a reverse proxy every learner would share the proxy's address and one bucket (30 gradings and 20 tutor questions per minute), so set `TRUST_PROXY=1` (the number of proxies in front, or an Express `trust proxy` value) and make the proxy forward the client address. Expired rate-limit windows are pruned as the table grows.
+- The server already sends `Cache-Control: no-cache` for `sw.js`, `index.html` and the manifest, `immutable` for `/assets/*`, a CSP and gzip. A CDN in front must honour those: it must not cache `sw.js` or `/` for long, and must not rewrite a missing `/assets/*` to `index.html` (answer 404; the service worker refuses to cache it, but the page would still be blank until the next load). `PORT=` (empty) means the default 8787; an invalid `GRADER_EFFORT` stops the server at start-up.
 - A **static-only** deployment (`web/dist` on any file host) is valid: the app runs offline-first and simply has no AI (the health request fails and the UI hides it).
 - Secrets live only in the server environment (`ANTHROPIC_API_KEY`/`ANTHROPIC_AUTH_TOKEN`); nothing about them reaches the browser, and error details stay in the server log.
 
-**Single-file build.** `npm run build:standalone` writes `dist/interview-trainer.html` (about 0.9 MB, no server, no service worker). Publish it anywhere that serves one HTML page. AI works only when the host provides `window.claude` with the `sample` capability (a claude.ai artifact does); elsewhere it is a plain offline trainer. Progress is stored per origin, and in a sandboxed frame it may fall back to memory for the tab, so the UI offers copy/paste backup there.
+**Single-file build.** `npm run build:standalone` writes two files (about 0.9 MB each, no server, no service worker):
 
-**Service worker cache version.** `web/public/sw.js` has `const CACHE = 'interview-trainer-v2'`.
+- `dist/interview-trainer.html` is a **fragment** for hosts that wrap one snippet in their own page (a claude.ai artifact). It has no doctype or `<html>`; it starts with `<meta charset>` and a viewport meta, which are harmless inside a host page and make the bytes right when something serves the snippet as is.
+- `dist/interview-trainer.standalone.html` is a **complete document** (doctype, `lang`, charset, viewport, theme colours). Use it for opening from disk (`file://`) or any static host. The fragment opened directly renders in quirks mode, reads UTF-8 as Latin-1 ("Â·") and lays out 980 px wide on a phone.
 
-- A normal release needs **no** bump: asset file names are hashed and the worker is stale-while-revalidate, so returning users get the new version on their second open.
-- **Bump the number** (`v3`, ...) whenever you change `sw.js` itself, the precached URL list, or need every client to drop its cached shell at once (a bad deploy, a data-format release, a changed `manifest`). Any byte change to `sw.js` makes browsers install the new worker; the new name makes `activate` delete every older cache and `clients.claim()` take over.
-- After bumping, verify in the browser: DevTools, Application, Service Workers shows the new worker activated, Cache Storage has only the new name, and offline mode still loads the app.
+AI works only when the host provides `window.claude` with the `sample` capability (a claude.ai artifact does); a `sample` call that does not answer within 25 s falls back to the offline self-check. Elsewhere it is a plain offline trainer. Progress is stored per origin; in a sandboxed frame `localStorage` throws, the progress then lives in memory for the tab, and the app says so and offers *Download backup* / *Copy backup text* / the text to select by hand. Do not rely on `window.confirm` in the UI: sandboxed hosts block it without `allow-modals`.
+
+**Service worker versions.** There is nothing to bump. `web/vite-sw-plugin.ts` derives the cache name from a hash of every file in the build, so each deploy that changes any byte installs a new worker, which pre-caches the new files, then replaces the old cache and takes over. Open pages show "A new version is ready" and reload when the learner chooses.
+
+- After a release, verify in the browser: DevTools, Application, Service Workers shows the worker activated, Cache Storage has exactly one `interview-trainer-<12 hex>` cache, and offline mode still loads the app.
+- To force every client to refetch (a bad deploy), ship any change to a shipped file; there is no separate lever.
 - Never cache `/api/` responses in the worker; grading must reach the server or fail fast.
+- Never serve `index.html` for a missing static file. `e2e/service-worker.spec.ts` and `server/src/static.test.ts` guard this.
 
 **Data-format releases.** If `Progress` changed, ship with the migration tests green and the arbitraries updated. Old app versions must keep refusing newer data (`future-version`) rather than overwriting it; never delete or rewrite the previous storage key. Mention the change in the release notes.
 
-**Rolling back** a build is safe for learners: the storage key is unchanged for additive changes, and v1 data is never deleted. Roll back the worker by publishing the old build with a *higher* cache number so clients actually switch.
+**Rolling back** a build is safe for learners: the storage key is unchanged for additive changes, and v1 data is never deleted. Publishing the old build again is enough for the worker, since its files hash to the old version and clients treat it as a new worker. An old build that meets data written by a newer one parks that data (it is never overwritten before a copy exists) and says so; the data comes back through Settings, Recovered data.
