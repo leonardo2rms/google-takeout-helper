@@ -23,9 +23,8 @@ export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
 
   return (
     <>
-      <p className="hint">{q.kind === 'steps' ? 'Tap the steps in the right order' : 'Tap the lines in the right order'}</p>
       <div className={`order-slot ${q.kind === 'steps' ? 'steps' : ''} ${placed.length === 0 ? 'empty' : ''}`} role="group" aria-label="Your arrangement">
-        {placed.length === 0 && <span className="placeholder">{q.kind === 'steps' ? 'Your sequence goes here' : 'Your code goes here'}</span>}
+        {placed.length === 0 && <span className="placeholder">{q.kind === 'steps' ? 'Tap the steps below in order' : 'Tap the lines below in order'}</span>}
         {placed.map((poolIndex, pos) => {
           const line = pool[poolIndex]!;
           const state = checked ? (line === q.lines[pos] ? 'correct' : 'wrong') : '';

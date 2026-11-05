@@ -100,7 +100,7 @@ export const playLesson = async (page: Page, lessonId: string): Promise<void> =>
 };
 
 export const homeAfterSummary = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Continue', exact: true }).click();
+  await page.getByRole('button', { name: 'Back home', exact: true }).click();
   await page.locator('.home').waitFor();
 };
 
@@ -114,3 +114,10 @@ export async function expectNoOverflow(page: Page): Promise<void> {
 
 export const dueCount = (page: Page) => page.getByTestId('due-count');
 export const stored = (page: Page, key = KEY_V2) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? 'null') as Record<string, any> | null, key);
+
+/** Opens "More ways to practise" on Home if it is on the page and closed (a new learner sees the practice modes there). */
+export async function openMore(page: Page): Promise<void> {
+  const more = page.getByTestId('more-practice');
+  if ((await more.count()) === 0) return;
+  if (!(await more.evaluate((el) => (el as HTMLDetailsElement).open))) await more.locator('summary').click();
+}

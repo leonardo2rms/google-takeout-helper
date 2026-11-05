@@ -44,7 +44,7 @@ lessons:
         explanation: "Kotlin classes and members are final by default; CGLIB proxies subclass the bean. The `kotlin-spring` plugin opens classes annotated with `@Component`, `@Transactional`, `@Configuration` etc. (Spring Initializr adds it by default). Method visibility, bean scope or JVM annotations do not change the fact that the class itself is final."
 
       - type: multi
-        prompt: Select ALL real benefits of constructor injection over field injection.
+        prompt: Select all real benefits of constructor injection over field injection.
         options:
           - { id: a, text: "Dependencies can be `val`s (immutability)" }
           - { id: b, text: "The class can be instantiated in a plain unit test without Spring or reflection" }
@@ -176,7 +176,7 @@ lessons:
         explanation: "The classic N+1: one query for the orders, then one lazy-load per order. It's invisible in small test data and devastating in production."
 
       - type: multi
-        prompt: Select ALL effective fixes for the N+1 problem above.
+        prompt: Select all effective fixes for the N+1 problem above.
         options:
           - { id: a, text: "`JOIN FETCH` in the query" }
           - { id: b, text: "`@EntityGraph` on the repository method" }
@@ -352,7 +352,7 @@ lessons:
         explanation: "With `REQUIRED` the inner call joins the outer transaction. When the exception leaves the inner proxy, Spring marks the whole transaction rollback-only, and catching it in the caller does not clear that mark. To skip bad rows independently use `REQUIRES_NEW` (or `NESTED`) on `importRow`, or validate before writing."
 
       - type: multi
-        prompt: "Two requests update the same account with read-modify-write and one update is lost. Select ALL effective fixes."
+        prompt: "Two requests update the same account with read-modify-write and one update is lost. Select all effective fixes."
         options:
           - { id: a, text: "Optimistic locking with a `@Version` column, so the second update fails and can be retried" }
           - { id: b, text: "A pessimistic write lock (`SELECT ... FOR UPDATE`) when reading the row" }
@@ -388,7 +388,7 @@ lessons:
         explanation: "`@ConditionalOnProperty` turns a bean on from configuration. `@ConditionalOnMissingBean` makes the second bean a back-off default, the same mechanism auto-configuration uses; `@ConditionalOnBean` would do the opposite. Condition evaluation depends on the order in which bean definitions are processed, which is why these conditions are most reliable in auto-configuration classes."
 
       - type: multi
-        prompt: Select ALL true statements about `@ConfigurationProperties`.
+        prompt: Select all true statements about `@ConfigurationProperties`.
         options:
           - { id: a, text: "Properties with a common prefix are bound to a typed class, with relaxed binding: `app.max-retries` and `APP_MAXRETRIES` both bind to `maxRetries`" }
           - { id: b, text: "With `@Validated` and Bean Validation constraints, invalid configuration fails the startup" }

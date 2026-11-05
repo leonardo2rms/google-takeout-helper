@@ -5,8 +5,13 @@ export const inDays = (n: number): string => (n <= 1 ? 'tomorrow' : `in ${n} day
 
 export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
-/** "tomorrow (5), in 3 days (4)" */
-export const forecastText = (buckets: readonly ForecastBucket[]): string => buckets.map((b) => `${inDays(b.inDays)} (${b.count})`).join(', ');
+/** "5 questions tomorrow, 4 in 3 days": what the count belongs to is said out loud. */
+export const forecastText = (buckets: readonly ForecastBucket[]): string =>
+  buckets.map((b, i) => `${i === 0 ? plural(b.count, 'question') : b.count} ${inDays(b.inDays)}`).join(', ');
+
+/** "A", "A and B", "A, B and C". */
+export const listNames = (names: readonly string[]): string =>
+  names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 
 /** Counts are capped so a long break never shows a scary number. */
 export const cappedCount = (n: number, cap = 30): string => (n > cap ? `${cap}+` : String(n));
@@ -20,3 +25,24 @@ export const prefersReducedMotion = (): boolean => {
 };
 
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+/** A day key ("2026-11-04") for people, in their own locale and without a timezone shift ("Nov 4, 2026"). Falls back to the key itself. */
+export function formatDay(key: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return key;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  try {
+    return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+  } catch {
+    return key;
+  }
+}
+
+/** A number with the reader's own digit grouping ("1,260" or "1.260"). */
+export const formatCount = (n: number): string => {
+  try {
+    return n.toLocaleString();
+  } catch {
+    return String(n);
+  }
+};

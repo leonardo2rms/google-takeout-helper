@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { KEY_V2, SHOTS, cardFor, day, dueCards, expectNoOverflow, lessons, questions, seed, stored, useClock, v2 } from './engage';
+import { KEY_V2, SHOTS, cardFor, day, dueCards, expectNoOverflow, lessons, openMore, questions, seed, stored, useClock, v2 } from './engage';
 import { answerCorrectly, check, next, solveAndContinue } from './solve';
 
 const LESSON = 'kotlin-null-types';
@@ -73,13 +73,14 @@ test.describe('bookmarks and notes', () => {
     await download.saveAs(file);
     expect(JSON.parse(readFileSync(file, 'utf8')).progress.notes[Q1.id].text).toBe('portable note');
 
-    page.once('dialog', (d) => void d.accept());
     await sheet.getByRole('button', { name: 'Reset progress' }).click();
+    await page.getByTestId('reset-confirm-ok').click();
     expect((await stored(page))!.notes).toEqual({});
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByTestId('import-file').setInputFiles(file);
     await page.getByTestId('import-confirm').getByRole('button', { name: 'Replace my progress' }).click();
+    await page.getByTestId('replace-confirm-ok').click();
     await expect(page.getByTestId('import-message')).toContainText('replaced');
     const after = await stored(page);
     expect(after!.notes[Q1.id].text).toBe('portable note');
@@ -173,13 +174,14 @@ test.describe('library', () => {
 
   test('an unknown question id shows the not-found page', async ({ page }) => {
     await page.goto('/#/q/no-such/1');
-    await expect(page.getByRole('heading', { name: 'Lesson not found' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Question not found' })).toBeVisible();
   });
 
   test('the Library is linked from Home and shows how many are saved', async ({ page }) => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2({ bookmarks: { [Q1.id]: { h: 'x', day: day(-1) } }, cards: { [Q1.id]: cardFor(Q1) } }) });
     await page.goto('/');
+    await openMore(page); // a learner who has only just started finds the Library under "More ways to practise"
     await expect(page.getByTestId('library-link')).toContainText('1 saved');
     await page.getByTestId('library-link').click();
     await expect(page).toHaveURL(/#\/library$/);

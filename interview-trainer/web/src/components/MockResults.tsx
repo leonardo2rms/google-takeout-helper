@@ -55,7 +55,7 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
 
       <section className="mock-score" aria-labelledby="mock-score-title">
         <h2 id="mock-score-title" className="sr-only">Overall</h2>
-        <p className="big-number" data-testid="mock-score">{report.score}%</p>
+        <p className="result-big" data-testid="mock-score" role="img" aria-label={`${report.score} percent`}>{report.score}<small>%</small></p>
         <p>
           <b>{report.correct} of {report.total}</b> correct · {clockText(usedSec * 1000)} of {limitMin}:00 used
         </p>
@@ -66,6 +66,10 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
         )}
         {!timedOut && notReached > 0 && <p className="muted">{plural(notReached, 'question')} left unanswered (counted as zero, never held against your review queue).</p>}
       </section>
+
+      {!saved && pendingSelf.length === 0 && (
+        <p className="muted" data-testid="mock-unsaved">Not saved yet. Saving adds the questions you missed to your review queue and records the XP.</p>
+      )}
 
       {pendingSelf.length > 0 && !saved && (
         <p className="notice" role="note" data-testid="mock-self-note">

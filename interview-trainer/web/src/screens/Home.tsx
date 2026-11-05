@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  READINESS_TEXT, allQuestions, buildDailySession, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
+  allQuestions, buildDailySession, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { ChallengeCard } from '../components/ChallengeCard';
@@ -9,7 +9,8 @@ import { OnboardingCard } from '../components/OnboardingCard';
 import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
-import { cappedCount, plural } from '../lib/format';
+import { formatCount, plural } from '../lib/format';
+import { dueInToday, dueLine, homeTier, readinessLine } from '../lib/home-copy';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
 import { unitStyle } from '../lib/unit-style';
@@ -54,7 +55,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       return { href: lesson ? `#/lesson/${lesson.id}` : '#/daily', title: 'Start your first lesson', sub: `${lesson?.title ?? 'A short lesson'} · about 5 minutes`, cta: 'Start' };
     }
     const parts = [
-      daily.mix.due && `${daily.mix.due} due`,
+      daily.mix.due && dueInToday(daily.mix.due, dueCount),
       daily.mix.weak && plural(daily.mix.weak, 'weak spot'),
       daily.mix.fresh && `${daily.mix.fresh} new`,
       daily.mix.filler && `${daily.mix.filler} to refresh`,
@@ -79,9 +80,68 @@ export function Home({ course, progress, health, update, onReset }: Props) {
     return { chip, line };
   })();
 
-  const finishOnboarding = (warmUp: boolean) => {
-    if (warmUp) window.location.hash = '/warmup';
-  };
+  const tier = homeTier(progress);
+
+  // The practice modes, shown on the page or tucked under "More ways to practise" depending on how far along the learner is.
+  const reviewCard = (
+    <a key="review" className={`card action ${dueCount ? '' : 'disabled'}`} href={dueCount ? '#/review' : undefined} aria-disabled={!dueCount} data-testid="due-card">
+      <span className="tile-i" aria-hidden="true"><Icon name="rotate-ccw" size={22} /></span>
+      <span>
+        <b>Review due</b>
+        <small data-testid="due-count" data-count={dueCount}>{dueLine(dueCount)}</small>
+      </span>
+      {dueCount > 0 && <Icon name="chevron-right" className="go" />}
+    </a>
+  );
+  const mixCard = (
+    <a key="mix" className="card action" href="#/mix" data-testid="mix-card">
+      <span className="tile-i" aria-hidden="true"><Icon name="shuffle" size={22} /></span>
+      <span><b>Mixed practice</b><small>{done === 0 ? '8 questions from across the course' : '8 questions, weighted toward your weak spots'}</small></span>
+      <Icon name="chevron-right" className="go" />
+    </a>
+  );
+  const progressCard = (
+    <a key="progress" className="card action progress-link" href="#/progress" data-testid="progress-link">
+      <span className="tile-i" aria-hidden="true"><Icon name="chart-column" size={22} /></span>
+      <span>
+        <b>Progress</b>
+        <small data-testid="readiness-line">{readinessLine(ready)}</small>
+      </span>
+      <Icon name="chevron-right" className="go" />
+    </a>
+  );
+  const mockCard = (
+    <a key="mock" className="card action mock-link" href="#/mock" data-testid="mock-link">
+      <span className="tile-i" aria-hidden="true"><Icon name="timer" size={22} /></span>
+      <span>
+        <b>Mock interview</b>
+        <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
+      </span>
+      <Icon name="chevron-right" className="go" />
+    </a>
+  );
+  const libraryCard = (
+    <a key="library" className="card action library-link" href="#/library" data-testid="library-link">
+      <span className="tile-i" aria-hidden="true"><Icon name="library" size={22} /></span>
+      <span>
+        <b>Library</b>
+        <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
+      </span>
+      <Icon name="chevron-right" className="go" />
+    </a>
+  );
+  const challengeCard = <ChallengeCard key="challenge" course={course} progress={progress} today={today} />;
+  const all = [
+    { id: 'challenge', node: challengeCard },
+    { id: 'review', node: reviewCard },
+    { id: 'mix', node: mixCard },
+    { id: 'progress', node: progressCard },
+    { id: 'mock', node: mockCard },
+    { id: 'library', node: libraryCard },
+  ];
+  const onPage = tier === 0 ? [] : tier === 1 ? ['challenge', 'review', 'progress'] : all.map((c) => c.id);
+  const inline = all.filter((c) => onPage.includes(c.id));
+  const more = all.filter((c) => !onPage.includes(c.id));
 
   return (
     <div className="home">
@@ -96,7 +156,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       <div className="rank-block">
         <p className="rank-line" data-testid="rank">
           <b>{rank.title}</b>
-          {rank.next !== null ? ` · ${progress.xp}/${rank.next} XP to ${rank.nextTitle}` : ' · top rank'}
+          {rank.next !== null ? ` · ${formatCount(progress.xp)}/${formatCount(rank.next)} XP to ${rank.nextTitle}` : ' · top rank'}
         </p>
         <div
           className="rank-bar"
@@ -124,7 +184,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
             {progress.freezes > 0 && <span className="freeze"><Icon name="snowflake" size="1.1em" /> {progress.freezes}</span>}
           </b>
         </button>
-        <span className="stat xp-stat" data-label="XP" title="Total XP" aria-label={`${progress.xp} XP`}><b>{progress.xp.toLocaleString('en-US')}</b></span>
+        <span className="stat xp-stat" data-label="XP" title="Total XP" aria-label={`${progress.xp} XP`}><b>{formatCount(progress.xp)}</b></span>
         <button
           type="button"
           className="goal-ring"
@@ -143,7 +203,16 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </p>
       )}
 
-      {!progress.profile.onboarded && <OnboardingCard today={today} progress={progress} update={update} onDone={finishOnboarding} />}
+      {/* Editing the plan from Settings (a learner who has already started) puts the open form first; on first run it is one quiet line under the lesson. */}
+      {!progress.profile.onboarded && tier > 0 && <OnboardingCard today={today} progress={progress} update={update} startOpen />}
+
+      <a className={`card hero ${tier === 0 ? 'first' : ''}`} href={hero.href} data-testid="daily-card">
+        <span className="tile-i solid" aria-hidden="true"><Icon name="target" size={22} /></span>
+        <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
+        <span className="cta" aria-hidden="true">{hero.cta}</span>
+      </a>
+
+      {!progress.profile.onboarded && tier === 0 && <OnboardingCard today={today} progress={progress} update={update} />}
 
       {iosTip && (
         <p className="notice" role="note">
@@ -155,14 +224,6 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </p>
       )}
 
-      <a className="card hero" href={hero.href} data-testid="daily-card">
-        <span className="tile-i solid" aria-hidden="true"><Icon name="target" size={22} /></span>
-        <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
-        <span className="cta" aria-hidden="true">{hero.cta}</span>
-      </a>
-
-      <ChallengeCard course={course} progress={progress} today={today} />
-
       {countdown && (
         <div className="countdown" data-testid="countdown">
           {countdown.chip && <span className="pill on">{countdown.chip}</span>}
@@ -171,52 +232,35 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </div>
       )}
 
-      <section className="practice" aria-label="Practice">
-        <a className={`card action ${dueCount ? '' : 'disabled'}`} href={dueCount ? '#/review' : undefined} aria-disabled={!dueCount} data-testid="due-card">
-          <span className="tile-i" aria-hidden="true"><Icon name="rotate-ccw" size={22} /></span>
-          <span>
-            <b>Review due</b>
-            <small data-testid="due-count" data-count={dueCount}>
-              {dueCount ? `${cappedCount(dueCount)} ready to review` : 'All caught up'}
-            </small>
-          </span>
-          {dueCount > 0 && <Icon name="chevron-right" className="go" />}
-        </a>
-        <a className="card action" href="#/mix" data-testid="mix-card">
-          <span className="tile-i solid" aria-hidden="true"><Icon name="shuffle" size={22} /></span>
-          <span><b>Mixed practice</b><small>8 questions, weighted toward your weak spots</small></span>
-          <Icon name="chevron-right" className="go" />
-        </a>
-        <a className="card action progress-link" href="#/progress" data-testid="progress-link">
-          <span className="tile-i" aria-hidden="true"><Icon name="chart-column" size={22} /></span>
-          <span>
-            <b>Progress</b>
-            <small data-testid="readiness-line">Readiness {ready.score} · {READINESS_TEXT[ready.label]}</small>
-          </span>
-          <Icon name="chevron-right" className="go" />
-        </a>
-        <a className="card action mock-link" href="#/mock" data-testid="mock-link">
-          <span className="tile-i" aria-hidden="true"><Icon name="timer" size={22} /></span>
-          <span>
-            <b>Mock interview</b>
-            <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
-          </span>
-          <Icon name="chevron-right" className="go" />
-        </a>
-        <a className="card action library-link" href="#/library" data-testid="library-link">
-          <span className="tile-i" aria-hidden="true"><Icon name="library" size={22} /></span>
-          <span>
-            <b>Library</b>
-            <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
-          </span>
-          <Icon name="chevron-right" className="go" />
-        </a>
-      </section>
+      {(tier > 0 || more.length > 0) && (
+        <section className="practice" aria-label="Practice">
+          {inline.map((c) => c.node)}
+        </section>
+      )}
+
+      {more.length > 0 && (
+        <details className="more-practice" data-testid="more-practice">
+          <summary><Icon name="chevron-down" className="chev" />More ways to practise</summary>
+          <div className="practice">{more.map((c) => c.node)}</div>
+        </details>
+      )}
+
+      {nextLesson && daily.kind !== 'first' && (() => {
+        const ui = course.units.findIndex((u) => u.lessons.some((l) => l.id === nextLesson.id));
+        const li = course.units[ui]!.lessons.findIndex((l) => l.id === nextLesson.id);
+        return (
+          <a className="card up-next" href={`#/lesson/${nextLesson.id}`} data-testid="up-next">
+            <span className="no" aria-hidden="true">{ui + 1}.{li + 1}</span>
+            <span className="hero-text"><b>{nextLesson.title}</b><small>Up next · {plural(nextLesson.questions.length, 'question')}</small></span>
+            <span className="cta" aria-hidden="true">Start</span>
+          </a>
+        );
+      })()}
 
       <div className="progress-line">
         <div className="row">
           <span className="label">{done} / {total} lessons</span>
-          {nextLesson ? <a href={`#/lesson/${nextLesson.id}`}>Up next: {nextLesson.title}</a> : <span className="label">All lessons done</span>}
+          {!nextLesson && <span className="label">All lessons done</span>}
         </div>
         <div className="segs" aria-hidden="true">
           {Array.from({ length: total }, (_, i) => <i key={i} className={i < done ? 'on' : ''} />)}

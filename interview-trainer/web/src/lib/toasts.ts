@@ -23,6 +23,13 @@ export function dismissBadgeToast(id: number): void {
   emit();
 }
 
+/** Drops every pending notice: they belong to the screen they appeared on and must not follow the learner to the next one. */
+export function clearBadgeToasts(): void {
+  if (queue.length === 0) return;
+  queue = [];
+  emit();
+}
+
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => void listeners.delete(l);

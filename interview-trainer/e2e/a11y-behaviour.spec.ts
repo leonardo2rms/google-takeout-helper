@@ -195,7 +195,7 @@ test.describe('keyboard operation', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Tab');
     await expect(editor).not.toBeFocused();
-    await expect(page.locator('.keys button').first()).toBeFocused();
+    await expect(page.getByRole('button', { name: /Run tests/ })).toBeFocused(); // the run button follows the editor; the symbol row comes after it
     // Shift+Tab always leaves, and the Tab-indents mode is back after the editor loses focus
     await editor.focus();
     await page.keyboard.press('Shift+Tab');
@@ -213,7 +213,7 @@ test.describe('keyboard operation', () => {
     await check(page);
     await expect(page.locator('.option.correct')).toContainText('your answer, correct');
     await expect(page.locator('.option.correct .marker svg')).toBeVisible(); // a check mark, not a letter
-    await expect(page.locator('.option.correct .tagtxt')).toHaveText('Correct'); // and the word
+    await expect(page.locator('.option.correct .tagtxt')).toHaveText('Your answer'); // the marker says whose answer it is; the verdict is in the panel
   });
 });
 

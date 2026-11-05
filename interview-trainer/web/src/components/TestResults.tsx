@@ -12,9 +12,10 @@ export function TestResults({ result }: { result: CodeRunResult }) {
           <li key={i} className={r.passed ? 'pass' : 'fail'}>
             <Icon name={r.passed ? 'check' : r.hidden ? 'eye-off' : 'x'} />
             {r.hidden ? (
-              <span>Hidden test {r.passed ? 'passed' : 'failed'}</span>
+              <span><b className="t-state" aria-hidden="true">{r.passed ? 'Pass' : 'Fail'}</b><span className="sr-only">Hidden test {r.passed ? 'passed' : 'failed'}</span><span aria-hidden="true"> hidden test</span></span>
             ) : (
               <span>
+                <b className="t-state" aria-hidden="true">{r.passed ? 'Pass' : 'Fail'}</b>
                 <span className="sr-only">{r.passed ? 'Passed: ' : 'Failed: '}</span>
                 <code>{r.call}</code>
                 {!r.passed && (

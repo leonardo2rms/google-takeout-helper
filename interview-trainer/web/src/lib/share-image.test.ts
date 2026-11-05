@@ -9,11 +9,11 @@ import { CARD_H, CARD_W, drawShareCard, renderShareCard } from './share-image';
 const card: ShareCard = {
   streak: 12,
   rank: 'Senior',
-  readinessScore: 64,
-  readinessLabel: 'Getting there',
-  coveragePct: 40,
-  strongest: { title: 'Kotlin', pct: 90 },
-  weakest: { title: 'Concurrency and coroutines in depth', pct: 30 },
+  lessonsDone: 7,
+  lessonsTotal: 34,
+  daysPracticed: 9,
+  readiness: { score: 64, label: 'Getting there' },
+  bestTopic: { title: 'Concurrency and coroutines in depth', pct: 90 },
   alt: 'alt',
   text: 'text',
 };
@@ -75,10 +75,18 @@ describe('drawShareCard', () => {
     drawShareCard(canvas, card);
     expect([canvas.width, canvas.height]).toEqual([CARD_W, CARD_H]);
     const { texts } = draw();
-    expect(texts).toEqual(expect.arrayContaining(['Interview Trainer', 'PROGRESS', 'STREAK', '12', 'days', 'RANK', 'Senior', 'READINESS', '64  Getting there', 'COURSE SEEN', '40%', 'STRONGEST TOPIC', '90%', 'Kotlin', 'WEAKEST TOPIC', '30%']));
+    expect(texts).toEqual(expect.arrayContaining(['Interview Trainer', 'PROGRESS', 'STREAK', '12', 'days', 'RANK', 'Senior', 'LESSONS', '7 of 34', 'DAYS PRACTISED', '9', 'READINESS', '64  Getting there', 'BEST TOPIC', '90%']));
     expect(texts.some((t) => /estimate of recall/.test(t))).toBe(true);
-    // Nothing else (dates, roles, question text) can sneak in: every drawn string is accounted for.
-    for (const t of texts) expect(t).toMatch(/^(Interview Trainer|PROGRESS|STREAK|\d+|days?|RANK|Senior|READINESS|\d+ {2}Getting there|COURSE SEEN|\d+%|STRONGEST TOPIC|WEAKEST TOPIC|TOPIC|Kotlin|.*…|Concurrency.*|Readiness is an estimate.*)$/);
+    // Nothing else (dates, roles, question text) can sneak in, and nothing unflattering: no weakest topic, no coverage figure.
+    for (const t of texts) expect(t).toMatch(/^(Interview Trainer|PROGRESS|STREAK|\d+|days?|RANK|Senior|LESSONS|\d+ of \d+|DAYS PRACTISED|READINESS|\d+ {2}Getting there|BEST TOPIC|\d+%|Concurrency.*|.*…|Readiness is an estimate.*)$/);
+    expect(texts.some((t) => /weakest|course seen/i.test(t))).toBe(false);
+  });
+
+  it('leaves out lessons and days practised while they are still zero', () => {
+    const { texts } = draw({ ...card, lessonsDone: 0, daysPracticed: 0 });
+    expect(texts).not.toContain('LESSONS');
+    expect(texts).not.toContain('DAYS PRACTISED');
+    expect(texts).toContain('RANK');
   });
 
   it('says "day" for a streak of one and "days" otherwise', () => {
@@ -88,32 +96,22 @@ describe('drawShareCard', () => {
     expect(draw({ ...card, streak: 0 }).texts).toContain('days');
   });
 
-  it('labels a single started topic just "Topic" and draws no second row', () => {
-    const { texts, rects } = draw({ ...card, strongest: null, weakest: { title: 'Only', pct: 10 } });
-    expect(texts.filter((t) => t === 'TOPIC')).toHaveLength(1);
-    expect(texts).not.toContain('STRONGEST TOPIC');
-    expect(texts).not.toContain('WEAKEST TOPIC');
-    expect(texts).toContain('Only');
-    expect(gaugeTicks(rects)).toHaveLength(20); // one gauge, not two
-    // the same holds the other way round (only a strongest topic)
-    expect(draw({ ...card, strongest: { title: 'Solo', pct: 80 }, weakest: null }).texts.filter((t) => t === 'TOPIC')).toHaveLength(1);
-  });
-
-  it('draws no topic rows at all when nothing was started', () => {
-    const { texts, rects } = draw({ ...card, strongest: null, weakest: null });
-    expect(texts.some((t) => /topic/i.test(t))).toBe(false);
+  it('draws no best-topic row when no topic is strong enough, and no readiness row before there is data', () => {
+    const { texts, rects } = draw({ ...card, bestTopic: null, readiness: null });
+    expect(texts.some((t) => /topic|readiness/i.test(t))).toBe(false);
+    expect(texts).toContain('Practised with Interview Trainer.');
     expect(gaugeTicks(rects)).toHaveLength(0);
   });
 
   it('shortens a title that does not fit with an ellipsis, and keeps one that does', () => {
     const shown = draw(card, 40).texts.find((t) => t.startsWith('Concurrency'))!; // wide characters force truncation
     expect(shown.endsWith('…')).toBe(true);
-    expect(shown.length).toBeLessThan(card.weakest!.title.length);
-    expect(draw(card, 1).texts).toContain(card.weakest!.title);
+    expect(shown.length).toBeLessThan(card.bestTopic!.title.length);
+    expect(draw(card, 1).texts).toContain(card.bestTopic!.title);
   });
 
   it('keeps the progress gauge visible for tiny percentages (at least one lit tick), and empty only at zero', () => {
-    const lit = (pct: number) => litTicks(draw({ ...card, strongest: null, weakest: { title: 'T', pct } }).rects);
+    const lit = (pct: number) => litTicks(draw({ ...card, bestTopic: { title: 'T', pct } }).rects);
     expect(lit(1)).toBe(1);
     expect(lit(2)).toBe(1);
     expect(lit(0)).toBe(0);

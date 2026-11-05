@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { STATUS_LABEL, TYPE_LABEL, allQuestions, searchLibrary, type Course, type Progress, type Question } from '@trainer/shared';
+import { STATUS_LABEL, TYPE_LABEL, allQuestions, searchLibrary, searchWords, type Course, type Progress, type Question } from '@trainer/shared';
 import { Icon } from '../components/icons';
 import { Inline } from '../components/Inline';
 import { QuestionTools } from '../components/QuestionTools';
 import { plural } from '../lib/format';
+import { codePreview } from '../lib/library-preview';
 import { useToday } from '../lib/today';
 import { unitStyle } from '../lib/unit-style';
 
@@ -39,6 +40,9 @@ export function Library({ course, progress }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `on` is spread into the dependency list below
     [course, progress, today, text, type, unitId, on.bookmarked, on.hasNote, on.due, on.neverSeen],
   );
+  const words = useMemo(() => searchWords(text), [text]);
+  /** "1.2": unit and lesson number, as on Home. */
+  const lessonNo = useMemo(() => new Map(course.units.flatMap((u, ui) => u.lessons.map((l, li) => [l.id, `${ui + 1}.${li + 1}`] as const))), [course]);
   const savedCount = Object.keys(progress.bookmarks).length;
   const filtered = Boolean(text.trim() || type || unitId || Object.values(on).some(Boolean));
   const styleOf = (id: string) => unitStyle(course.units.find((u) => u.id === id) ?? { id });
@@ -123,11 +127,19 @@ export function Library({ course, progress }: Props) {
         <ul className="lib-list" data-testid="lib-list">
           {results.slice(0, shown).map((e) => (
             <li key={e.q.id} className="lib-item" data-testid="lib-item" data-qid={e.q.id}>
-              <p className="lib-prompt"><Inline text={e.q.prompt} /></p>
+              <p className="lib-top">
+                <span className="lib-type">{TYPE_LABEL[e.q.type]}</span>
+                <span className={`pill status-${e.status}`} data-testid="lib-status">{STATUS_LABEL[e.status]}</span>
+                <span className="lib-marks">
+                  {e.bookmarked && <span className="lib-mark" role="img" aria-label="Saved" data-testid="lib-mark-saved"><Icon name="bookmark" size="1.1em" /></span>}
+                  {e.note && <span className="lib-mark" role="img" aria-label="Has your note" data-testid="lib-mark-note"><Icon name="square-pen" size="1.1em" /></span>}
+                </span>
+              </p>
+              <p className="lib-prompt"><Inline text={e.q.prompt} mark={words} /></p>
+              {codePreview(e.q).length > 0 && <pre className="lib-code" aria-label="Code in this question"><code>{codePreview(e.q).join('\n')}</code></pre>}
               <p className="lib-meta">
                 <span className="unit-tag" style={styleOf(e.unitId).style}><Icon name={styleOf(e.unitId).icon} size="1.1em" />{e.unitTitle}</span>
-                <span>{TYPE_LABEL[e.q.type]}</span>
-                <span className={`pill status-${e.status}`} data-testid="lib-status">{STATUS_LABEL[e.status]}</span>
+                <span className="lib-lesson"><span className="mono">{lessonNo.get(e.lessonId)}</span> {e.lessonTitle}</span>
               </p>
               <div className="lib-actions">
                 <a className="btn small secondary" href={`#/q/${e.q.id}`} aria-label={`Practise this one: ${plain(e.q.prompt)}`} data-testid="lib-practise">Practise this one</a>

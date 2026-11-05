@@ -83,7 +83,7 @@ test.describe('wrong answers are marked, explained and come back', () => {
       await expectNoHorizontalOverflow(page);
       await check(page);
       await expect(page.locator('.feedback')).toHaveClass(/bad/);
-      await expect(page.locator('.feedback h2')).toHaveText('Not quite');
+      await expect(page.locator('.feedback h2')).toHaveText('Incorrect'); // the verdict is said once
       await page.screenshot({ path: `${SHOTS}/${type}-3-wrong.png` });
 
       // The question comes back at the end of the lesson; here: finish the rest, then it reappears.
@@ -93,6 +93,8 @@ test.describe('wrong answers are marked, explained and come back', () => {
       await solveAndContinue(page, q);
       // First attempt missed, so the lesson is not perfect, but it completes with a recovered answer.
       await expect(page.locator('.summary h1')).toHaveText('Lesson complete');
+      // and it says what "complete" means after a miss, instead of a bare first-try percentage
+      await expect(page.getByTestId('ending-line')).toContainText('answered right by the end');
     });
   }
 });
@@ -218,7 +220,7 @@ test.describe('every lesson can be completed perfectly', () => {
 
       await expect(page.locator('.summary h1')).toHaveText('Clean run');
       await expect(page.locator('.tile.acc')).toContainText('100%');
-      await page.getByRole('button', { name: 'Continue', exact: true }).click();
+      await page.getByRole('button', { name: 'Back home', exact: true }).click();
       await expect(page.locator('.stat').first()).toContainText('1'); // streak started
     });
   }

@@ -107,13 +107,26 @@ They are never used as text colour, as a fill behind text or as a verdict. A uni
 
 - **Home**: a lesson index. Header with wordmark and Settings, rank line and gauge, a readout row (streak, XP, daily goal ring), the Today card (ink icon tile, ink "Start"), practice rows, a segmented lesson bar,
   then one title block per unit with 56px lesson rows (number, title, mastery gauge, done box). The next lesson has a cobalt tint, a rail and an "Up next" tag.
+  **Progressive disclosure** (`web/src/lib/home-copy.ts`, `homeTier`): a brand-new learner sees the hero ("Start your first lesson", larger, ink outline) and one quiet dashed line for the optional plan (goal, date, role; it opens inline);
+  every practice mode sits under a "More ways to practise" disclosure. After the first session the daily challenge, Review and Progress join the page; after three lessons everything is on it. Nothing is ever unreachable.
+  Numbers agree: Today says "5 of 24 due" when it takes some of the due cards, Review says "24 ready · 10 at a time", Progress says "not enough data yet" until a quarter of the course has been seen.
 - **Lesson**: close, a gauge with one tick per question, XP readout; a mono kicker, the prompt, the answer area; a fixed bottom bar with a 3px verdict stripe (teal or vermilion) after checking. The primary button stays ink in every state.
-- **Feedback**: a neutral sheet panel with a 4px rail, a verdict line (icon and word), the heading, ink body text, and the details.
+- **Feedback**: a neutral sheet panel with a 4px rail and **one** verdict line (icon and one word: Correct, Incorrect, Partial, Skipped, or Self-check in neutral ink while the learner compares with the model answer); it is the heading that focus lands on.
+  Option markers say whose answer it is ("Your answer", "Answer"), not the verdict again. The model answer of an open question is open when it matters (self-check, a miss, a skip). With no AI, "Ask why" is one quiet inline row, not a block.
 - **Question types**: options with letter markers and a tag word; blanks as form underlines; order rows numbered by a CSS counter; spot lines 44px with a line-number gutter and a mark; estimate as one field with the unit inside; match items with numbered badges
   (the number carries the pairing, the pen hue is secondary); code editor with 44px symbol keys and test rows (icon, call, expected/got diff); open answers with a status line (`bot` or `wifi-off`) and a counter.
-- **Summary**: a mono readout, a ruled table (XP earned, accuracy, streak, to revisit), the goal ring, notes with icons. "Next lesson" is the primary action when there is one.
+- **Summary**: a mono readout, a ruled table (XP earned, accuracy, streak, to revisit), the goal ring, notes with icons. The headline follows the outcome (`web/src/lib/summary-copy.ts`: Clean run, Lesson complete, Review done, Practice complete;
+  "Another pass needed" only when a third or more ended wrong). New badges are listed here, inline. After a lesson "Next lesson" is primary, otherwise "Back home" is.
 - **Progress, Library, Mock interview, Settings and the sheets** use the same parts: ruled lists (`.facts`, `.calib-rows`, `.mock-history`), 8px gauges, outlined chips, dashed borders for "flagged" and "partial".
 - **Share card** (`web/src/lib/share-image.ts`): drawn on a canvas in the light palette whatever the app theme is (a picture that leaves the app should look the same everywhere), with a drawing border, a title block, a ruled readout and tick gauges, in Plex Sans and the system mono.
+
+## Dialogs, notices and the desktop
+
+- **Confirmation dialog** (`components/ConfirmDialog.tsx`, `useConfirm()`): replaces every `window.confirm` (which is ignored in sandboxed hosts and looks foreign in an installed app). A centred card on the backdrop, `role="alertdialog"`, focus trap, Escape and backdrop cancel, focus returns to the opener,
+  layered dialogs close one at a time (`components/useModal.ts`, shared with `Sheet`). When something is thrown away the safe button is primary and focused and the destructive one is an outline in vermilion (`.btn.danger`).
+- **Badge notice** (`AchievementToasts`): a short notice above the bottom bar (never over a heading or prompt), 4 seconds, dismissible, cleared when the route changes. A finished session lists its new badges on the summary instead.
+- **Desktop** (900px and up): the same single column, made deliberate: `--col` goes from 640 to 720px, the page is a sheet of paper (`--paper`) with hairline sides on a slightly darker desk (`--code`). No second layout.
+- **Match board**: two columns from 480px, stacked on phones (terms first, descriptions under them). Each item is one text box; the layout guard `e2e/layout.spec.ts` fails if any word of any match question is split across lines at 390 or 320px.
 
 ## Rules for new UI
 

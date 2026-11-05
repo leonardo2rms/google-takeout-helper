@@ -1,4 +1,4 @@
-import { scoreFromCoverage, spotLines, verdictFor, type OpenVerdict, type Question } from '@trainer/shared';
+import { scoreFromCoverage, spotLines, verdictFor, type Question } from '@trainer/shared';
 import type { ReactNode } from 'react';
 import { isPass, type Outcome } from '../lib/evaluate';
 import { CodeBlock } from './CodeBlock';
@@ -32,33 +32,42 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
   const score = open ? scoreFromCoverage(open.covered) : pass ? 1 : 0;
   const verdict = open ? verdictFor(score) : pass ? 'correct' : 'incorrect';
 
-  const title = headline(outcome, verdict);
-
   // On a follow-up the card shows this answer, the bar shows the combined result: when they disagree, say so with amber.
   const own = pass ? 'good' : verdict === 'partial' ? 'meh' : 'bad';
   const tone = overall && (overall.pass ? 'good' : 'bad') !== own ? 'meh' : own;
   const sol = !pass ? solution(q) : null;
   const answerLine = q.type === 'estimate' ? estimateLine(q) : null;
+  /** Comparing with the model answer is the learner's job: until they have, the verdict mark is neutral ink, not a hue. */
+  const selfCheck = Boolean(open?.needsSelfAssessment) && !outcome.skipped;
+  const word = verdictWord(tone, outcome);
+  const covered = open ? open.covered.filter(Boolean).length : 0;
+  const modelAnswer = oq && (
+    <details open={!pass || outcome.skipped || selfCheck || undefined}>
+      <summary><Icon name="chevron-down" className="chev" />Model answer</summary>
+      {oq.format === 'code' ? <CodeBlock source={oq.modelAnswer} /> : <p><Inline text={oq.modelAnswer} /></p>}
+    </details>
+  );
 
   return (
     <section className={`feedback ${tone}`} aria-labelledby="feedback-title">
-      <p className="verdict" data-testid="verdict">
-        <Icon name={VERDICT_ICON[tone]} size="1.1em" strokeWidth={2.5} />
-        <span>{verdictWord(tone, outcome, open ? open.covered : null)}</span>
-      </p>
-      <h2 id="feedback-title" tabIndex={-1}>{title}</h2>
+      {/* The verdict is said once: icon, word and the rail. This heading is what keyboard and screen-reader focus lands on. */}
+      <h2 id="feedback-title" className={`verdict ${selfCheck ? 'neutral' : ''}`} tabIndex={-1} data-testid="verdict">
+        <Icon name={selfCheck ? 'square-pen' : VERDICT_ICON[tone]} size="1.1em" strokeWidth={2.5} />
+        <span>{word}</span>
+      </h2>
 
       {open && oq && (
         <>
           <p className="score">
-            {open.covered.filter(Boolean).length}/{open.covered.length} key points
-            {open.gradedBy === 'ai' ? ' · graded by AI' : ' · self-assessed'}
+            {selfCheck ? `${covered} of ${open.covered.length} points ticked` : `${covered}/${open.covered.length} key points`}
+            {open.gradedBy === 'ai' ? ' · graded by AI' : ''}
           </p>
           {open.feedback && <p className="ai-feedback"><Inline text={open.feedback} /></p>}
-          {open.needsSelfAssessment && (
-            <p className="hint">AI grading isn't available, so compare with the model answer and tick the points you covered.</p>
-          )}
-          <ul className="rubric">
+          {selfCheck && <p className="hint">Compare your answer with the model answer, then tick the points you made.</p>}
+          {/* Self-checking is comparing: the model answer is open for it, and for any miss or skip. */}
+          {selfCheck && modelAnswer}
+          {selfCheck && <p className="rubric-title">Which points did you make?</p>}
+          <ul className="rubric" aria-label={selfCheck ? 'Which points did you make?' : 'Key points'}>
             {oq.keyPoints.map((kp, i) => (
               <li key={i}>
                 {open.needsSelfAssessment ? (
@@ -79,10 +88,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
               </li>
             ))}
           </ul>
-          <details open={!pass || outcome.skipped}>
-            <summary><Icon name="chevron-down" className="chev" />Model answer</summary>
-            {oq.format === 'code' ? <CodeBlock source={oq.modelAnswer} /> : <p><Inline text={oq.modelAnswer} /></p>}
-          </details>
+          {!selfCheck && modelAnswer}
         </>
       )}
 
@@ -152,13 +158,12 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
 
 const VERDICT_ICON: Record<'good' | 'bad' | 'meh', IconName> = { good: 'check', bad: 'x', meh: 'contrast' };
 
-/** The verdict as a word, so it never depends on colour or on the icon alone. */
-function verdictWord(tone: 'good' | 'bad' | 'meh', outcome: Outcome, covered: boolean[] | null): string {
+/** The verdict as one word, so it never depends on colour or on the icon alone. Points and detail live in their own line. */
+function verdictWord(tone: 'good' | 'bad' | 'meh', outcome: Outcome): string {
   if (outcome.skipped) return 'Skipped';
-  const points = covered ? `${covered.filter(Boolean).length}/${covered.length} points` : null;
-  if (outcome.open?.needsSelfAssessment) return points ? `Self-check · ${points}` : 'Self-check';
+  if (outcome.open?.needsSelfAssessment) return 'Self-check';
   if (tone === 'good') return 'Correct';
-  if (tone === 'meh') return points ? `Partial · ${points}` : 'Partial';
+  if (tone === 'meh') return 'Partial';
   return 'Incorrect';
 }
 
@@ -169,10 +174,3 @@ function estimateLine(q: Extract<Question, { type: 'estimate' }>): string {
 }
 
 const trim = (n: number) => String(Math.round(n * 100) / 100);
-
-function headline(outcome: Outcome, verdict: OpenVerdict): string {
-  if (outcome.skipped) return 'Here is the answer';
-  if (outcome.open?.needsSelfAssessment) return 'Check your answer';
-  if (verdict === 'correct') return 'Correct';
-  return verdict === 'partial' ? 'Partly there' : 'Not quite';
-}

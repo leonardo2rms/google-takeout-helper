@@ -69,12 +69,19 @@ export const READINESS_TEXT: Record<ReadinessLabel, string> = {
 };
 const LABELS: ReadinessLabel[] = ['early', 'building', 'solid', 'ready'];
 
+/** Share of the course that must be seen before Readiness shows a number: a score built from a handful of questions says nothing. */
+export const READINESS_MIN_COVERAGE = 0.25;
+/** A topic needs this many seen questions before it can be called the weakest: one wrong answer is not a weak topic. */
+export const WEAKEST_MIN_SEEN = 3;
+
 export interface Readiness {
   /** 0-100: an estimate of how much of THIS COURSE you would recall today. Not a prediction of any outcome. */
   score: number;
   /** Share of the course's questions you have seen, 0..1. */
   coverage: number;
   label: ReadinessLabel;
+  /** Whether enough of the course has been seen (`READINESS_MIN_COVERAGE`) for the score to be worth showing. */
+  enough: boolean;
   weakestUnitId: string | null;
 }
 
@@ -101,9 +108,9 @@ export function readiness(course: Course, p: Progress, today: Day, weights?: Rec
   }
   const score = den === 0 ? 0 : Math.round((num / den) * 100);
   const coverage = total === 0 ? 0 : seen / total;
-  const started = stats.filter((s) => s.seen > 0);
+  const started = stats.filter((s) => s.seen >= WEAKEST_MIN_SEEN);
   const weakest = started.length ? started.reduce((a, b) => (b.strength < a.strength ? b : a)) : undefined;
-  return { score, coverage, label: labelFor(coverage, score), weakestUnitId: weakest?.unitId ?? null };
+  return { score, coverage, label: labelFor(coverage, score), enough: coverage >= READINESS_MIN_COVERAGE, weakestUnitId: weakest?.unitId ?? null };
 }
 
 function questionsOf(course: Course, unitId: string): Question[] {
@@ -141,10 +148,24 @@ export function weakSpots(course: Course, p: Progress, today: Day, n: number, se
   return out.slice(0, n);
 }
 
-/** Mixed practice: a seeded draw without replacement, weighted by `1 + 2 * (1 - strength)` so weak material shows up more. */
-export function pickMix(course: Course, p: Progress, today: Day, n: number, seed: number): Question[] {
+/** Formats that need no typing or coding: what a first mixed session is drawn from, so the first question is never a blank page. */
+export const isGentleFormat = (q: Question): boolean => q.type !== 'open' && q.type !== 'code';
+
+/** Sessions after which Mixed practice may draw open and code questions. */
+export const GENTLE_SESSIONS = 3;
+
+/** The pool limit for Mixed practice: gentle formats only while the learner is brand new (fewer than 3 sessions, no lessons or cards beyond the first few). */
+export function mixFilterFor(p: Pick<Progress, 'stats' | 'lessons'>): ((q: Question) => boolean) | undefined {
+  return p.stats.sessions < GENTLE_SESSIONS && Object.keys(p.lessons).length < GENTLE_SESSIONS ? isGentleFormat : undefined;
+}
+
+/**
+ * Mixed practice: a seeded draw without replacement, weighted by `1 + 2 * (1 - strength)` so weak material shows up more.
+ * `only` limits the pool (a first-ever session passes `isGentleFormat`).
+ */
+export function pickMix(course: Course, p: Progress, today: Day, n: number, seed: number, only?: (q: Question) => boolean): Question[] {
   const rand = mulberry32(seed);
-  const keyed = allQuestions(course).map((q) => {
+  const keyed = allQuestions(course).filter((q) => !only || only(q)).map((q) => {
     const weight = 1 + 2 * (1 - strength(cardFor(p, q), today));
     return { q, key: -Math.log(1 - rand()) / weight };
   });

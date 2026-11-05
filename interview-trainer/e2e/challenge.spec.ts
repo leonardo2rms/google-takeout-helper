@@ -1,9 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { CHALLENGE_XP, challengeQuestion } from '../shared/src';
-import { KEY_V2, SHOTS, TODAY, course, day, expectNoOverflow, seed, setDay, stored, useClock, v2 } from './engage';
+import { KEY_V2, SHOTS, TODAY, course, day, expectNoOverflow, seed, setDay, stored, useClock, v2 as blank } from './engage';
 import { solveAndContinue, visible } from './solve';
 
 const questionOn = (d: string) => challengeQuestion(course, d)!;
+/** The daily challenge joins Home after the first session, so these learners have had one. */
+const v2 = (over: Parameters<typeof blank>[0] = {}) => blank({ stats: { ...blank().stats, sessions: 1 }, ...over });
 const card = (page: Page) => page.getByTestId('challenge-card');
 
 /** Give up on the question: "I don't know" until the session ends (a missed question comes back twice). */
@@ -42,7 +44,7 @@ test.describe('daily challenge', () => {
     expect(p!.stats.perfect).toBe(0);
     expect(p!.days[TODAY].answered).toBe(1);
 
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Back home', exact: true }).click();
     await expect(card(page)).toHaveAttribute('data-result', 'pass');
     await expect(card(page)).toContainText('passed');
     await expect(page.getByTestId('challenge-streak')).toContainText('1 day in a row');
@@ -63,7 +65,7 @@ test.describe('daily challenge', () => {
     await giveUp(page);
     await expect(page.getByTestId('summary-notes')).toContainText('Daily challenge done.');
     await expect(page.getByTestId('summary-notes')).toContainText('Challenge streak: 2 days');
-    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.getByRole('button', { name: 'Back home', exact: true }).click();
     await expect(card(page)).toHaveAttribute('data-result', 'fail');
     await expect(card(page)).toContainText('Tomorrow brings a new one');
     expect((await stored(page))!.xp).toBe(0);

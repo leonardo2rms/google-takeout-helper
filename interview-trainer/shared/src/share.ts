@@ -6,24 +6,28 @@ import type { Course } from './schema';
 import { streakStatus } from './streak';
 
 /**
- * What a shared progress card says. Only numbers the learner already sees in the app (streak, rank, readiness, topic bars):
- * no dates, no interview date, no role, no question content, no identifiers.
+ * What a shared progress card says. Only numbers the learner already sees in the app, and only the ones worth posting:
+ * streak, rank, lessons done, days practised, the readiness score once there is enough data behind it, and the best topic
+ * once it is genuinely strong. Never the weakest topic, never a low score. No dates, no interview date, no role,
+ * no question content, no identifiers.
  */
 export interface ShareCard {
   streak: number;
   rank: string;
-  readinessScore: number;
-  readinessLabel: string;
-  /** Percent of the course seen. */
-  coveragePct: number;
-  /** Topics with at least one question seen; `null` when there is nothing to compare. */
-  strongest: { title: string; pct: number } | null;
-  weakest: { title: string; pct: number } | null;
+  lessonsDone: number;
+  lessonsTotal: number;
+  daysPracticed: number;
+  /** The readiness score, only once enough of the course has been seen for it to mean something. */
+  readiness: { score: number; label: string } | null;
+  /** The strongest started topic, only when it is at least `BEST_TOPIC_MIN_PCT`. */
+  bestTopic: { title: string; pct: number } | null;
   /** Spoken description for the image (alt text). */
   alt: string;
   /** Plain-text version: the share text and the "copy" fallback. */
   text: string;
 }
+
+export const BEST_TOPIC_MIN_PCT = 50;
 
 const pct = (x: number) => Math.round(x * 100);
 
@@ -31,45 +35,37 @@ export function buildShareCard(course: Course, p: Progress, today: Day): ShareCa
   const streak = streakStatus(p, today).streak;
   const rank = rankFor(p.xp).title;
   const ready = readiness(course, p, today);
+  const lessonsTotal = course.units.reduce((n, u) => n + u.lessons.length, 0);
+  const lessonsDone = Object.keys(p.lessons).length;
+  const daysPracticed = p.stats.practiceDays;
   const started = topicStats(course, p, today).filter((t) => t.seen > 0 && t.total > 0);
-  const byStrength = [...started].sort((a, b) => b.strength - a.strength || a.title.localeCompare(b.title));
-  // With a single topic started, "strongest" and "weakest" would be the same bar: show only one.
-  const strongestStat = byStrength.length >= 2 ? byStrength[0]! : null;
-  const weakestStat = byStrength.length >= 1 ? byStrength[byStrength.length - 1]! : null;
-  const strongest = strongestStat ? { title: strongestStat.title, pct: pct(strongestStat.strength) } : null;
-  const weakest = weakestStat ? { title: weakestStat.title, pct: pct(weakestStat.strength) } : null;
-  const label = READINESS_TEXT[ready.label];
+  const top = [...started].sort((a, b) => b.strength - a.strength || a.title.localeCompare(b.title))[0];
+  const bestTopic = top && pct(top.strength) >= BEST_TOPIC_MIN_PCT ? { title: top.title, pct: pct(top.strength) } : null;
+  const readinessShown = ready.enough ? { score: ready.score, label: READINESS_TEXT[ready.label] } : null;
+  const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
 
   const facts = [
     `${streak}-day streak`,
     `rank ${rank}`,
-    `readiness ${ready.score} (${label.toLowerCase()}, ${pct(ready.coverage)}% of the course seen)`,
-    strongest && `strongest topic ${strongest.title} ${strongest.pct}%`,
-    weakest && `${strongest ? 'weakest' : 'topic'} ${weakest.title} ${weakest.pct}%`,
+    `${lessonsDone} of ${lessonsTotal} lessons done`,
+    `${days(daysPracticed)} practised`,
+    readinessShown && `readiness ${readinessShown.score} (${readinessShown.label.toLowerCase()})`,
+    bestTopic && `best topic ${bestTopic.title} ${bestTopic.pct}%`,
   ].filter((x): x is string => Boolean(x));
 
   const text = [
     'My Interview Trainer progress',
-    `Streak: ${streak} ${streak === 1 ? 'day' : 'days'}`,
+    `Streak: ${days(streak)}`,
     `Rank: ${rank}`,
-    `Readiness: ${ready.score} (${label}) · ${pct(ready.coverage)}% of the course seen. An estimate of recall, not a prediction.`,
-    strongest && `Strongest topic: ${strongest.title} (${strongest.pct}%)`,
-    weakest && `${strongest ? 'Weakest' : 'Topic'}: ${weakest.title} (${weakest.pct}%)`,
+    `Lessons: ${lessonsDone} of ${lessonsTotal}`,
+    `Days practised: ${daysPracticed}`,
+    readinessShown && `Readiness: ${readinessShown.score} (${readinessShown.label}). An estimate of recall, not a prediction.`,
+    bestTopic && `Best topic: ${bestTopic.title} (${bestTopic.pct}%)`,
   ]
     .filter((x): x is string => Boolean(x))
     .join('\n');
 
-  return {
-    streak,
-    rank,
-    readinessScore: ready.score,
-    readinessLabel: label,
-    coveragePct: pct(ready.coverage),
-    strongest,
-    weakest,
-    alt: `Interview Trainer progress card: ${facts.join(', ')}.`,
-    text,
-  };
+  return { streak, rank, lessonsDone, lessonsTotal, daysPracticed, readiness: readinessShown, bestTopic, alt: `Interview Trainer progress card: ${facts.join(', ')}.`, text };
 }
 
 /** The learner has done something worth sharing. */

@@ -95,7 +95,7 @@ lessons:
         explanation: "The offsets of the polled batch are committed before any record is processed. If the app crashes between the commit and `process`, those records are skipped for good: at-most-once. Commit after processing (at-least-once) and make `process` idempotent, because a crash between the processing and the commit means the batch is delivered again."
 
       - type: multi
-        prompt: "Select ALL settings that reduce the chance of losing a write that the producer has already seen acknowledged."
+        prompt: "Select all settings that reduce the chance of losing a write that the producer has already seen acknowledged."
         options:
           - { id: a, text: "acks=all on the producer" }
           - { id: b, text: "Replication factor 3 with min.insync.replicas=2 (which is enforced for acks=all writes)" }

@@ -26,11 +26,11 @@ test.describe('share card', () => {
     await openCard(page);
     const img = page.getByTestId('share-preview');
     const alt = (await img.getAttribute('alt'))!;
-    expect(alt).toMatch(/^Interview Trainer progress card: 5-day streak, rank Engineer, readiness \d+ \(.+\)/);
-    expect(alt).toMatch(/strongest topic .+ \d+%/);
+    expect(alt).toMatch(/^Interview Trainer progress card: 5-day streak, rank Engineer, \d+ of \d+ lessons done, \d+ days? practised/);
+    expect(alt).not.toMatch(/weakest|weak/i);
     expect(await img.evaluate((i: HTMLImageElement) => [i.naturalWidth, i.naturalHeight])).toEqual([1080, 1350]);
     await expectNoOverflow(page);
-    await expect(page.getByRole('textbox', { name: 'Text version of the card' })).toHaveValue(/Streak: 5 days\nRank: Engineer\nReadiness:/);
+    await expect(page.getByRole('textbox', { name: 'Text version of the card' })).toHaveValue(/Streak: 5 days\nRank: Engineer\nLessons: \d+ of \d+\nDays practised: \d+/);
     await page.screenshot({ path: `${SHOTS}/share-card-sheet.png` });
   });
 

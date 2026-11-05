@@ -5,6 +5,9 @@ interface Props {
   update: (fn: (p: Progress) => Progress) => void;
 }
 
+/** The scale each size applies (kept in step with the data-text-size rules in styles.css), so each button previews its own size. */
+const PREVIEW_SCALE: Record<TextSize, number> = { S: 0.9, M: 1, L: 1.2, XL: 1.4 };
+
 const SIZE_NAMES: Record<TextSize, string> = { S: 'Small', M: 'Medium', L: 'Large', XL: 'Extra large' };
 
 /** Settings -> Reading: text size and an optional dyslexia-friendly font stack. Applied live through data attributes (see useReadingPrefs). */
@@ -20,10 +23,11 @@ export function ReadingSection({ progress, update }: Props) {
         {TEXT_SIZES.map((size) => (
           <label key={size} className={`choice ${textSize === size ? 'on' : ''}`}>
             <input type="radio" name="text-size" checked={textSize === size} onChange={() => set({ textSize: size })} aria-label={SIZE_NAMES[size]} data-testid={`text-size-${size}`} />
-            <span><b>{size}</b></span>
+            <span><b aria-hidden="true" style={{ fontSize: `${(18 * PREVIEW_SCALE[size]).toFixed(1)}px` }}>Aa</b></span>
           </label>
         ))}
       </div>
+      <p className="muted reading-sample">This is how a sentence reads at the size you chose.</p>
       <label className="toggle-row">
         <input type="checkbox" checked={dyslexiaFont} onChange={(e) => set({ dyslexiaFont: e.target.checked })} data-testid="dyslexia-font" />
         <span>

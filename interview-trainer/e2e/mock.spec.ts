@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { MOCK_XP_CAP, buildMock, mockSeed, type MockConfig, type Progress, type Question } from '../shared/src';
-import { KEY_V2, SHOTS, TODAY, course, day, dueCards, expectNoOverflow, seed, setDay, stored, useClock, v2 } from './engage';
+import { KEY_V2, SHOTS, TODAY, course, day, dueCards, expectNoOverflow, openMore, seed, setDay, stored, useClock, v2 } from './engage';
 import { answerCorrectly, answerWrongly, writeCode } from './solve';
 
 const timer = (page: Page) => page.getByTestId('mock-timer');
@@ -47,6 +47,7 @@ test.describe('mock interview: setup', () => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     await page.goto('/');
+    await openMore(page); // the mock interview is optional: it sits under "More ways to practise" until the learner has found their feet
     await expect(page.getByTestId('mock-link')).toContainText('optional');
     await page.getByTestId('mock-link').click();
     await expect(page).toHaveURL(/#\/mock$/);
@@ -133,11 +134,9 @@ test.describe('mock interview: running', () => {
     const qs = planned();
     await startMock(page);
     await answer(page, qs[0]!, 'right');
-    page.once('dialog', (d) => {
-      expect(d.message()).toContain('Nothing is saved');
-      void d.accept();
-    });
     await page.getByRole('button', { name: 'Quit mock interview' }).click();
+    await expect(page.getByTestId('quit-confirm')).toContainText('Nothing is saved');
+    await page.getByTestId('quit-confirm-ok').click();
     await expect(page.getByTestId('mock-start')).toBeVisible();
     expect((await stored(page))?.mocks ?? []).toEqual([]);
   });
@@ -249,6 +248,7 @@ test.describe('mock interview: results', () => {
     expect(p!.stats.perfect).toBe(0);
 
     await page.goto('/');
+    await openMore(page);
     await page.getByTestId('mock-link').click();
     await expect(page.getByTestId('mock-history-item')).toHaveCount(1);
     await expect(page.getByTestId('mock-history-item').first()).toContainText(`${score}%`);
