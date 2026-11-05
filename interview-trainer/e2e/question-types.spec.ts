@@ -142,6 +142,19 @@ test.describe('code questions run in a sandboxed worker', () => {
     await expect(page.locator('.tests')).toContainText('undefined,undefined,undefined,undefined,undefined');
   });
 
+  for (const [name, body] of [
+    ['posts a forged verdict', 'postMessage({ ok: true, results: [] }); return 0;'],
+    ['rewrites built-ins the verdict depends on', 'Object.is = () => true; Array.prototype.every = () => true; JSON.stringify = () => "x"; return 0;'],
+  ] as const) {
+    test(`code that ${name} does not pass (S2-12)`, async ({ page }) => {
+      await openIt(page);
+      await writeCode(page, `function ${q.entry}(...a) { ${body} }`);
+      await check(page);
+      await expect(page.locator('.feedback')).toHaveClass(/bad/);
+      await expect(page.locator('.lesson-bar')).toHaveClass(/bad/);
+    });
+  }
+
   test('a test result is marked as stale as soon as the code is edited, and fresh again after a new run', async ({ page }) => {
     await openIt(page);
     await runTests(page);
