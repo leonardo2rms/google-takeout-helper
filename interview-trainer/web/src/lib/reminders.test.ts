@@ -124,36 +124,6 @@ describe('showLocalNotification', () => {
   });
 });
 
-describe('files', () => {
-  it('canDownloadFiles is false only in the hosted single-file build', async () => {
-    vi.stubEnv('VITE_STANDALONE', '');
-    vi.resetModules();
-    expect((await import('./reminders')).canDownloadFiles()).toBe(true);
-    vi.stubEnv('VITE_STANDALONE', '1');
-    vi.resetModules();
-    expect((await import('./reminders')).canDownloadFiles()).toBe(false);
-  });
-
-  it('saveTextFile clicks a temporary download link and revokes the object URL afterwards', async () => {
-    const { saveTextFile } = await import('./reminders');
-    const link = { href: '', download: '', click: vi.fn(), remove: vi.fn() };
-    const create = vi.fn(() => 'blob:abc');
-    const revoke = vi.fn();
-    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke }));
-    vi.stubGlobal('document', { createElement: () => link, body: { appendChild: vi.fn() } });
-    saveTextFile('r.ics', 'BEGIN', 'text/calendar');
-    expect(link).toMatchObject({ href: 'blob:abc', download: 'r.ics' });
-    expect(link.click).toHaveBeenCalledTimes(1);
-    expect(link.remove).toHaveBeenCalledTimes(1);
-    expect(revoke).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(1000);
-    expect(revoke).toHaveBeenCalledWith('blob:abc');
-    const blob = (create.mock.calls[0] as unknown as [Blob])[0];
-    expect(await blob.text()).toBe('BEGIN');
-    expect(blob.type).toBe('text/calendar');
-  });
-});
-
 describe('useReminderCheck', () => {
   it('shows exactly one notification when everything lines up, and records it before showing', async () => {
     seed(base());

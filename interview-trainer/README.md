@@ -87,6 +87,12 @@ Everything (course, logic, styles) is inlined, with no service worker and no API
 a `sample` capability (a claude.ai artifact does) grade open questions through the viewer's own Claude account;
 anywhere else it falls back to self-assessment. Handy for trying the app from a phone with nothing installed.
 
+**Publishing it as an artifact.** Publish `dist/interview-trainer.html` with the capabilities
+`{"sample": {}, "downloads": true}`: `sample` gives AI grading, `downloads` lets the page offer files (backups, the share image).
+Inside the viewer a plain `<a download>` does nothing, so every file offer goes through the one `saveFile` helper
+(`web/src/lib/files.ts`), which uses `window.claude.use('downloads')` there (the viewer asks the learner to confirm, and they may
+decline) and a normal download link everywhere else. Without the capability the page falls back to copying text.
+
 ## Engagement and progress
 
 Everything below is local to the device: no accounts, no tracking, nothing sent anywhere. Design notes and the ethics
@@ -150,7 +156,7 @@ Settings -> **Reminders**: pick a daily time, then either or both of:
   after that time with something due. At most one per day (`prefs.reminders.lastNotified`), never on a rest day, never after you practised, never when nothing is due, and the copy is
   plain ("5 questions are ready to review"). There is no push server, so browsers generally cannot fire it while the app is closed, and the UI says so.
 
-"Turn reminders off" clears the time and the choice. The hosted single-file build cannot download files from its frame, so it replaces the calendar button with a note.
+"Turn reminders off" clears the time and the choice. In the hosted single-file build the viewer's `downloads` capability does not accept `.ics` files, so it replaces the calendar button with a note.
 Stored under `progress.prefs.reminders` (`{ time, notify, lastNotified }`); like other settings it stays local on import/merge.
 
 ### Share card
@@ -158,8 +164,8 @@ Stored under `progress.prefs.reminders` (`{ time, notify, lastNotified }`); like
 Progress -> **Share my progress** (shown once you have answered something) draws a 1080x1350 PNG on a canvas (`web/src/lib/share-image.ts`) from `buildShareCard`
 (`shared/src/share.ts`): streak, rank, lessons done and days practised, plus the readiness score once enough of the course has been seen and your best topic once it is at least 50%. The weakest topic and low scores are never on the card. It contains only what the app already shows:
 no dates, role, interview date or question content, and nothing is uploaded. The image has real alt text. Delivery uses what the browser has: `navigator.share` with the PNG
-(or text only when files cannot be shared), otherwise a download link, plus **Copy text** and a selectable text version. The hosted single-file build cannot download from its frame,
-so the download button is hidden there; a sheet with no working option says how to save the picture.
+(or text only when files cannot be shared), otherwise a download link, plus **Copy text** and a selectable text version. In the hosted single-file build the download button uses the viewer's `downloads` capability (the learner confirms; a decline is met with a calm
+"Nothing was saved" note) and is hidden when the viewer does not offer it; a sheet with no working option says how to save the picture.
 
 ### Accessibility and reading settings
 

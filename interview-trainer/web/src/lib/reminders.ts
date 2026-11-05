@@ -3,7 +3,6 @@ import {
   allQuestions, dayKey, markNotified, reminderDecision, reviewQueue, unitOfFor,
   type Course, type NotifyPermission,
 } from '@trainer/shared';
-import { isStandalone } from './sample-grader';
 import { getProgress, updateProgress } from './store';
 
 export function notificationPermission(): NotifyPermission {
@@ -41,22 +40,6 @@ export async function showLocalNotification(title: string, body: string): Promis
       return false;
     }
   }
-}
-
-/** Saves text as a file. False if the host cannot download (the hosted single-file build's frame blocks it). */
-export function canDownloadFiles(): boolean {
-  return !isStandalone;
-}
-
-export function saveTextFile(name: string, text: string, type: string): void {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 /**
