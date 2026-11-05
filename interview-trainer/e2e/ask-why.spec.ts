@@ -28,13 +28,11 @@ async function toFeedback(page: Page) {
 }
 
 test.describe('Ask why', () => {
-  test('is disabled with a reason when no AI is available, and nothing is broken', async ({ page }) => {
+  test('shows one quiet line instead of a dead button when no AI is available, and nothing is broken', async ({ page }) => {
     const errors = watchErrors(page);
     await toFeedback(page);
-    const button = page.getByTestId('ask-why');
-    await expect(button).toBeDisabled();
-    await expect(page.getByTestId('ask-why-off')).toContainText('Needs the AI tutor');
-    await expect(button).toHaveAccessibleDescription(/AI tutor/);
+    await expect(page.getByTestId('ask-why')).toHaveCount(0);
+    await expect(page.getByTestId('ask-why-off')).toContainText('Ask why needs AI');
     await expectNoHorizontalOverflow(page);
     await page.screenshot({ path: `${SHOTS}/ask-why-1-disabled.png` });
     await page.getByRole('button', { name: 'Continue', exact: true }).click(); // the lesson carries on

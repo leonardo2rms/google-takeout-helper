@@ -611,7 +611,7 @@ legend { font-weight: 600; padding: 0; margin-bottom: 6px; }
 /* ===== Ask why (tutor chat) ===== */
 .ask-why { display: grid; gap: 4px; justify-items: start; margin-top: 4px; }
 .ask-why .btn.small { min-height: 44px; }
-.ask-why .btn:disabled { opacity: .85; }
+.ask-why.off { display: flex; gap: 6px; align-items: center; margin: 0; }
 .chat { display: grid; gap: 8px; max-height: 45dvh; overflow-y: auto; }
 .chat:empty { display: none; }
 .bubble { margin: 0; padding: 10px 14px; border-radius: var(--r2); white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-16); max-width: 92%; }

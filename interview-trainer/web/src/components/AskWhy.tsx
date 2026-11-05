@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { EXPLAIN_MAX_USER_CHARS, EXPLAIN_MAX_USER_MESSAGES, type ExplainMessage } from '@trainer/shared';
 import type { ExplainFn } from '../lib/explain';
+import { Icon } from './icons';
 import { Sheet } from './Sheet';
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
   /** The learner's answer as short text; "" if they skipped. */
   answer: string;
   correct: boolean;
-  /** Undefined when no AI is available (offline, no key): the button is shown disabled, with the reason. */
+  /** Undefined when no AI is available (offline, no key): one quiet line says so instead of a dead button. */
   explain?: ExplainFn;
 }
 
@@ -31,10 +32,7 @@ export function AskWhy({ questionId, answer, correct, explain }: Props) {
 
   if (!explain) {
     return (
-      <div className="ask-why off">
-        <button type="button" className="btn ghost small" disabled aria-describedby="ask-why-off" data-testid="ask-why">Ask why</button>
-        <span id="ask-why-off" className="hint" data-testid="ask-why-off">Needs the AI tutor (off)</span>
-      </div>
+      <p className="ask-why off hint" data-testid="ask-why-off"><Icon name="info" size="1.1em" />Ask why needs AI, which is off.</p>
     );
   }
 

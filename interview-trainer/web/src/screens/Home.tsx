@@ -156,7 +156,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       <div className="rank-block">
         <p className="rank-line" data-testid="rank">
           <b>{rank.title}</b>
-          {rank.next !== null ? ` · ${progress.xp}/${rank.next} XP to ${rank.nextTitle}` : ' · top rank'}
+          {rank.next !== null ? ` · ${formatCount(progress.xp)}/${formatCount(rank.next)} XP to ${rank.nextTitle}` : ' · top rank'}
         </p>
         <div
           className="rank-bar"
@@ -245,7 +245,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </details>
       )}
 
-      {nextLesson && (() => {
+      {nextLesson && daily.kind !== 'first' && (() => {
         const ui = course.units.findIndex((u) => u.lessons.some((l) => l.id === nextLesson.id));
         const li = course.units[ui]!.lessons.findIndex((l) => l.id === nextLesson.id);
         return (
