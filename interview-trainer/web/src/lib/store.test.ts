@@ -137,6 +137,14 @@ describe('failing storage', () => {
     expect(store.getProgress().xp).toBe(4);
   });
 
+  it('keeps its in-memory state when a later read throws (storage revoked mid-session)', async () => {
+    const { store } = await load();
+    store.updateProgress(withXp(3));
+    storage.failReads = true;
+    expect(() => store.updateProgress(withXp(4))).not.toThrow();
+    expect(store.getProgress().xp).toBe(4);
+  });
+
   it('keeps unreadable data safe: starts empty, and backs it up before the first overwrite', async () => {
     storage.data.set(KEY_V2, '{this is not json');
     const { store } = await load();
@@ -239,10 +247,8 @@ describe('badges', () => {
     const { store, toasts } = await load();
     store.updateProgress(finishedLesson);
     expect(stored().achievements['first-lesson']).toBe('2026-06-15');
-    const probe = vi.fn();
     // The toast queue is observable through the hook's server snapshot.
     expect(readToast(toasts)).toMatchObject({ badges: [{ id: 'first-lesson' }] });
-    probe();
     // A second write that earns nothing new raises no further toast.
     toasts.dismissBadgeToast(readToast(toasts)!.id);
     store.updateProgress(withXp(5));

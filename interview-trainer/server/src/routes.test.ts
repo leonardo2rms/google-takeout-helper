@@ -45,15 +45,20 @@ const tutor: Tutor = {
   },
 };
 
-type Served = ReturnType<typeof serve>;
+interface Served {
+  server: ReturnType<ReturnType<typeof createApp>['listen']>;
+  base: string;
+  raw: (path: string, init?: RequestInit) => Promise<Response>;
+  post: (path: string, body: unknown, headers?: Record<string, string>) => Promise<Response>;
+}
 const servers: Served[] = [];
-function serve(opts: Partial<Parameters<typeof createApp>[0]> = {}) {
+function serve(opts: Partial<Parameters<typeof createApp>[0]> = {}): Served {
   const server = createApp({ course, ...opts }).listen(0);
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const raw = (path: string, init?: RequestInit) => fetch(`${base}${path}`, init);
   const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
     raw(path, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: typeof body === 'string' ? body : JSON.stringify(body) });
-  const s = { server, base, raw, post };
+  const s: Served = { server, base, raw, post };
   servers.push(s);
   return s;
 }

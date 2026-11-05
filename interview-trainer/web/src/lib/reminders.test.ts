@@ -84,6 +84,12 @@ describe('permission helpers', () => {
     expect(notificationPermission()).toBe('unsupported');
   });
 
+  it('treats a Notification API that throws on access (locked-down webviews) as unsupported', async () => {
+    const { notificationPermission } = await import('./reminders');
+    vi.stubGlobal('Notification', new Proxy({}, { get() { throw new Error('denied by policy'); } }));
+    expect(notificationPermission()).toBe('unsupported');
+  });
+
   it('requests permission and never throws (a rejecting prompt falls back to the current state)', async () => {
     const { requestNotificationPermission } = await import('./reminders');
     FakeNotification.permission = 'default';

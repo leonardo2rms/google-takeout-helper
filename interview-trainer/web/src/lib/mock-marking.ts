@@ -29,7 +29,8 @@ export async function markMock(
       try {
         out[q.id] = await evaluate(q, a!, grade, run);
       } catch {
-        out[q.id] = await evaluate(q, a!, undefined, run);
+        // Neither the AI grader nor the code runner may lose the mock: fall back to the offline checklist / a failed run.
+        out[q.id] = await evaluate(q, a!, undefined, undefined);
       }
     } else {
       out[q.id] = skipOutcome(q);
