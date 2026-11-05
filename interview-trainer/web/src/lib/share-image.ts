@@ -97,16 +97,16 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
   ctx.fillRect(M, 196, inner, 2);
 
   // streak
-  label(ctx, 'Streak', M, 290);
-  icon(ctx, FLAME, M, 330, 120, C.ink, 1.6);
+  label(ctx, 'Streak', M, 270);
+  icon(ctx, FLAME, M, 300, 100, C.ink, 1.6);
   ctx.fillStyle = C.ink;
-  ctx.font = mono(260, 500);
+  ctx.font = mono(220, 500);
   ctx.textAlign = 'left';
-  ctx.fillText(String(card.streak), M + 150, 540);
+  ctx.fillText(String(card.streak), M + 130, 470);
   const numW = ctx.measureText(String(card.streak)).width;
   ctx.fillStyle = C.graphite;
   ctx.font = mono(52, 500);
-  ctx.fillText(card.streak === 1 ? 'day' : 'days', M + 150 + numW + 24, 540);
+  ctx.fillText(card.streak === 1 ? 'day' : 'days', M + 130 + numW + 24, 470);
 
   // ruled readout: rank, readiness, coverage
   const rows: [string, string][] = [
@@ -114,17 +114,17 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
     ['Readiness', `${card.readinessScore}  ${card.readinessLabel}`],
     ['Course seen', `${card.coveragePct}%`],
   ];
-  let y = 640;
+  let y = 560;
   ctx.fillStyle = C.ink;
   ctx.fillRect(M, y, inner, 3);
   for (const [name, value] of rows) {
-    label(ctx, name, M, y + 62, 28);
+    label(ctx, name, M, y + 54, 28);
     ctx.fillStyle = C.ink;
     ctx.font = sans(46, 600);
     ctx.textAlign = 'right';
-    ctx.fillText(fit(ctx, value, inner - 360), CARD_W - M, y + 66);
+    ctx.fillText(fit(ctx, value, inner - 360), CARD_W - M, y + 58);
     ctx.textAlign = 'left';
-    y += 96;
+    y += 84;
     ctx.fillStyle = C.hairline;
     ctx.fillRect(M, y, inner, 2);
   }
@@ -134,7 +134,7 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
     card.strongest && { name: card.weakest ? 'Strongest topic' : 'Topic', ...card.strongest },
     card.weakest && { name: card.strongest ? 'Weakest topic' : 'Topic', ...card.weakest },
   ].filter((r): r is { name: string; title: string; pct: number } => Boolean(r));
-  y = 990;
+  y = 892;
   for (const t of topics) {
     label(ctx, t.name, M, y, 26);
     ctx.fillStyle = C.ink;
@@ -143,9 +143,9 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
     ctx.fillText(`${t.pct}%`, CARD_W - M, y + 6);
     ctx.textAlign = 'left';
     ctx.font = sans(42, 600);
-    ctx.fillText(fit(ctx, t.title, inner - 170), M, y + 62);
-    gauge(ctx, M, y + 92, inner, 22, t.pct);
-    y += 190;
+    ctx.fillText(fit(ctx, t.title, inner - 170), M, y + 54);
+    gauge(ctx, M, y + 78, inner, 20, t.pct);
+    y += 160;
   }
 
   // footer

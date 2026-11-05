@@ -297,6 +297,12 @@ button.stat:active { background: var(--hairline); }
 .order-slot { counter-reset: n; min-height: 96px; padding: 6px; border-radius: var(--r2); border: 1px dashed var(--edge); display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-content: start; }
 .order-slot .placeholder { color: var(--graphite); font-size: var(--fs-14); padding: 8px; }
 .order-pool { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.order-pool.all-placed { display: none; }
+.code-line .vmark { flex: none; margin-left: auto; }
+.code-line.correct .vmark { color: var(--teal); }
+.code-line.wrong .vmark { color: var(--vermilion); }
+/* ordering plain sentences instead of code */
+.order-slot.steps .code-line, .order-pool.steps .code-line { font-family: var(--sans); font-size: var(--fs-15); white-space: normal; line-height: 1.35; }
 .code-line {
   counter-increment: n; display: flex; gap: 10px; align-items: center; min-height: 44px; width: 100%; padding: 8px 12px; text-align: left;
   font: var(--fs-14) var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--sheet); color: var(--ink); border: 1px solid var(--edge); border-radius: var(--r2);
