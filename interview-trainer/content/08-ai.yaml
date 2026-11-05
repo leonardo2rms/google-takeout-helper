@@ -30,20 +30,20 @@ lessons:
       - type: single
         prompt: "The assistant suggests `list.chunkedBy(3)`, which doesn't exist in the Kotlin stdlib (`chunked(3)` does). What's the best general defence against this kind of hallucination?"
         options:
-          - { id: a, text: "Compile and run it, and check unfamiliar APIs against official docs; don't trust that an API exists because it looks plausible" }
-          - { id: b, text: "Ask the assistant 'are you sure?' and trust the answer" }
-          - { id: c, text: "Never use generated code for anything involving a library" }
-          - { id: d, text: "Rely on the IDE to hide the error" }
+          - { id: a, text: "Compile and run it, and check unfamiliar APIs in the official docs; don't trust a plausible name" }
+          - { id: b, text: "Ask the assistant 'are you sure?' and trust the answer it gives the second time around" }
+          - { id: c, text: "Avoid generated code for library-heavy tasks and write those parts by hand" }
+          - { id: d, text: "Tell the assistant in the prompt which library version you use, which rules out invented methods" }
         answer: a
-        explanation: "Models generate plausible text, not verified facts. Compilers, type checkers and tests are cheap, objective verifiers, and 'are you sure?' just samples another answer."
+        explanation: "Models generate plausible text, not verified facts. Compilers, type checkers and tests are cheap, objective verifiers; 'are you sure?' just samples another answer, and naming the version reduces hallucinations but cannot rule them out. Avoiding generated code altogether gives up a lot of value when a compile step catches this for free."
 
       - type: single
         prompt: "In a long session the assistant starts ignoring a constraint you gave at the start. What is the most effective response?"
         options:
-          - { id: a, text: "Start a fresh session with a concise summary or spec, and keep standing rules in a persistent project instructions file" }
-          - { id: b, text: "Repeat the constraint in capital letters in every message" }
-          - { id: c, text: "Keep going; models never lose track of earlier context" }
-          - { id: d, text: "Paste the entire chat history again" }
+          - { id: a, text: "Start a fresh session with a concise summary or spec, and keep rules in project instructions" }
+          - { id: b, text: "Repeat the constraint in capital letters in each message, so the model cannot overlook it again" }
+          - { id: c, text: "Keep going and ask again; models do not lose track of earlier context within their window" }
+          - { id: d, text: "Paste the entire chat history again into a new message, so that the constraint is back in context for the model" }
         answer: a
         explanation: "Long contexts get cluttered with dead ends and stale decisions. A clean context with the current state and rules (e.g. CLAUDE.md-style project instructions) usually beats trying to rescue a long one."
 
@@ -51,21 +51,21 @@ lessons:
         hint: "Who wrote the tests, and what assumptions did that author share with the code?"
         prompt: "The assistant wrote both a function and its unit tests, and they all pass. Is that sufficient evidence the function is correct?"
         options:
-          - { id: a, text: "No: the tests share the same assumptions as the code. Review them against the spec and add edge-case/property tests" }
-          - { id: b, text: "Yes: passing tests prove correctness" }
-          - { id: c, text: "Yes, if there are more than 10 tests" }
-          - { id: d, text: "No: AI-written tests can never be trusted, so delete them" }
+          - { id: a, text: "No: the tests share the code's assumptions. Review them against the spec and add edge-case or property tests" }
+          - { id: b, text: "Yes: if each test passes, the function matches the requirement" }
+          - { id: c, text: "Yes, as long as the suite reaches 100% line coverage" }
+          - { id: d, text: "No: tests written by an AI can never be trusted, so delete them and rely on manual checks" }
         answer: a
-        explanation: "If the model misunderstood the requirement, it will usually encode the same misunderstanding in both code and tests. Write (or at least carefully read) tests from the requirement, include boundaries, and mutation-test if it matters."
+        explanation: "If the model misunderstood the requirement, it will usually encode the same misunderstanding in both code and tests, so neither a green run nor full coverage shows the requirement was understood. Write (or at least carefully read) tests from the requirement, include boundaries, and mutation-test if it matters. Deleting tests altogether throws away a useful regression net."
 
       - type: single
         hint: "Think about what leaves your control once the text is pasted."
         prompt: A teammate wants to paste a production database dump with customer emails into a public AI chat tool to debug a query. What is the right call?
         options:
-          - { id: a, text: "Don't: use anonymised/synthetic data and an approved tool under your company's data policy" }
-          - { id: b, text: "Fine, since the chat history is private" }
-          - { id: c, text: "Fine if you delete the chat afterwards" }
-          - { id: d, text: "Fine for the first 100 rows" }
+          - { id: a, text: "Don't: use anonymised or synthetic data in an approved tool, under your company's data policy" }
+          - { id: b, text: "Acceptable, because the tool's terms say that chat history is private to the user" }
+          - { id: c, text: "Acceptable if you delete the chat as soon as the query is fixed" }
+          - { id: d, text: "Paste the first 100 rows, since a small sample of customer data is not a real disclosure and is quickly forgotten" }
         answer: a
         explanation: "Sending data to a third party is a disclosure, regardless of later deletion. Redact or generate representative data, and use tools your organisation has vetted for the data's classification."
 
@@ -89,22 +89,22 @@ lessons:
         hint: "What does a model not know unless you hand it over?"
         prompt: What is the primary purpose of retrieval-augmented generation (RAG)?
         options:
-          - { id: a, text: "Ground the model in your own, current documents by retrieving relevant passages and including them in the prompt" }
-          - { id: b, text: "Retrain the model on your data every night" }
-          - { id: c, text: "Make the model faster by shrinking its weights" }
-          - { id: d, text: "Guarantee the model never hallucinates" }
+          - { id: a, text: "Ground the model in your own, current documents by retrieving passages into the prompt" }
+          - { id: b, text: "Retrain the model on your documents each night so that its weights stay current" }
+          - { id: c, text: "Make the model faster and cheaper by shrinking its weights and quantising them" }
+          - { id: d, text: "Remove hallucination, because the model answers from the retrieved documents alone and cannot add anything else" }
         answer: a
         explanation: "RAG reduces (not eliminates) hallucination and keeps knowledge fresh without retraining. Quality hinges on retrieval: chunking, embeddings, filters and re-ranking."
 
       - type: single
         prompt: "In a RAG system, what does the vector store enable?"
         options:
-          - { id: a, text: "Finding chunks whose embeddings are semantically close to the query, even when they share no keywords" }
-          - { id: b, text: "Exact SQL joins between documents" }
-          - { id: c, text: "Fine-tuning the model" }
-          - { id: d, text: "Compressing the prompt losslessly" }
+          - { id: a, text: "Finding chunks that are semantically close to the query, even without shared keywords" }
+          - { id: b, text: "Exact SQL joins between documents, using primary keys that the embeddings generate for each chunk" }
+          - { id: c, text: "Fine-tuning the model on your documents without running a training job" }
+          - { id: d, text: "Compressing the retrieved text losslessly so that more of it fits into the prompt" }
         answer: a
-        explanation: "Embeddings map text to vectors where similar meaning means small distance. Production systems often combine this with keyword (BM25) search and metadata filters."
+        explanation: "Embeddings map text to vectors where similar meaning means small distance; the store answers approximate nearest-neighbour queries, not exact joins, and it neither trains the model nor compresses text. Production systems often combine this with keyword (BM25) search and metadata filters."
 
       - type: multi
         hint: "Think about what the model is allowed to DO after reading untrusted text."
@@ -122,10 +122,10 @@ lessons:
         hint: "How would you tell luck from a real improvement?"
         prompt: How do you know whether a prompt change actually improved your feature?
         options:
-          - { id: a, text: "Run it against an eval set of representative cases (including hard ones) and compare scores before and after" }
-          - { id: b, text: "Try two or three examples by hand and go with your gut" }
-          - { id: c, text: "Ask the model whether the new prompt is better" }
-          - { id: d, text: "Ship it and see if support tickets go down" }
+          - { id: a, text: "Run it against an eval set of representative cases (including hard ones) and compare scores" }
+          - { id: b, text: "Try a handful of examples by hand and keep the version that feels better to you" }
+          - { id: c, text: "Ask the model whether the new prompt is better than the old one, and trust its verdict" }
+          - { id: d, text: "Ship it to everyone and watch whether the number of support tickets goes down" }
         answer: a
         explanation: "LLM outputs vary, so anecdotes mislead. Grade with code where possible, otherwise with a model judge calibrated against human labels, and track regressions as you change prompts or models."
 
@@ -133,30 +133,30 @@ lessons:
         hint: "Which part of the request never changes between calls?"
         prompt: "Each request to your LLM feature includes the same 20,000-token policy document followed by a short user question. What is the best cost and latency optimisation?"
         options:
-          - { id: a, text: "Use prompt caching: keep the static document as a stable prefix so repeated reads are cheap and fast" }
-          - { id: b, text: "Shorten the user's question" }
-          - { id: c, text: "Send the document only on every tenth request" }
-          - { id: d, text: "Split the document across several parallel requests" }
+          - { id: a, text: "Use prompt caching: keep the static document as a stable prefix, with the question after it" }
+          - { id: b, text: "Shorten the user's question, since the long document is a small part of the cost" }
+          - { id: c, text: "Send the document with each tenth request and rely on the model's memory in between" }
+          - { id: d, text: "Split the document across several parallel requests and merge the answers, which cuts latency" }
         answer: a
-        explanation: "Caching works on identical prefixes, so put stable content first and per-request content last, and avoid changing it (timestamps in the prefix break it). Also consider a smaller model for simple steps."
+        explanation: "Caching works on identical prefixes, so put stable content first and per-request content last, and avoid changing it (timestamps in the prefix break it). The document, not the short question, is the cost; the model is stateless, so a request without the document simply lacks it; and splitting multiplies the tokens you pay for. Also consider a smaller model for simple steps."
 
       - type: single
         prompt: Your Spring service needs to consume the model's answer as data (an object with typed fields). What is the most reliable approach?
         options:
-          - { id: a, text: "Request structured output against a JSON schema, then validate and deserialise it, with a defined fallback on failure" }
-          - { id: b, text: "Ask nicely for JSON and parse it with a regex" }
-          - { id: c, text: "Parse free-form prose with string splitting" }
-          - { id: d, text: "Trust the output and cast it" }
+          - { id: a, text: "Request schema-constrained JSON output, then validate it and keep a fallback" }
+          - { id: b, text: "Ask the model to answer in JSON in the prompt and extract the fields with a regex" }
+          - { id: c, text: "Let the model answer in prose and extract the fields with string splitting on keywords" }
+          - { id: d, text: "Trust the model to follow the format and cast the output straight to your data class" }
         answer: a
         explanation: "Schema-constrained output removes most format errors, but you still validate semantically (ranges, enums, business rules) because valid JSON can still be wrong."
 
       - type: single
         prompt: "Unit tests that call a live LLM are flaky and slow. What's the better testing strategy?"
         options:
-          - { id: a, text: "Hide the model behind an interface and use fakes/recorded responses in unit tests; measure quality separately with an eval suite" }
-          - { id: b, text: "Retry each test until it passes" }
-          - { id: c, text: "Mock everything and skip quality checks" }
-          - { id: d, text: "Only test manually" }
+          - { id: a, text: "Hide the model behind an interface and use fakes in unit tests; measure quality with a separate eval suite" }
+          - { id: b, text: "Retry each test up to five times and accept the first run that passes, so flaky output no longer fails the build" }
+          - { id: c, text: "Mock the model everywhere and drop quality checks, since the output of an LLM is untestable automatically" }
+          - { id: d, text: "Test by hand, since the output of an LLM is too variable for automated tests" }
         answer: a
         explanation: "Separate deterministic plumbing (parsing, retries, routing: unit-testable) from model quality (statistical: evals). Keep a few live integration checks outside the main CI gate."
 
@@ -252,10 +252,10 @@ lessons:
       - type: single
         prompt: "An agent keeps calling the same `search` tool with the same arguments and never finishes. Where does the fix belong?"
         options:
-          - { id: a, text: "In the orchestration code: hard limits on steps, tokens and wall-clock time, plus detection of repeated identical tool calls" }
-          - { id: b, text: "In the prompt only: tell the model to stop after five steps" }
-          - { id: c, text: "In the sampling settings: raise the temperature until it stops repeating itself" }
-          - { id: d, text: "Nowhere: a better model will never loop" }
+          - { id: a, text: "In the orchestration code: hard limits on steps, tokens and time, plus loop detection" }
+          - { id: b, text: "In the prompt: tell the model to stop after five steps and ask it to count its own tool calls carefully" }
+          - { id: c, text: "In the sampling settings: raise the temperature until it stops repeating the same call" }
+          - { id: d, text: "Nowhere: a stronger model never loops, so the fix is to upgrade to a newer model" }
         answer: a
         explanation: "The model proposes actions, but your code runs the loop, so the guarantees have to be enforced there: a step and budget cap, a timeout, loop detection and a defined way to give up (return a partial result or hand over to a human). A prompt instruction is a request, not a control. Every tool result should also be bounded in size, or the context fills up with noise."
 
@@ -302,10 +302,10 @@ lessons:
       - type: single
         prompt: "A unit test calls a model with temperature 0 and asserts that the answer is exactly the same string every time. Why is this test fragile?"
         options:
-          - { id: a, text: "Providers do not guarantee identical output even at temperature 0 (floating-point and batching effects, model updates), so assert on parsed fields or properties and measure quality with evals" }
-          - { id: b, text: "Temperature 0 is not a valid setting" }
-          - { id: c, text: "Models always randomise the first token of an answer" }
-          - { id: d, text: "Strings returned by an API cannot be compared with equals" }
+          - { id: a, text: "Providers do not guarantee identical output at temperature 0 (batching, model updates)" }
+          - { id: b, text: "At temperature 0 the model returns an empty string unless a seed is set in the request" }
+          - { id: c, text: "Models randomise the first token of an answer, so the start of the string differs between runs of the same prompt" }
+          - { id: d, text: "Strings returned by an API arrive in streamed chunks, so `equals` compares the first chunk" }
         answer: a
         explanation: "Low temperature makes output more repeatable, not guaranteed identical, and providers update models over time. Design for it: put the model behind an interface and use fakes in unit tests, request structured output and assert on its fields or invariants (valid enum, value within range), and track statistical quality with an eval suite instead of single-run string equality."
 

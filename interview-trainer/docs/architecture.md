@@ -85,7 +85,7 @@ Points worth knowing:
 
 - **Everything except the two outbound calls (the model and the worker) is pure or injected.** `applySession` takes `today` and the course as arguments and returns a new `Progress` plus a list of `SessionEvent`s; the UI only decides how to celebrate them. That is why streaks, freezes, DST and "the clock moved backwards" can be tested without a browser.
 - **`updateProgress(fn)` always re-reads storage first**, so a write from another tab is applied *under* this tab's change instead of being overwritten. Between ticks the `storage` event keeps tabs in sync.
-- **Writes are best effort.** A quota error or a storage area that throws leaves the in-memory state intact; the next successful write persists it. If `localStorage` itself is unavailable (private window, sandboxed frame) the store falls back to a per-tab in-memory map.
+- **Writes are best effort, and never silent.** A quota error or a storage area that throws leaves the in-memory profile intact and marks it `dirty`. `lastRaw` keeps meaning "what storage really holds", so the next `updateProgress` does not mistake our own unsaved state for stale data and replace it with the older stored copy (that bug used to drop every session played while storage was full). The store retries with backoff (4 s doubling to 60 s), when the page is hidden or closed, and when the browser comes back online; if another tab wrote in the meantime the unsaved changes are *merged* on top of it. If `localStorage` itself is unavailable (private window, sandboxed frame) the store falls back to a per-tab in-memory map. Either way `useSafetyStatus()` reports it (`persistence: 'ok' | 'memory' | 'failing'`, `atRisk`) and `DataSafetyBanners` shows a non-blocking notice with *Download backup*, *Copy backup text* and, where downloads and the clipboard are blocked too, the text to select by hand. `atRisk` stays false until the learner has something to lose, so browsing a blocked host is not nagged about.
 - **A finished session settles three things at once**: lessons/XP/missed (the v1-visible part), the spaced-repetition cards (`applyToCards`), and the day log, streak and milestones. The single write path is `applySession`; nothing else mutates learning data.
 - **Open questions with follow-ups** are two gradings: the main answer, then an authored follow-up chosen by what the learner covered (`pickFollowUp`). The question passes on the mean of both scores.
 
@@ -105,7 +105,18 @@ Points worth knowing:
 | `version: 2` | `normalizeProgress` clamps and repairs every field, then `pruneProgress` drops cards whose question hash no longer matches and days older than 400 |
 | `version > 2` | `problem: 'future-version'` |
 
-When `problem` is set, the caller **must not overwrite** the stored value without copying it to `interview-trainer.progress.backup-YYYYMMDD` first. `saveProgress` does that via the `protectedRaw` it is given. The store keeps `protectedRaw` until the first successful write.
+When `problem` is set, the caller **must not overwrite** the stored value until a copy of it exists. `saveProgress` enforces this with the `protectedRaw` it is given: it parks the value first (`parkRaw`), and if that copy cannot be written (quota, blocked storage) it writes **nothing** and returns `skipped: true`, so the unreadable value stays where it is, still the only copy. The store keeps `protectedRaw` (and the learner's new progress in memory, with a visible "not saved" notice) until a copy succeeds.
+
+**Parked copies** (`shared/src/storage.ts`): copies are never replaced and rotate.
+
+| Key | Holds | Kept |
+|---|---|---|
+| `interview-trainer.progress.backup-YYYYMMDD[-NN]` | unreadable data (corrupt, or written by a newer version) set aside before it would be overwritten | the newest 8 |
+| `interview-trainer.progress.before-YYYYMMDD-NN` | a readable profile as it was just before *Replace my progress*, *Restore (replace)* or *Reset progress* | the newest 3 |
+
+A second corruption on the same day gets the next free suffix instead of replacing the first, an identical copy is reused, and the oldest copy of a kind is dropped only after a newer one was written. *Replace* also keeps this device's reading preferences and reminders. The learner finds the copies under **Settings, Recovered data** (`RecoveredData` in `components/DataSafety.tsx`): download, copy, and, when this version can read one, *Restore (merge)* or *Restore (replace)*. A banner announces newly parked data once (acknowledged per key in `interview-trainer.ui.recovered-ack`).
+
+Stored and imported profiles are bounded: at most `MAX_RECORDS` (5000) missed ids, cards and lessons, ids at most `MAX_ID_LENGTH` (120) characters, so a hand-made file cannot fill the quota.
 
 **Properties the tests enforce** (`shared/src/properties-progress.test.ts`): normalising is total and idempotent; valid data passes through unchanged (`changed: false`); v1 to v2 keeps every v1 field and is idempotent; merging is commutative and associative for the fields it promises to treat symmetrically, never loses a counter, lesson, card or badge, and merging a profile with itself changes nothing; keys such as `__proto__` are dropped rather than allowed to swap a container's prototype.
 
@@ -170,12 +181,13 @@ Be honest about what this is: best-effort isolation for the learner's *own* code
 
 ## Offline and PWA strategy
 
-The whole course (including the answers) is inside the JS bundle, which is what makes instant feedback and offline practice possible. The service worker (`web/public/sw.js`) therefore only has to cache the app shell:
+The whole course (including the answers) is inside the JS bundle, which is what makes instant feedback and offline practice possible. The service worker is built per deploy (`web/vite-sw-plugin.ts` bundles `web/src/sw/sw.ts` into `web/dist/sw.js` after the app is built) and its decisions live in `web/src/lib/sw-logic.ts`, which is unit tested with a fake `caches` and `fetch`:
 
-- **Install** precaches `/`, `/manifest.webmanifest` and `/icon.svg`, then `skipWaiting()`; **activate** deletes every cache whose name is not the current `CACHE` constant and `clients.claim()`s.
-- **Fetch**: only same-origin `GET`s that are not under `/api/`. Stale-while-revalidate: answer from cache, refresh in the background; offline navigations fall back to the cached `/`. API calls are never cached, so grading simply fails over to self-assessment.
+- **Version-keyed, all-or-nothing install.** The plugin lists every file of the build (`/`, hashed bundle and font, manifest, icons) and hashes their bytes into a version. The cache is named `interview-trainer-<version>`; install fetches each file (bypassing the HTTP cache), refuses any response that is not a 200 of the content type its URL promises, and fails as a whole if one is bad, so the previous worker keeps running. Only after a successful install does it `skipWaiting()`; **activate** deletes every other `interview-trainer-*` cache and `clients.claim()`s. There is no hand-bumped constant any more: any byte change in any shipped file is a new version.
+- **Fetch**: only same-origin `GET`s that are not under `/api/`. Page navigations are **network-first** (a deploy shows on the next load; the shell copy is refreshed; offline or a 5xx falls back to the cached `/`). Everything else is **cache-first** (hashed files never change), and a response is stored only if it is a complete 200 of the expected type: an HTML page answered for a script URL is returned but never cached (that poisoned the cache after a deploy and left a blank page). API calls are never cached, so grading simply fails over to self-assessment.
+- **Update notice.** The page registers with `updateViaCache: 'none'`, re-checks when the tab becomes visible and hourly, and when a new worker takes control of a page that already had one it shows a quiet "A new version is ready" notice with *Reload* / *Later* (`lib/sw-register.ts`). Nothing reloads behind the learner's back mid-lesson.
+- The server answers a missing `/assets/*`, any path with a file extension and any dot-path with a real **404**, not `index.html`; only extension-less page navigations fall back to the shell. `/sw.js`, the shell and the manifest are sent `no-cache`, hashed assets `immutable` for a year; responses are gzip-compressed and carry a CSP, `nosniff`, `Referrer-Policy: no-referrer` and `X-Frame-Options: DENY` (the CSP allows `'unsafe-eval'` because the code runner uses `new Function` in a blob worker).
 - It is registered only in production builds and **not** in the single-file build (`import.meta.env.PROD && !isStandalone`).
-- **The cache name is the release lever.** Hashed asset names change with every build so they are cached on first use, but the *precached* `/` and any change to `sw.js` semantics need a new `CACHE` string (`interview-trainer-v2` today) so old clients drop stale entries. See the checklist in [contributing.md](contributing.md#releasing).
 - Storage durability: after the first finished session the app calls `navigator.storage.persist()`; on iPhone Safari that is not installed it shows a one-time "Add to Home Screen" tip, because Safari may clear script-written storage of sites you have not installed after about a week of inactivity.
 - Cross-device: export/import and merge (`backup.ts`) are the transfer mechanism; there are no accounts.
 
@@ -185,7 +197,7 @@ The whole course (including the answers) is inside the JS bundle, which is what 
 |---|---|---|---|---|
 | Development | `npm run dev` | Vite on :5173 (binds to the network, reloads when `content/*.yaml` changes) and the API on :8787 restarting when server/shared code changes (the API reads the YAML once at start-up, so restart it after editing content); Vite proxies `/api` to the API | server, if `ANTHROPIC_API_KEY` is set | no (dev build) |
 | Production | `npm run build` then `npm start` | `web/dist` served by the Express server on :8787 (`PORT` to change), one process, SPA fallback for client routes | server | yes |
-| Single file | `npm run build:standalone` | `dist/interview-trainer.html`: course, logic and styles inlined (about 0.9 MB), no server, no install, no SW (`web/.env.standalone` sets `VITE_STANDALONE=1`) | host `sample` capability, else none | no |
+| Single file | `npm run build:standalone` | `dist/interview-trainer.html` (a fragment for hosts that wrap it, such as a claude.ai artifact) and `dist/interview-trainer.standalone.html` (a complete document for opening from disk or a static host): course, logic and styles inlined (about 0.9 MB), no server, no install, no SW (`web/.env.standalone` sets `VITE_STANDALONE=1`) | host `sample` capability (25 s timeout, then self-check), else none | no |
 | End-to-end | `npm run e2e` | production build served with the AI keys forced empty so runs are deterministic and free | off | yes |
 
 `web/vite.config.ts` has a tiny plugin that exposes the **validated** YAML as `import course from 'virtual:course'`: invalid content fails the build, not the learner. `vitest.config.ts` registers the same virtual module so `web/src/lib` can be tested.

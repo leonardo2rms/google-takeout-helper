@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-  addDays, allQuestions, DAYS_KEPT, emptyProgress, fnv1a, MAX_INTERVAL, migrateProgress, normalizeProgress, pruneProgress, questionHash,
+  addDays, allQuestions, DAYS_KEPT, emptyProgress, fnv1a, MAX_ID_LENGTH, MAX_INTERVAL, MAX_RECORDS, migrateProgress, normalizeProgress, pruneProgress, questionHash,
   rankFor, sameJson, type MigrationContext, type Progress,
 } from './index';
 import { loadCourse } from './load-content';
@@ -205,5 +205,34 @@ describe('pruneProgress', () => {
     const old = addDays(today, -DAYS_KEPT - 5);
     const p: Progress = { ...emptyProgress(), days: { [old]: { xp: 1, answered: 1, firstTry: 1, target: 8 }, [today]: { xp: 1, answered: 1, firstTry: 1, target: 8 } } };
     expect(Object.keys(pruneProgress(p, ctx).days)).toEqual([today]);
+  });
+});
+
+describe('normalizeProgress: bounded size (QA S2-19)', () => {
+  const many = (n: number, f: (i: number) => unknown) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`id-${i}`, f(i)]));
+
+  it('keeps at most MAX_RECORDS missed ids, cards and lessons, and drops absurdly long ids', () => {
+    const r = normalizeProgress(
+      {
+        version: 2,
+        missed: [...Array.from({ length: MAX_RECORDS * 3 }, (_, i) => `q/${i}`), 'x'.repeat(MAX_ID_LENGTH + 1)],
+        cards: many(MAX_RECORDS + 50, () => ({ h: 'abc', due: today })),
+        lessons: many(MAX_RECORDS + 50, () => ({ bestAccuracy: 1, completions: 1, lastDay: today })),
+      },
+      ctx,
+    );
+    expect(r.missed).toHaveLength(MAX_RECORDS);
+    expect(Object.keys(r.cards)).toHaveLength(MAX_RECORDS);
+    expect(Object.keys(r.lessons)).toHaveLength(MAX_RECORDS);
+    const long = normalizeProgress({ version: 2, missed: ['x'.repeat(MAX_ID_LENGTH + 1), 'ok'], cards: { ['y'.repeat(MAX_ID_LENGTH + 1)]: { h: 'a', due: today } }, lessons: { ['z'.repeat(MAX_ID_LENGTH + 1)]: {} } }, ctx);
+    expect(long.missed).toEqual(['ok']);
+    expect(long.cards).toEqual({});
+    expect(long.lessons).toEqual({});
+  });
+
+  it('a profile of realistic size is untouched', () => {
+    const r = migrateProgress({ version: 2, missed: ['a/1', 'a/2'], lessons: { a: { bestAccuracy: 0.5, completions: 2, lastDay: today } } }, ctx).progress;
+    expect(r.missed).toEqual(['a/1', 'a/2']);
+    expect(r.lessons.a).toMatchObject({ completions: 2 });
   });
 });

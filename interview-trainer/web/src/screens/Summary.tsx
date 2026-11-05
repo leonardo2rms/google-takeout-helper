@@ -13,8 +13,8 @@ export interface Finished {
   title: string;
   kind: SessionKind;
   summary: SessionSummary;
-  /** XP actually credited (the engine's figure includes a perfect-lesson bonus that one-question sessions do not earn). */
-  xp: number;
+  /** XP actually credited for the session (the engine's figure includes bonuses a one-question session does not get). */
+  xpEarned: number;
   /** Badges this session unlocked, shown here instead of as a floating notice. */
   newBadges: { id: string; title: string; icon: string; description: string }[];
   streak: number;
@@ -142,7 +142,7 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       )}
 
       <div className="tiles">
-        <div className="tile xp"><small>XP earned</small><b>+{finished.xp}</b></div>
+        <div className="tile xp"><small>XP earned</small><b>+{finished.xpEarned}</b></div>
         <div className="tile acc"><small>Accuracy</small><b>{pct}%</b></div>
         <div className="tile fire"><small>Streak</small><b><Icon name="flame" size="1em" /> {plural(streak, 'day')}</b></div>
         {outstanding > 0 && <div className="tile todo"><small>To revisit</small><b>{outstanding}</b></div>}

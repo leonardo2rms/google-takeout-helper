@@ -1,0 +1,9 @@
+/* Notices about data safety and app updates (components/DataSafety.tsx). They reuse the .notice look from styles.css. */
+.safety-bars { padding: 0 16px; }
+.safety-bars:not(:empty) { padding-top: 12px; }
+.safety-bars .notice { margin-bottom: 8px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.safety-bars .notice p { margin: 0 0 8px; }
+.safety-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.recovered-list { list-style: none; padding: 0; margin: 0 0 var(--s3); }
+.recovered-list .notice { margin-bottom: 8px; }
+.recovered-list .notice p { margin: 0 0 6px; }

@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod/v4';
-import { SYSTEM_PROMPT, buildUserPrompt, type GradeResponse, type OpenQ } from '@trainer/shared';
+import { SYSTEM_PROMPT, buildUserPrompt, cleanFeedback, type GradeResponse, type OpenQ } from '@trainer/shared';
 
 export { SYSTEM_PROMPT, buildUserPrompt, sanitizeAnswer } from '@trainer/shared';
 
@@ -52,7 +52,7 @@ export class AnthropicGrader implements Grader {
     return {
       score: covered.filter(Boolean).length / covered.length,
       covered,
-      feedback: parsed.feedback.trim(),
+      feedback: cleanFeedback(parsed.feedback),
       graded_by: 'ai',
     };
   }

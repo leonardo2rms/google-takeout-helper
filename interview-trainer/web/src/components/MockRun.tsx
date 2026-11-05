@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { monotonicNow } from '../lib/monotonic';
 import { clockText, elapsedMs, isTimeUp, pauseTimer, remainingMs, resumeTimer, startTimer, timeAnnouncement, type MockTimer, type Question } from '@trainer/shared';
 import { isAnswered } from '../lib/mock-marking';
 import { runCodeInWorker } from '../lib/run-code';
@@ -55,8 +56,8 @@ function hash(s: string): number {
  * timestamp-based, pauses while the app is hidden and submits automatically at zero.
  */
 export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Props) {
-  const [timer, setTimer] = useState<MockTimer>(() => startTimer(Date.now(), minutes));
-  const [now, setNow] = useState(() => Date.now());
+  const [timer, setTimer] = useState<MockTimer>(() => startTimer(monotonicNow(), minutes));
+  const [now, setNow] = useState(() => monotonicNow());
   const [index, setIndex] = useState(0);
   const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set([0]));
   const [answers, setAnswers] = useState<Record<string, Answer | null>>({});
@@ -74,21 +75,21 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
     (timedOut: boolean) => {
       if (submitted.current) return;
       submitted.current = true;
-      const t = Date.now();
+      const t = monotonicNow();
       onDone({ answers, flagged: [...flagged], usedSec: Math.round(Math.min(elapsedMs(timer, t), timer.limitMs) / 1000), timedOut });
     },
     [answers, flagged, timer, onDone],
   );
 
-  // The clock: a tick each second reads the real time, so a throttled background tab cannot drift.
+  // The clock: a tick each second reads a monotonic clock (the wall clock can be changed under us), so a throttled background tab cannot drift.
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    const id = window.setInterval(() => setNow(monotonicNow()), 1000);
     return () => window.clearInterval(id);
   }, []);
 
   // Leaving the app pauses the timer; coming back resumes it.
   useEffect(() => {
-    const onVis = () => setTimer((t) => (document.hidden ? pauseTimer(t, Date.now()) : resumeTimer(t, Date.now())));
+    const onVis = () => setTimer((t) => (document.hidden ? pauseTimer(t, monotonicNow()) : resumeTimer(t, monotonicNow())));
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);

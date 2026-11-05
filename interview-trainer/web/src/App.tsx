@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  ACHIEVEMENTS, CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, mixFilterFor, pickMix, previewInterval,
+  ACHIEVEMENTS, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
-import { fetchHealth, gradeOpen } from './lib/api';
+import { fetchHealthWithRetry, gradeOpen } from './lib/api';
+import { routeOf } from './lib/route';
 import { type SessionKind } from './lib/summary-copy';
 import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
@@ -14,6 +15,7 @@ import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { AchievementToasts } from './components/AchievementToasts';
 import { ConfirmProvider } from './components/ConfirmDialog';
+import { DataSafetyBanners } from './components/DataSafety';
 import { useReminderCheck } from './lib/reminders';
 import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
@@ -24,7 +26,7 @@ import { ProgressScreen } from './screens/ProgressScreen';
 import { Summary, type Finished } from './screens/Summary';
 
 function useHashRoute(): string {
-  const read = () => window.location.hash.replace(/^#/, '') || '/';
+  const read = () => routeOf(window.location.hash);
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const onChange = () => setRoute(read());
@@ -82,6 +84,7 @@ function Shell() {
       >
         Skip to main content
       </a>
+      <DataSafetyBanners />
       <main id="main" tabIndex={-1}>
         <Screens />
       </main>
@@ -101,8 +104,10 @@ function Screens() {
 
   useEffect(() => {
     if (!isStandalone) {
-      void fetchHealth().then(setHealth);
-      return;
+      // A server that is still starting must not switch AI off for the whole session: ask again, a few times.
+      const abort = new AbortController();
+      void fetchHealthWithRetry(abort.signal).then((h) => h && setHealth(h));
+      return () => abort.abort();
     }
     // Hosted single-file build: no API server; grade through the viewer's own Claude when offered.
     void loadSample().then((sample) => {
@@ -113,8 +118,10 @@ function Screens() {
     });
   }, []);
 
-  const finish = useCallback((title: string, summary: SessionSummary, sessionKind: SessionKind, lessonId?: string) => {
+  // `servedOn` is the day the session was opened: the daily challenge is recorded against it, even when the answer comes after midnight.
+  const finish = useCallback((title: string, summary: SessionSummary, sessionKind: SessionKind, lessonId?: string, servedOn?: string) => {
     const today = dayKey(new Date());
+    const challengeDay = servedOn ?? today;
     // A session of one question (Library practice, the daily challenge) is stored as a "single".
     const kind = sessionKind === 'one' ? 'single' : sessionKind === 'challenge' ? 'challenge' : undefined;
     const outcomes = outcomesOf(summary);
@@ -127,7 +134,8 @@ function Screens() {
     let challengeBonus = 0;
     updateProgress((p) => {
       before = p;
-      challengeBonus = kind === 'challenge' && pass && !p.challenge[today] ? CHALLENGE_XP : 0;
+      const settled = kind === 'challenge' ? settleChallenge(p, challengeDay, pass) : null;
+      challengeBonus = settled?.bonus ?? 0;
       const res = applySession(
         p,
         { lessonId, kind: kind ? 'single' : undefined, accuracy: summary.accuracy, xp: baseXp + challengeBonus, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes, hinted: summary.hinted, confidence: summary.confidence },
@@ -136,7 +144,7 @@ function Screens() {
       events = res.events;
       // The first finished session ends first-run setup: the plan card is not shown again unless the learner asks to edit it.
       const done = { ...res.progress, profile: { ...res.progress.profile, onboarded: true } };
-      return kind === 'challenge' ? recordChallenge(done, today, pass) : done;
+      return kind === 'challenge' ? settleChallenge(done, challengeDay, pass).progress : done;
     });
     const after = getProgress();
     if (before.stats.sessions === 0) requestPersistence(); // ask the browser to keep our storage once there is something worth keeping
@@ -148,8 +156,7 @@ function Screens() {
       title,
       kind: sessionKind,
       summary,
-      /** What was really credited (the engine's figure includes a perfect-lesson bonus that one-question sessions do not earn). */
-      xp: baseXp + challengeBonus,
+      xpEarned: baseXp + challengeBonus, // what was really credited (a one-question session earns no perfect-lesson bonus)
       newBadges: ACHIEVEMENTS.filter((a) => after.achievements[a.id] && !badgesBefore[a.id]).map(({ id, title: t, icon, description }) => ({ id, title: t, icon, description })),
       streak: streakStatus(after, today).streak,
       nextLessonId: nextLesson?.id,
@@ -279,9 +286,10 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
   grade?: GradeFn;
   explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
-  onFinish: (title: string, s: SessionSummary, kind: SessionKind) => void;
+  onFinish: (title: string, s: SessionSummary, kind: SessionKind, lessonId?: string, servedOn?: string) => void;
 }) {
   const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
+  const [servedOn] = useState(() => dayKey(new Date())); // same moment the questions were picked
 
   if (questions.length === 0) {
     return (
@@ -302,7 +310,7 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}
-      onFinish={(s) => onFinish(title, s, kind)}
+      onFinish={(s) => onFinish(title, s, kind, undefined, servedOn)}
     />
   );
 }
