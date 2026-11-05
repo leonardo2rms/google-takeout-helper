@@ -170,6 +170,42 @@ describe('blocked storage is detected (S1-5)', () => {
   });
 });
 
+describe('safety copies in a tab whose storage is blocked', () => {
+  it('are kept in the tab, rotated, and listed', async () => {
+    storageGetterThrows = true;
+    const { store } = await load();
+    const { reset } = store.useProgress();
+    for (let i = 1; i <= 5; i++) {
+      store.updateProgress(addXp(i)); // a different profile each time, so each reset makes a new copy
+      reset();
+    }
+    const copies = store.listParkedCopies();
+    expect(copies).toHaveLength(3); // the newest three
+    expect(copies.map((c) => JSON.parse(c.raw).xp)).toEqual([5, 4, 3]);
+  });
+
+  it('useSafetyStatus returns the same snapshot as getSafetyStatus', async () => {
+    const { store } = await load();
+    expect(store.useSafetyStatus()).toBe(store.getSafetyStatus());
+  });
+});
+
+describe('storage that fails after it was working', () => {
+  it('keeps the in-memory profile when a later read throws, and does not claim another tab wrote', async () => {
+    const { store } = await load();
+    store.updateProgress(addXp(5));
+    let reads = 0;
+    const real = storage.getItem.bind(storage);
+    storage.getItem = (k: string) => {
+      // the availability probe passes; the read that looks for another tab's write throws
+      if (++reads % 2 === 0) throw new Error('revoked');
+      return real(k);
+    };
+    expect(() => store.updateProgress(addXp(5))).not.toThrow();
+    expect(store.getProgress().xp).toBe(10);
+  });
+});
+
 describe('unreadable data is parked, kept and shown (S0-1, S1-6)', () => {
   const future = JSON.stringify({ version: 99, xp: 1000 });
 

@@ -39,7 +39,7 @@ All commands run from `interview-trainer/`.
 | Type checking (all packages and e2e) | `npm run typecheck` | web test files are type checked too |
 | Coverage with thresholds | `npm run coverage` | prints a summary and per-file table, writes `coverage/lcov.info` (git-ignored); fails below the ratchet |
 | Production build | `npm run build` | runs `tsc` then `vite build`; also validates the YAML |
-| Single-file build | `npm run build:standalone` | writes `dist/interview-trainer.html` |
+| Single-file build | `npm run build:standalone` | writes `dist/interview-trainer.html` (fragment) and `dist/interview-trainer.standalone.html` (complete document) |
 | End to end | `npm run e2e` | builds, serves with AI off, drives headless Chromium. First time on a machine: `npx playwright install chromium` |
 
 Where the unit tests live:
@@ -50,7 +50,7 @@ Where the unit tests live:
 | `shared/src/properties-*.test.ts` | `properties-progress`, `properties-logic` | fast-check properties (below) |
 | `shared/src/schema.test.ts`, `load-content.test.ts` | the content schema, every cross-field rule, loading from a directory | |
 | `server/src/*.test.ts` | `app` and `explain` (grading and tutor endpoints), `routes` (parsing, limits, headers, static serving, rate-limit windows, error hygiene), `clients` (the Anthropic wrappers) | HTTP via `fetch` against `app.listen(0)` |
-| `web/src/lib/*.test.ts` | `store` (fake `localStorage`, quota errors, multi-tab events), `evaluate*`, `run-code` (fake Worker), `reminders` (fake `Notification`), `hooks` (a11y/today with stubbed React), `share-image` (recording canvas), API clients, `highlight`, `format`, `toasts`, `mock-marking` | the platform glue |
+| `web/src/lib/*.test.ts` | `store` and `store-safety` (fake `localStorage`, quota errors and recovery, unreadable data, blocked storage, safety copies, multi-tab events), `sw-logic` and `sw-register` (fake `caches`/`fetch`: what may be cached, all-or-nothing install, update notice), `sample-timeout`, `evaluate*`, `run-code` (fake Worker), `reminders` (fake `Notification`), `hooks` (a11y/today with stubbed React), `share-image` (recording canvas), API clients, `highlight`, `format`, `toasts`, `mock-marking` | the platform glue |
 | `content/*.test.ts` | the course and the docs | see below |
 
 ### Property-based tests
@@ -104,6 +104,7 @@ E2E_PORT=4182 npx playwright test -g "every lesson"
 - Time is controlled with `page.clock` (a review that becomes due tomorrow, a mock that times out), never with real waiting.
 - Correct answers are read from the YAML (`e2e/solve.ts`, `answerCorrectly`) using only what a learner can tap, so tests stay in sync with the content. `question-types.spec.ts` plays **every question type** and **every lesson in the course** perfectly, checks the XP, the feedback, that wrong answers come back, and that nothing scrolls sideways on a phone.
 - Network failures and the AI endpoints are faked in the browser (`page.route`), never reached.
+- Robustness (QA audit regressions, each fails without its fix): `data-safety.spec.ts` (failed writes, blocked storage, unreadable data and Recovered data), `service-worker.spec.ts` (404 for missing assets, version-keyed pre-cache, offline, update notice), `standalone.spec.ts` (builds the single file, opens it from `file://`, a hanging `sample` host), `session-credit.spec.ts` (summary XP, challenge across midnight), `mock-clock.spec.ts` (timer vs wall clock), `routes-robustness.spec.ts`.
 - Accessibility: `a11y.spec.ts` runs axe over every screen and state (fails on serious/critical issues; colour contrast is the one tracked exception, see [accessibility.md](accessibility.md)); `a11y-behaviour.spec.ts` covers what axe cannot see.
 - Prefer selectors a learner could use: roles, labels and visible text. Reach for CSS classes or DOM structure only when there is no accessible alternative (a few helpers in `e2e/solve.ts` still do), because those break on redesigns.
 

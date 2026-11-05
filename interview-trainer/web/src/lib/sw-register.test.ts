@@ -100,6 +100,15 @@ describe('looking for new deploys', () => {
     expect(c.update).toHaveBeenCalledTimes(2);
   });
 
+  it('uses setInterval for the periodic check unless told otherwise', async () => {
+    vi.useFakeTimers();
+    const c = new FakeContainer({});
+    await registerServiceWorker(asContainer(c), fakeDoc());
+    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_MS * 2);
+    expect(c.update).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
   it('swallows a failed update check and a failed registration', async () => {
     const c = new FakeContainer({});
     c.update.mockRejectedValue(new Error('offline'));

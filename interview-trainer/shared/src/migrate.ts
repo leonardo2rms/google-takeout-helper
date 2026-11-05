@@ -57,8 +57,9 @@ export function sameJson(a: unknown, b: unknown): boolean {
 function normalizeCards(raw: unknown, today: Day): Progress['cards'] {
   const out: Progress['cards'] = {};
   if (!isObj(raw)) return out;
+  let kept = 0;
   for (const [id, c] of Object.entries(raw)) {
-    if (Object.keys(out).length >= MAX_RECORDS) break;
+    if (kept >= MAX_RECORDS) break;
     if (id.length > MAX_ID_LENGTH || !safeKey(id) || !isObj(c) || typeof c.h !== 'string' || c.h === '' || !isDay(c.due)) continue;
     // A due date far in the future can only come from clock skew: pull it back inside the interval cap.
     const due = daysBetween(today, c.due) > MAX_INTERVAL ? addDays(today, MAX_INTERVAL) : c.due;
@@ -75,6 +76,7 @@ function normalizeCards(raw: unknown, today: Day): Progress['cards'] {
     };
     if (c.hc === true) card.hc = true;
     out[id] = card;
+    kept++;
   }
   return out;
 }
@@ -99,8 +101,9 @@ function normalizeDays(raw: unknown, today: Day, target: number): Progress['days
 function normalizeLessons(raw: unknown, today: Day): Progress['lessons'] {
   const out: Progress['lessons'] = {};
   if (!isObj(raw)) return out;
+  let kept = 0;
   for (const [id, r] of Object.entries(raw)) {
-    if (Object.keys(out).length >= MAX_RECORDS) break;
+    if (kept >= MAX_RECORDS) break;
     if (id.length > MAX_ID_LENGTH || !safeKey(id) || !isObj(r)) continue;
     const rec: LessonRecord = {
       bestAccuracy: typeof r.bestAccuracy === 'number' && Number.isFinite(r.bestAccuracy) ? Math.min(1, Math.max(0, r.bestAccuracy)) : 0,
@@ -108,6 +111,7 @@ function normalizeLessons(raw: unknown, today: Day): Progress['lessons'] {
       lastDay: isDay(r.lastDay) ? r.lastDay : today,
     };
     out[id] = rec;
+    kept++;
   }
   return out;
 }

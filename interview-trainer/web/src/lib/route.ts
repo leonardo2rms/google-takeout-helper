@@ -4,6 +4,6 @@
  * instead of silently showing Home or "not found" (QA S2-17).
  */
 export function routeOf(hash: string): string {
-  const path = (hash.replace(/^#/, '').split(/[?#]/)[0] ?? '').replace(/\/{2,}/g, '/').replace(/\/+$/, '');
+  const path = hash.replace(/^#/, '').replace(/[?#].*$/s, '').replace(/\/{2,}/g, '/').replace(/\/+$/, '');
   return path === '' ? '/' : path.startsWith('/') ? path : `/${path}`;
 }
