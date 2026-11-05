@@ -16,12 +16,12 @@ lessons:
       - type: single
         prompt: "What ordering does Kafka guarantee?"
         options:
-          - { id: a, text: "Records within one partition are ordered; records with the same key go to the same partition (while the partition count stays the same), so they are ordered per key" }
-          - { id: b, text: "All records of a topic are globally ordered" }
-          - { id: c, text: "Records are ordered across all partitions, but only inside one consumer group" }
-          - { id: d, text: "Ordering is guaranteed only when there is exactly one broker" }
+          - { id: a, text: "Records within one partition are ordered, and equal keys go to the same partition, so order holds per key" }
+          - { id: b, text: "All records of a topic are globally ordered, because the broker assigns each record a topic-wide sequence number" }
+          - { id: c, text: "Records are ordered across all partitions, but only for the consumers inside one consumer group" }
+          - { id: d, text: "Ordering is guaranteed only when the topic has exactly one broker, because replicas can reorder records" }
         answer: a
-        explanation: "The partition is the unit of ordering and of parallelism. A global order would force a single partition and a single reader. So choose a key that carries the ordering you need (for example the order id) and expect no ordering between different keys."
+        explanation: "The partition is the unit of ordering and of parallelism (and keys map to the same partition only while the partition count stays the same). A global order would force a single partition and a single reader; offsets are per partition, and the number of brokers or consumer groups does not change that. So choose a key that carries the ordering you need (for example the order id) and expect no ordering between different keys."
         difficulty: easy
 
       - type: code
@@ -63,10 +63,10 @@ lessons:
             INFO  [Consumer clientId=billing-3, groupId=billing] Revoking previously assigned partitions [payments-4]
             ERROR [Consumer clientId=billing-3, groupId=billing] Offset commit failed: the group has already rebalanced and the partitions belong to another member
         options:
-          - { id: a, text: "Processing a polled batch took longer than max.poll.interval.ms, so the member was removed and its partition moved to another member; reduce max.poll.records or speed up the work (or move it off the poll thread), and raise the interval only if the work is truly that slow" }
-          - { id: b, text: "The broker ran out of disk, so it dropped the consumer" }
-          - { id: c, text: "The topic has too many partitions; delete some to stop the rebalances" }
-          - { id: d, text: "Heartbeats were lost on the network; the only fix is a longer session.timeout.ms" }
+          - { id: a, text: "Processing a batch took longer than max.poll.interval.ms, so the member was removed; reduce max.poll.records or speed up the work" }
+          - { id: b, text: "The broker ran out of disk space and dropped the consumer, so free disk space and restart the broker" }
+          - { id: c, text: "The topic has too many partitions for one group, so delete partitions to stop the rebalances" }
+          - { id: d, text: "Heartbeats were lost on the network, so the only fix is to raise session.timeout.ms and heartbeat.interval.ms" }
         answer: a
         explanation: "The log names the cause: 412 s between poll() calls against a 300 s limit. The consumer was declared failed, a rebalance gave payments-4 to someone else, and its late offset commit was rejected, so the new owner re-reads records the old one had already processed (hence duplicates, and the need for idempotent handling). Heartbeats run on a separate thread and are governed by `session.timeout.ms`; this is the poll-interval limit."
 
@@ -108,10 +108,10 @@ lessons:
       - type: single
         prompt: "A topic has 6 partitions and a consumer group of 6 instances, each at capacity. Lag keeps growing at peak. In a regular consumer group, which of these will NOT raise the group's throughput?"
         options:
-          - { id: a, text: "Starting 6 more instances of the same group: each partition is assigned to at most one member, so the extra ones sit idle" }
-          - { id: b, text: "Making per-record work cheaper, for example by batching database writes" }
+          - { id: a, text: "Starting 6 more instances of the group: each partition has one owner, so the extras sit idle" }
+          - { id: b, text: "Making per-record work cheaper, for example by batching database writes in each poll" }
           - { id: c, text: "Adding partitions and consumers, accepting that keys map to different partitions afterwards" }
-          - { id: d, text: "Handing records from each poll to a worker pool, and committing only offsets whose records are all finished" }
+          - { id: d, text: "Handing records from each poll to a worker pool and committing only offsets of finished records" }
         answer: a
         explanation: "Within one group the partition count caps useful parallelism. Options B, C and D all add capacity per partition or add partitions, each with a cost: C breaks key-to-partition stability, and D needs careful offset handling and loses strict per-partition ordering of side effects unless you hash by key to workers. This is also why you size partitions with the peak consumer count in mind."
 
@@ -191,10 +191,10 @@ lessons:
       - type: single
         prompt: "A colleague says: 'Kafka has exactly-once semantics, so our consumers do not need to be idempotent.' What is the best response?"
         options:
-          - { id: a, text: "Exactly-once covers read-process-write that stays inside Kafka (idempotent producer plus transactions); an external side effect such as a database write or HTTP call can still be repeated, so make it idempotent or deduplicate" }
-          - { id: b, text: "Exactly-once delivery is mathematically impossible, so Kafka has nothing like it" }
-          - { id: c, text: "Setting enable.idempotence=true on the producer makes every consumer safe from duplicates" }
-          - { id: d, text: "That is correct for any consumer once acks=all is set" }
+          - { id: a, text: "Exactly-once covers read-process-write inside Kafka (idempotent producer plus transactions); external side effects such as database writes can still repeat" }
+          - { id: b, text: "Exactly-once delivery is mathematically impossible in any distributed system, so Kafka's claim is only marketing and consumers must be idempotent" }
+          - { id: c, text: "Setting enable.idempotence=true on the producer makes every consumer safe from duplicates, including external side effects" }
+          - { id: d, text: "That is correct for any consumer once acks=all and min.insync.replicas are set, because no record is delivered twice then" }
         answer: a
         explanation: "Kafka's exactly-once semantics are real but scoped: the idempotent producer removes duplicates caused by producer retries, and transactions make a consume-transform-produce step atomic, with consumers reading only committed data. The moment the consumer touches a system outside Kafka, a crash after the side effect but before the offset commit replays the record. Idempotent handlers (inbox table, unique constraint, natural idempotency) are still required. acks=all is about durability, not duplicates."
 
@@ -211,20 +211,20 @@ lessons:
       - type: single
         prompt: "How do a classic queue (RabbitMQ-style) and a log (Kafka-style) differ at their core?"
         options:
-          - { id: a, text: "A classic queue tracks delivery and acknowledgment per message and removes a message once it has been consumed; a log keeps records for a retention period and each consumer group tracks its own offset, so records can be replayed and read by many groups" }
-          - { id: b, text: "A queue can only hold one message at a time, while a log holds many" }
-          - { id: c, text: "A log delivers each record to exactly one consumer overall, while a queue broadcasts to all consumers" }
-          - { id: d, text: "A queue is always faster than a log" }
+          - { id: a, text: "A queue tracks acknowledgment per message and removes it once consumed; a log keeps records and each group tracks its own offset" }
+          - { id: b, text: "A queue can hold only one message at a time, so producers have to wait for each consumer, while a log buffers many records on disk" }
+          - { id: c, text: "A log delivers each record to exactly one consumer overall and then deletes it, while a queue retains every message and broadcasts it to all consumers" }
+          - { id: d, text: "A queue is always faster than a log, because a log has to write every record to disk and keep it for days" }
         answer: a
         explanation: "Queue: work distribution, with per-message acks, requeueing and routing through exchanges. Log: an append-only history that consumers read at their own pace and can rewind, which suits event streaming, reprocessing and many independent readers. Neither is simply better: pick the queue for task distribution with rich routing, the log for event streams, replay and high throughput. (RabbitMQ also offers stream-style queues, so the distinction is about the model, not the product name.)"
 
       - type: single
         prompt: "You add an optional field to an event that producers publish and several teams consume, using a schema registry with compatibility checks. Which kind of change is generally safe?"
         options:
-          - { id: a, text: "Adding a new field with a default value, which old readers can ignore and new readers can fill in" }
-          - { id: b, text: "Changing a field's type from an integer to a string" }
-          - { id: c, text: "Making a previously optional field required" }
-          - { id: d, text: "Reusing a removed field's name or number for a different meaning" }
+          - { id: a, text: "Adding a new field with a default, which old readers ignore and new readers can fill in" }
+          - { id: b, text: "Changing a field's type from an integer to a string, since both are scalar values" }
+          - { id: c, text: "Making a previously optional field required, since every current producer sets it" }
+          - { id: d, text: "Reusing a removed field's name or number for a different meaning, once nobody sends the old one" }
         answer: a
         explanation: "Safe evolution is additive: new optional fields with defaults, and removing optional fields in a coordinated way. Type changes, tightening optional to required, and reusing identifiers for other meanings break either old readers or old data. Choose the compatibility mode (backward, forward, full) to match whether consumers or producers are upgraded first, and remember that events stay in the log for a long time, so old data will be read by new code."
 
