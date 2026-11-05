@@ -288,7 +288,7 @@ lessons:
         options:
           - { id: a, text: "Each element sent to a Channel is received by exactly one receiver, which lets several consumers share the work" }
           - { id: b, text: "A cold Flow runs its producer block again for every collector" }
-          - { id: c, text: "A consumer looping with `for (x in channel)` keeps going until the channel is closed" }
+          - { id: c, text: "A consumer looping with `for (x in channel)` waits on an empty channel and ends normally only once the channel is closed" }
           - { id: d, text: "`Channel<T>()` created with no arguments buffers 64 elements by default" }
           - { id: e, text: "Collecting a `StateFlow` ends when its producer stops updating it" }
         answers: [a, b, c]
