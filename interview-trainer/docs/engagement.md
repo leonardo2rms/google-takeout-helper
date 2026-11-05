@@ -2,7 +2,7 @@
 
 The loop: **a cue** (the Today card, a countdown the learner chose) -> **a five-minute action** (8 interleaved questions) ->
 **a benign reward** (the ring fills, the rank bar moves, a milestone is named once) -> **investment** (cards scheduled, topics
-mastered, days practised, all exportable) -> **the next cue** ("N ready to review").
+mastered, days practised, all exportable) -> **the next cue** ("N due").
 
 The engine is the due queue, not the confetti: spaced retrieval is the best-evidenced way to keep material from decaying
 before an interview. Gamification is the wrapper.
@@ -30,7 +30,7 @@ All of it is pure: `today` is always passed in, there is no `Date.now()` in `sha
 - No hearts, energy or anything that blocks practising. No paid, ad-gated or time-limited streak repair. No "streak in danger"
   banners, countdown-to-midnight timers, sad mascots or red badge counters. Freezes are earned (every 7 days in a row) and capped at 2.
 - Rest days are the learner's choice and free. A lapse is "fresh start": the longest streak and the days practised overall never reset.
-- Copy is factual ("6 questions are ready to review"), never guilt. A long backlog is capped at "30+" and Today still asks for 8.
+- Copy is factual ("6 questions are due for review"), never guilt. The backlog is stated honestly ("73 due · 10 per session") and Today still asks for 8. "Due" always means a card whose due date has arrived (`dueOverview`).
 - The only variable reward is additive, disclosed and switchable: about 1 session in 6 shows a "Worth remembering" tip with +5 XP,
   decided by `fnv1a(date|sessions) % 6`, so a reload cannot re-roll it. It never gates anything.
 - Readiness means "how much of this course you would recall today", with coverage shown. It never claims a chance of passing.
@@ -59,10 +59,14 @@ defaults in `normalizeProgress`, so they need no migration.
 ## Reminders
 
 A reminder is a cue the learner chose, not a lever we pull. Rules: opt-in only (nothing is requested until the toggle is used), the time is theirs, at most one local notification a day,
-nothing on rest days or after practising or when nothing is due, copy that states a fact ("5 questions are ready to review"), no streak talk, one tap to turn it all off, and honesty about the limits
+nothing on rest days or after practising or when nothing is due, copy that states a fact ("5 questions are due for review"), no streak talk, one tap to turn it all off, and honesty about the limits
 (no push server: the calendar event is the reliable channel). The `.ics` generator and the notification rule are pure functions in `shared/src/reminders.ts` with an injected clock.
 
 ## Share card
 
 Share only what the learner already sees, never anything inferred or personal (no interview date, role, practice time or question content), and make it optional and local: the image is drawn in the browser
 and handed to the system share sheet or saved; nothing is uploaded and there is no referral tracking. The copy never claims a result ("readiness is an estimate of recall").
+
+## Tomorrow bridge
+
+After each of the first three sessions the summary says what is next and when ("Next review: 7 questions tomorrow, about 4 min"). Once, in those early sessions, it also offers a calendar entry (time picker, `.ics`) with a plain "No thanks". The offer is marked as shown the moment it appears (`prefs.reminders.nudged`) so it never returns, is not shown when a reminder already exists, and says nothing about streaks or loss.

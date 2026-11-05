@@ -101,7 +101,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const mixCard = (
     <a key="mix" className="card action" href="#/mix" data-testid="mix-card">
       <span className="tile-i" aria-hidden="true"><Icon name="shuffle" size={22} /></span>
-      <span><b>Mixed practice</b><small>{done === 0 ? '8 questions from across the course' : '8 questions, weighted toward your weak spots'}</small></span>
+      <span><b>Mixed practice</b><small>{done === 0 ? '8 questions from across the course' : '8 questions, weighted toward what you know least'}</small></span>
       <Icon name="chevron-right" className="go" />
     </a>
   );

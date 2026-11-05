@@ -6,7 +6,7 @@
 /* Goal met: the hero is calm (outline tile, quiet button) and offers one optional next step. */
 .card.hero.done { border-color: var(--edge); }
 .cta.quiet { background: transparent; color: var(--ink); border: 1px solid var(--edge); }
-.card.up-next { margin: 0 0 var(--s2); }
+.card.up-next, .card.hero + .card.up-next { margin: 0 0 var(--s2); }
 
 /* Daily challenge, finished: the action sits under the text instead of squeezing the title. */
 .card.challenge.done .hero-text b { overflow-wrap: anywhere; }
@@ -33,3 +33,4 @@
 .btn.danger-btn { color: var(--vermilion); border-color: var(--vermilion); }
 .more-mocks { margin: 4px 0 0; }
 .more-mocks > summary { color: var(--graphite); font-weight: 500; }
+.tip .tip-note { display: block; margin-top: 6px; font-size: var(--fs-13); }

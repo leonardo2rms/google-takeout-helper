@@ -221,6 +221,7 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
         <section className="tip" data-testid="tip">
           <b><Icon name="lightbulb" /> Worth remembering <span className="muted">(+{finished.tip.bonusXp} XP)</span></b>
           <Inline text={finished.tip.text} />
+          <small className="muted tip-note">An occasional bonus, not a reward for streaks. Turn it off in Settings.</small>
         </section>
       )}
 
