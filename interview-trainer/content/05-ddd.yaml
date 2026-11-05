@@ -47,11 +47,11 @@ lessons:
             }
         options:
           - { id: a, text: "Anemic domain model: the rules live in a service while the domain object is just data" }
-          - { id: b, text: "Primitive obsession is the only issue; the structure is fine" }
-          - { id: c, text: "A God Class" }
-          - { id: d, text: "Shotgun surgery" }
+          - { id: b, text: "Primitive obsession: the status should be an enum or value type, and nothing else is wrong" }
+          - { id: c, text: "A God Class: `Order` does too much and should be split into smaller classes" }
+          - { id: d, text: "Shotgun surgery: one change to the status rules would touch many classes at once" }
         answer: a
-        explanation: "Behaviour should live with the data it protects: `order.ship()` enforces the invariant, and the status can't be set to arbitrary strings from outside. (The raw String status is also primitive obsession.)"
+        explanation: "Behaviour should live with the data it protects: `order.ship()` enforces the invariant, and the status can't be set to arbitrary strings from outside. (The raw String status is also primitive obsession, but it is not the only problem.) `Order` is tiny, so it is no God Class, and nothing here fans a change out across many classes."
 
       - type: fill
         prompt: Make the aggregate protect its own invariant, with a strongly-typed id.
@@ -72,21 +72,21 @@ lessons:
         hint: "Which layer coordinates the steps and the transaction without containing business rules?"
         prompt: "Where should \"load the order, call `order.pay()`, save it, then publish `OrderPaid`\" live?"
         options:
-          - { id: a, text: "An application service (use case), which orchestrates and owns the transaction" }
-          - { id: b, text: "Inside the Order entity" }
-          - { id: c, text: "In the REST controller" }
-          - { id: d, text: "In the repository implementation" }
+          - { id: a, text: "An application service (use case), which orchestrates the steps and owns the transaction" }
+          - { id: b, text: "Inside the Order entity, so the aggregate can load, pay and persist itself in one method" }
+          - { id: c, text: "In the REST controller, which already receives the request and can call each step directly" }
+          - { id: d, text: "In the repository implementation, which is the only place that can see the database transaction" }
         answer: a
-        explanation: "Domain logic belongs to entities/value objects/domain services; orchestration, transactions and I/O belong to application services. Controllers only translate HTTP to a use-case call."
+        explanation: "Domain logic belongs to entities/value objects/domain services; orchestration, transactions and I/O belong to application services. Controllers only translate HTTP to a use-case call, an entity should not load or save itself, and a repository only loads and stores aggregates."
 
       - type: single
         hint: "Think about dependency direction: who is allowed to know about whom?"
         prompt: "In a hexagonal/DDD layout, where does the `OrderRepository` *interface* belong?"
         options:
-          - { id: a, text: "The domain layer; the JPA implementation lives in infrastructure" }
-          - { id: b, text: "Infrastructure, next to the JPA implementation" }
-          - { id: c, text: "The web layer" }
-          - { id: d, text: "A shared 'common' module used by all services" }
+          - { id: a, text: "The domain layer, so the domain defines the contract and JPA implements it elsewhere" }
+          - { id: b, text: "Infrastructure, next to the JPA implementation, because only that code uses it" }
+          - { id: c, text: "The web layer, because controllers are the main callers of repositories" }
+          - { id: d, text: "A shared 'common' module so that every service reuses one repository contract" }
         answer: a
         explanation: "The domain declares what it needs in domain terms (`save(order)`, `findById(id)`), and infrastructure implements it. That's the dependency inversion that keeps the domain free of Spring/JPA."
 
@@ -155,10 +155,10 @@ lessons:
         hint: "Does the same word need to mean exactly the same thing in both teams' language?"
         prompt: "In Sales, a \"Customer\" has credit limits and discounts. In Shipping, a \"Customer\" is just a delivery address and phone number. What does DDD recommend?"
         options:
-          - { id: a, text: "Separate bounded contexts, each with its own model of Customer, linked by an identifier" }
-          - { id: b, text: "One shared Customer class containing every field for every team" }
-          - { id: c, text: "A single global database table" }
-          - { id: d, text: "Rename one of them to avoid the clash and keep one model" }
+          - { id: a, text: "Separate bounded contexts, each with its own Customer model, linked by an identifier" }
+          - { id: b, text: "One shared Customer class holding every field, so that all teams use the same definition" }
+          - { id: c, text: "A single global Customer table that every context reads and writes directly" }
+          - { id: d, text: "Rename one of the two concepts to avoid the clash, and keep one canonical model for the whole company" }
         answer: a
         explanation: "A model is only valid within a boundary. Trying to build one canonical model forces every team to couple to every other team's concerns."
 
@@ -166,12 +166,12 @@ lessons:
         hint: "Picture a legacy model whose concepts you do not want leaking into yours."
         prompt: What problem does an Anti-Corruption Layer (ACL) solve?
         options:
-          - { id: a, text: "It translates between an external/legacy model and your own so the foreign concepts don't leak into your domain" }
-          - { id: b, text: "It encrypts traffic between services" }
-          - { id: c, text: "It prevents SQL injection" }
-          - { id: d, text: "It caches calls to third parties" }
+          - { id: a, text: "It translates between a foreign model and your own, so foreign concepts don't leak in" }
+          - { id: b, text: "It encrypts and authenticates the traffic between your services and external systems" }
+          - { id: c, text: "It validates and sanitises incoming data so that injection attacks cannot corrupt the domain" }
+          - { id: d, text: "It caches responses from third-party APIs so the domain is shielded from their downtime" }
         answer: a
-        explanation: "Typically an adapter + translator in front of a legacy system or third-party API, so your domain keeps speaking its own language."
+        explanation: "Typically an adapter + translator in front of a legacy system or third-party API, so your domain keeps speaking its own language. It is a modelling boundary, not a security, validation or caching mechanism."
 
       - type: multi
         prompt: Select ALL valid context-mapping relationships.
@@ -198,20 +198,20 @@ lessons:
         hint: "Make the two writes one write: what can share a single database transaction?"
         prompt: "A service saves an order to its DB and then publishes `OrderPlaced` to Kafka. The process crashes between the two steps. Which pattern fixes the inconsistency?"
         options:
-          - { id: a, text: "Transactional outbox: write the event to an outbox table in the same DB transaction, and relay it afterwards" }
-          - { id: b, text: "Publish first, then save" }
-          - { id: c, text: "Wrap both in a try/catch and retry the save" }
-          - { id: d, text: "Use a bigger Kafka cluster" }
+          - { id: a, text: "Transactional outbox: write the event to an outbox table in the same transaction, then relay it" }
+          - { id: b, text: "Publish first and save afterwards, so that a crash can only leave an unsaved order" }
+          - { id: c, text: "Wrap both calls in a try/catch and retry the failed step when the process restarts" }
+          - { id: d, text: "Use a bigger Kafka cluster with acks=all so that the broker never loses the message" }
         answer: a
         explanation: "A DB and a broker can't share a transaction (the dual-write problem). The outbox makes the event part of the local atomic commit, and a relay or CDC process delivers it at-least-once."
 
       - type: single
         prompt: "What is the best starting heuristic for drawing microservice boundaries?"
         options:
-          - { id: a, text: "Align with bounded contexts / business capabilities" }
-          - { id: b, text: "One service per database table" }
-          - { id: c, text: "One service per Java package" }
-          - { id: d, text: "One service per developer" }
+          - { id: a, text: "Align with bounded contexts and the business capabilities they serve" }
+          - { id: b, text: "One service per database table, so each service owns exactly one set of rows" }
+          - { id: c, text: "One service per Java package, since packages already group related code" }
+          - { id: d, text: "One service per developer, so each service has a clear owner" }
         answer: a
         explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is cheaper than merging prematurely split services."
 
@@ -276,20 +276,20 @@ lessons:
       - type: single
         prompt: "In an event-sourced system a bug stored `PriceChanged(sku, 90)` when the price should have been 99. What is the right way to correct the history?"
         options:
-          - { id: a, text: "Append a correcting event (a new `PriceChanged(sku, 99)` or a dedicated `PriceCorrected`); stored events are immutable facts and projections replay to the corrected state" }
-          - { id: b, text: "Edit or delete the wrong event in the event store" }
-          - { id: c, text: "Fix only the read model and leave the event stream as it is" }
-          - { id: d, text: "Drop the event store and rebuild it from the current database tables" }
+          - { id: a, text: "Append a correcting event (a new `PriceChanged(sku, 99)` or a `PriceCorrected`); stored events are immutable facts" }
+          - { id: b, text: "Edit or delete the wrong event, so the history shows the right price from the start" }
+          - { id: c, text: "Fix only the read model and leave the event stream as it is, since projections are disposable" }
+          - { id: d, text: "Drop the event store and rebuild it from the current database tables, which hold the right price" }
         answer: a
         explanation: "The event log is the source of truth and the audit trail, so you add to it rather than rewrite it: the wrong event stays visible, and the correction says what changed and why. Editing history silently invalidates every projection and snapshot built from it. Patching only a read model leaves the source of truth wrong, so the next rebuild would bring the bug back."
 
       - type: single
         prompt: "A CQRS system updates its read model asynchronously from events. After placing an order, the user is redirected to 'My orders' and the order is missing. Which fix keeps the benefit of the asynchronous read model?"
         options:
-          - { id: a, text: "Return the new order from the command and show it right away, or have the query wait until the projection has reached the version the command produced (read-your-writes)" }
-          - { id: b, text: "Make every command sleep for two seconds before it returns" }
-          - { id: c, text: "Query the write model's tables again and drop the read model" }
-          - { id: d, text: "Accept it: with eventual consistency a UI must never show recent changes" }
+          - { id: a, text: "Return the order from the command and show it right away, or have the query wait for the projection's version (read-your-writes)" }
+          - { id: b, text: "Make every command sleep for a couple of seconds before it returns, so that the projection always has time to catch up under load" }
+          - { id: c, text: "Read from the write model's tables again and drop the asynchronous read model entirely" }
+          - { id: d, text: "Accept it, because eventual consistency means a UI can never show recent changes" }
         answer: a
         explanation: "Eventual consistency is a UX design problem as well as a technical one. Typical answers: optimistic UI using the command's response, a pending state, or a version token that lets the read side wait (briefly, with a timeout) for the projection to catch up. A fixed sleep is a race that is wrong under load, and querying the write model gives up the reason for having a read model."
 
@@ -338,10 +338,10 @@ lessons:
         prompt: Select ALL practices that keep a modular monolith modular.
         options:
           - { id: a, text: "Each module exposes a small public API and keeps its internals, including its entities and tables, private" }
-          - { id: b, text: "Modules may join each other's tables directly when it is faster" }
+          - { id: b, text: "Modules may join each other's tables directly when that is faster than calling the other module's API" }
           - { id: c, text: "Modules communicate through that public API or through events, not through each other's repositories" }
           - { id: d, text: "Module boundaries are verified automatically, for example with architecture tests (ArchUnit) or Spring Modulith's module verification" }
-          - { id: e, text: "Each module needs its own deployable and service discovery, otherwise it is not a module" }
+          - { id: e, text: "Each module needs its own deployable and its own service discovery, otherwise it is not really a module" }
         answers: [a, c, d]
         explanation: "A modular monolith gets most of the benefit of service boundaries (clear ownership, independent change, a path to extract a module later) without network calls. The boundaries only last if they are enforced: package-private visibility, separate Gradle modules or tests that fail the build on illegal dependencies. Shared tables are the usual way they erode."
 
