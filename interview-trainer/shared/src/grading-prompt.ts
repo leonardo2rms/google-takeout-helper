@@ -11,7 +11,7 @@ Return one entry in "points" per rubric point, in the same order. Write "feedbac
 
 /** Neutralises anything in the candidate text that could close or spoof our delimiter tags. */
 export function sanitizeAnswer(answer: string): string {
-  return answer.replace(/<\/?\s*candidate_answer\s*>/gi, '[tag removed]');
+  return answer.replace(/<\/?\s*candidate_answer\b[^>]*>/gi, '[tag removed]');
 }
 
 export function buildUserPrompt(q: OpenQ, answer: string): string {
