@@ -27,7 +27,7 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,504 unit/content/docs tests (vitest) |
+| `npm test` | 1,507 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
 | `npm run e2e` | 302 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,504 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
+1,507 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -209,18 +209,21 @@ Ids are stable so commits and sessions can refer to them. Audit ids in brackets 
   questions each, so a couple of questions move it 10 points; the ratchet bounds the whole course at 40%), and in data
   the answer is never the shortest option (0 of 6). Worth a look when those units next get new questions.
 
-**P1-2 Content clean-ups the audits listed** [S2-25, N-S2-13, round-1 content notes]
-- Duplicate open question "Design a rate limiter for a public API..." in `content/06-scale.yaml` (lesson
-  `scale-advanced`, question 9) and `content/11-system-design.yaml` (lesson `sd-estimation-traffic`, question 9):
-  replace one.
-- Near-duplicate topics: `spring-advanced/3` vs `data-sql/7` (lost update), `data-jpa/7` vs `scale-advanced/6`
-  (cache-aside race), `spring-advanced/8` vs `testing-strategy/3` (test slices): differentiate or merge.
-- Four `order` questions have lines that are identical once trimmed (`coroutines-flow/5`, `scale-resilience/7`,
-  `complexity-reading/8`, `complexity-advanced/7`); they rely on indentation, which the round-1 UX audit also flagged
-  (UX-22). Rewrite them so lines are unique without indentation, then indentation can be hidden in the pool.
-- 34 of 36 multi-select questions are "3 correct of 5": vary the number of correct answers (changes keys, so
-  re-fact-check).
-- *Size:* M.
+**P1-2 Content clean-ups the audits listed** [S2-25, N-S2-13, UX-22]: **done** (2026-11-05).
+- The duplicate rate-limiter question in `scale-advanced` (position 9) is now an open question on hedged requests for
+  tail latency; the system-design one stays.
+- Overlaps resolved: `spring-advanced/3` is now about `@Version` and retrying an optimistic-locking failure outside
+  the transaction (`data-sql/7` keeps the SQL-level lost update); `data-jpa/7` is now Hibernate second-level cache
+  staleness (`scale-advanced/6` keeps the cache-aside order); `testing-strategy/3` is now `@JsonTest`
+  (`spring-advanced/8` keeps `@WebMvcTest`).
+- Order questions: lines are unique once trimmed, the pool shows them without indentation (placed lines show it), and
+  `coroutines-flow/5` and `scale-resilience/7` had a second valid order, now pinned down by their prompts.
+- Multi-select: 2, 3 and 4 correct answers of 5 (11 / 12 / 11 questions, plus two 4 of 6), explanations rewritten.
+- Guards in `content/content.test.ts`: no repeated question, order lines unique once trimmed, no correct-answer count on
+  more than half of the `multi` questions. A fact-check of the 30 changed questions found the two order errors above and
+  three smaller issues, all fixed.
+- Learners keep their cards except for the questions whose prompt changed (the six above that were rewritten), which
+  start fresh, as intended when the question itself changes.
 
 **P1-3 Verify what could not be verified in the sandbox**
 - Real AI grading and the tutor with `ANTHROPIC_API_KEY`: prompt quality, latency, cost per call, refusals, the
