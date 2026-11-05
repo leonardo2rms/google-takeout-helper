@@ -69,7 +69,7 @@ Below, the first block of each type is a complete, valid question. Constraints a
   explanation: "GET, PUT and DELETE are idempotent: repeating the request leaves the same server state. POST is not, and PATCH is not guaranteed to be (it depends on the patch format), so retries of either need an idempotency key."
 ```
 
-3 to 7 options, at least 2 correct, all-or-nothing grading (the learner must pick exactly the right set).
+3 to 7 options, at least 2 correct, all-or-nothing grading (the learner must pick exactly the right set). **Vary how many are correct.** The screen only says "Select all that apply"; when most questions had 3 correct of 5, "always tick three" was a strategy. `content/content.test.ts` fails if any one count is used by more than half of the `multi` questions, so when you write a new one, look at the current mix (2, 3 and 4 of 5 are all common) rather than defaulting to three.
 
 ### `fill` - tap tokens into the blanks of a snippet
 
@@ -98,7 +98,7 @@ Blanks are `[[1]]`, `[[2]]`, ... each used exactly once; `answers[i]` fills blan
   explanation: "After enough failures the breaker opens; after a cool-down it lets trial calls through (half-open); if they succeed it closes again, otherwise it re-opens."
 ```
 
-3 to 10 lines. `kind: code` (the default) renders monospace lines where **indentation is part of the line**; `kind: steps` renders plain sentences. All lines must be unique, including indentation, otherwise the order would be ambiguous. The canonical order is the order you write them.
+3 to 10 lines. `kind: code` (the default) renders monospace lines; `kind: steps` renders plain sentences. The canonical order is the order you write them. **Indentation is shown only once a line is placed**: the pool shows every line trimmed, so the nesting does not give the order away. Lines must therefore be unique once trimmed (a test enforces it): two closing braces `}` at different depths are not allowed. Merge a closing brace onto the line before it, put a short body on one line, or label it (`} // for`). Then check that no other order of the lines is also valid code with the same meaning.
 
 ### `spot` - tap the buggy line
 

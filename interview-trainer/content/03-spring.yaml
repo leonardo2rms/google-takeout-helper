@@ -48,11 +48,11 @@ lessons:
         options:
           - { id: a, text: "Dependencies can be `val`s, which keeps them immutable" }
           - { id: b, text: "The class can be instantiated in a plain unit test, with no Spring container" }
-          - { id: c, text: "Circular dependencies are resolved more easily" }
+          - { id: c, text: "Circular dependencies between beans are resolved more easily than with field injection" }
           - { id: d, text: "An object can never exist in a partially-initialised state" }
-          - { id: e, text: "It is required for `@Autowired` to work (on fields it is ignored)" }
-        answers: [a, b, d]
-        explanation: "Constructor injection makes dependencies explicit and mandatory, and circular dependencies fail fast instead of being silently tolerated. With a single constructor `@Autowired` isn't even needed."
+          - { id: e, text: "Every dependency is visible in the constructor signature, so too many of them stand out" }
+        answers: [a, b, d, e]
+        explanation: "Constructor injection makes dependencies explicit and mandatory: they show up in the signature, where a long parameter list is a design smell nobody can miss, and circular dependencies fail fast instead of being silently tolerated. With a single constructor `@Autowired` isn't even needed."
 
       - type: single
         hint: "When does the constructor injection of the prototype happen, and how many times is the singleton constructed?"
@@ -180,11 +180,11 @@ lessons:
         options:
           - { id: a, text: "`JOIN FETCH` in the query" }
           - { id: b, text: "`@EntityGraph` on the repository method" }
-          - { id: c, text: "`hibernate.default_batch_fetch_size`" }
+          - { id: c, text: "Mark the service method `@Transactional(readOnly = true)`" }
           - { id: d, text: "Switch the association to `FetchType.EAGER`" }
           - { id: e, text: "Add an index on the foreign key" }
-        answers: [a, b, c]
-        explanation: "Fetch joins/entity graphs load the association in the same query; batch fetching turns N queries into N/batch. EAGER doesn't fix it for `findAll()` (it still issues one select per parent) and makes every other query heavier. An index speeds each query but doesn't reduce their number."
+        answers: [a, b]
+        explanation: "Fetch joins and entity graphs load the association in the same query (batch fetching with `hibernate.default_batch_fetch_size` is a third fix: it turns N queries into N/batch). A read-only transaction skips dirty checking and flushes, but every lazy access inside it still issues its own select. EAGER doesn't fix it for `findAll()` (it still issues one select per parent) and makes every other query heavier. An index speeds each query but doesn't reduce their number."
 
       - type: single
         hint: "Compare how long the connection is borrowed with how long you actually need it."
@@ -352,15 +352,16 @@ lessons:
         explanation: "With `REQUIRED` the inner call joins the outer transaction. When the exception leaves the inner proxy, Spring marks the whole transaction rollback-only, and catching it in the caller does not clear that mark. To skip bad rows independently use `REQUIRES_NEW` (or `NESTED`) on `importRow`, or validate before writing."
 
       - type: multi
-        prompt: "Two requests update the same account with read-modify-write and one update is lost. Select all effective fixes."
+        prompt: "The JPA entity `Account` has a `@Version` field, and `AccountService.debit` is `@Transactional`. Under load some debits fail with `ObjectOptimisticLockingFailureException`. Select all true statements."
         options:
-          - { id: a, text: "Optimistic locking with a `@Version` column, so the second update fails and can be retried" }
-          - { id: b, text: "A pessimistic write lock (`SELECT ... FOR UPDATE`) when reading the row" }
-          - { id: c, text: "One atomic statement such as `UPDATE account SET balance = balance - :amount WHERE id = :id AND balance >= :amount`" }
-          - { id: d, text: "Make the service method `synchronized`: only one thread then runs the update at a time" }
-          - { id: e, text: "Lower the isolation level to `READ_UNCOMMITTED` so readers never wait for writers" }
+          - { id: a, text: "A retry works if a caller outside the transaction calls `debit` again, so each attempt reloads the account" }
+          - { id: b, text: "The conflict can surface at commit, after the method body has returned, where a `try`/`catch` in `debit` cannot see it" }
+          - { id: c, text: "The version is checked and bumped for a dirty-checked change too, so the code needs no explicit `save()` call" }
+          - { id: d, text: "Catch the exception inside `debit` and call `save()` again, so the second attempt overwrites the row with the new balance" }
+          - { id: e, text: "The exception means a row lock taken when the account was read timed out, so a longer lock timeout fixes it" }
         answers: [a, b, c]
-        explanation: "A lost update needs either detection (version check), exclusion (row lock) or a statement the database applies atomically. `synchronized` only covers one JVM, and with a proxy-based `@Transactional` the commit happens after the synchronized method has returned, so another thread can read the old value before the commit. Weaker isolation makes anomalies more likely, not less."
+        explanation: "`@Version` adds `AND version = ?` to every UPDATE of the entity and increments the version, including the UPDATE that dirty checking generates without a `save()` call. If another transaction committed first, no row matches and Spring translates Hibernate's error into `ObjectOptimisticLockingFailureException`. Without an explicit flush this usually happens when the proxy commits, after `debit` has returned, and the failed transaction is rolled back anyway, so catching the exception inside the method and saving the same stale entity again cannot work. Retry the whole unit of work from outside the transaction (a caller loop, or a retry annotation whose advice runs outside the transactional one), so that every attempt starts a new transaction and reads the current row. Optimistic locking takes no lock when it reads, so there is no lock timeout to raise; waiting on a row lock is what pessimistic locking does."
+        tags: [spring, jpa, optimistic-locking, retry]
 
       - type: estimate
         prompt: "Each request holds one connection for its outer transaction and then, while still holding it, needs a second connection for a `REQUIRES_NEW` call. The pool has 10 connections and nothing else uses it. What is the largest number of concurrent requests for which a pool deadlock is impossible?"

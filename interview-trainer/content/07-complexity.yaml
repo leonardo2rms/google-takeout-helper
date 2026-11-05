@@ -136,7 +136,7 @@ lessons:
           - "    for ((i, x) in nums.withIndex()) {"
           - "        seen[target - x]?.let { return intArrayOf(it, i) }"
           - "        seen[x] = i"
-          - "    }"
+          - "    } // for"
           - "    return null"
           - "}"
         explanation: "Look up the complement before inserting the current element, so an element is never paired with itself. One pass with expected O(1) map operations gives O(n) time and O(n) space, versus O(n²) for checking every pair."
@@ -252,12 +252,12 @@ lessons:
         prompt: Select all operations that run in O(log n).
         options:
           - { id: a, text: "TreeMap.get" }
-          - { id: b, text: "PriorityQueue.offer" }
+          - { id: b, text: "PriorityQueue.peek" }
           - { id: c, text: "Collections.binarySearch on a sorted ArrayList" }
           - { id: d, text: "HashMap.get (expected)" }
           - { id: e, text: "ArrayDeque.addFirst" }
-        answers: [a, b, c]
-        explanation: "TreeMap is a red-black tree, PriorityQueue is a binary heap (offer/poll are O(log n); peek is O(1)), and binary search halves the range. HashMap.get and ArrayDeque.addFirst are O(1)."
+        answers: [a, c]
+        explanation: "TreeMap is a red-black tree and binary search halves the range, so both are O(log n). PriorityQueue is a binary heap: offer and poll are O(log n), but peek only reads the root, which is O(1). HashMap.get (expected) and ArrayDeque.addFirst (amortised) are O(1) as well."
 
       - type: single
         prompt: "What is the complexity of this loop on an `ArrayList`, and what is a better data structure?"
@@ -517,10 +517,8 @@ lessons:
           - "    val dp = IntArray(amount + 1) { amount + 1 }"
           - "    dp[0] = 0"
           - "    for (a in 1..amount) {"
-          - "        for (c in coins) {"
-          - "            if (c <= a) dp[a] = minOf(dp[a], dp[a - c] + 1)"
-          - "        }"
-          - "    }"
+          - "        for (c in coins) if (c <= a) dp[a] = minOf(dp[a], dp[a - c] + 1)"
+          - "    } // for a"
           - "    return if (dp[amount] > amount) -1 else dp[amount]"
           - "}"
         explanation: "`dp[a]` is the fewest coins for amount `a`. Every entry starts at 'impossible' (`amount + 1` is larger than any real answer), the base case `dp[0] = 0` comes before the loops, and each amount is built from smaller, already solved amounts: try every coin and take the best `dp[a - c] + 1`. Dynamic programming is recursion with memoisation turned upside down: the same sub-problems, solved in dependency order."

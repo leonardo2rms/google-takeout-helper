@@ -73,6 +73,33 @@ describe('course content', () => {
     }
   });
 
+  it('no question repeats another: same prompt and code, or (open questions) the same prompt', () => {
+    const norm = (t: string) => t.toLowerCase().replace(/\s+/g, ' ').trim();
+    const seen = new Map<string, string>();
+    for (const q of questions) {
+      const code = 'code' in q && q.code && typeof q.code === 'object' ? q.code.source : '';
+      const key = q.type === 'open' ? `open:${norm(q.prompt)}` : `${norm(q.prompt)}\n${norm(code)}`;
+      expect(seen.get(key), `${q.id} repeats ${seen.get(key)}`).toBeUndefined();
+      seen.set(key, q.id);
+    }
+  });
+
+  it('order lines are unique once trimmed: the pool shows them without indentation (UX-22)', () => {
+    for (const q of questions)
+      if (q.type === 'order') {
+        const trimmed = q.lines.map((l) => l.trim());
+        expect(trimmed.filter((l, i) => trimmed.indexOf(l) !== i), q.id).toEqual([]);
+      }
+  });
+
+  it('multi questions vary how many options are correct, so "always tick three" does not work', () => {
+    const multis = questions.filter((q) => q.type === 'multi');
+    const counts = new Map<number, number>();
+    for (const q of multis) counts.set(q.answers.length, (counts.get(q.answers.length) ?? 0) + 1);
+    expect(counts.size, JSON.stringify([...counts])).toBeGreaterThanOrEqual(3);
+    for (const [k, n] of counts) expect(n / multis.length, `${n} of ${multis.length} multi questions have ${k} correct options`).toBeLessThanOrEqual(0.5);
+  });
+
   it('every follow-up applies to at least one outcome of its main question (no dead branches)', () => {
     for (const q of questions.filter((x): x is OpenQ => x.type === 'open')) {
       for (const f of q.followUps) expect(f.point, `${q.id} -> "${f.prompt}"`).toBeLessThanOrEqual(q.keyPoints.length);

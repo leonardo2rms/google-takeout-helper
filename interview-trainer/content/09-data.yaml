@@ -30,13 +30,13 @@ lessons:
       - type: multi
         prompt: "Ordinary B-tree indexes exist on `email` and on `created_at`. Select all predicates that generally stop the database from using the index for an efficient lookup."
         options:
-          - { id: a, text: "`WHERE lower(email) = 'ana@example.com'`" }
+          - { id: a, text: "`WHERE email = lower('Ana@Example.com')`" }
           - { id: b, text: "`WHERE email LIKE '%@example.com'`" }
           - { id: c, text: "`WHERE created_at >= '2024-05-01' AND created_at < '2024-05-02'`" }
           - { id: d, text: "`WHERE email = 'ana@example.com'`" }
           - { id: e, text: "`WHERE YEAR(created_at) = 2024`" }
-        answers: [a, b, e]
-        explanation: "An index is sorted by the stored column value. Wrapping the column in a function (`lower(email)`, `YEAR(created_at)`) means the planner would have to compute the function for every row, unless you create an expression (functional) index. A leading wildcard has no sorted prefix to seek on. A plain equality or a half-open range on the bare column is exactly what a B-tree is for; prefer the range form over a function on the column."
+        answers: [b, e]
+        explanation: "An index is sorted by the stored column value. Wrapping the column in a function (`YEAR(created_at)`) means the planner would have to compute the function for every row, unless you create an expression (functional) index. A function applied to the constant, as in `email = lower('Ana@Example.com')`, is evaluated once, so the index still serves the lookup. A leading wildcard has no sorted prefix to seek on. A plain equality or a half-open range on the bare column is exactly what a B-tree is for; prefer the range form over a function on the column."
 
       - type: estimate
         prompt: "Assume each B-tree page holds about 200 child pointers (fan-out 200). How many levels of pages must a lookup walk, root to leaf, to find one key among 1,000,000 keys?"
@@ -214,10 +214,10 @@ lessons:
           - { id: a, text: "Page cost stays about the same however deep you go, given an index on the sort columns" }
           - { id: b, text: "It neither skips nor repeats rows when new rows are inserted between page requests" }
           - { id: c, text: "The sort needs a unique tie-breaker, such as `(created_at, id)`, to make the cursor unambiguous" }
-          - { id: d, text: "It lets you jump straight to page 500 by number, just like OFFSET pagination does" }
+          - { id: d, text: "It cannot jump straight to page 500 by number the way OFFSET pagination can" }
           - { id: e, text: "It stays fast even when the sort columns have no supporting index, because it only reads one page" }
-        answers: [a, b, c]
-        explanation: "OFFSET n makes the database read and discard n rows, so deep pages get slower, and an insert before the current page shifts everything by one. Keyset remembers the last row seen and asks for rows after it (`WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT 20`), which an index can answer with a seek. The price: next/previous only, no random page numbers, and you do need the supporting index."
+        answers: [a, b, c, d]
+        explanation: "OFFSET n makes the database read and discard n rows, so deep pages get slower, and an insert before the current page shifts everything by one. Keyset remembers the last row seen and asks for rows after it (`WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT 20`), which an index can answer with a seek. The price: next/previous only, no jumping to a page number, and you do need the supporting index."
 
       - type: code
         prompt: "Implement `keysetPage(rows, cursor, limit)` for a feed sorted ascending by (`ts`, `id`). `rows` are `{id, ts}` objects in any order; `cursor` is `null` (first page) or the `{ts, id}` of the last row already seen. Return `{items, next}`: the next `limit` rows strictly after the cursor, and `next` = `{ts, id}` of the last returned item if more rows remain after the page, otherwise `null`."
@@ -292,15 +292,16 @@ lessons:
         explanation: "Dual writes start before the backfill so no row can be changed in the gap, and the old column stays until no running version reads or writes it. Every step is compatible with the previous app version, which matters during rolling deployments where old and new instances run side by side. A single `ALTER TABLE ... RENAME COLUMN` breaks the instances that are still running the old code."
 
       - type: single
-        prompt: "Cache-aside: a reader misses and loads the OLD row from the database. Before it stores that value in the cache, a writer updates the row and deletes the cache key. Then the reader stores the old value. What is the state now, and what bounds the damage?"
+        prompt: "The `Product` entity is cached in Hibernate's second-level cache, and product 42 is in it. Another service then changes that product's price with a plain SQL `UPDATE`. What does `productRepository.findById(42)` return in a new transaction of this application?"
         options:
-          - { id: a, text: "The cache serves the old value until the entry is removed, which is why a TTL bounds the damage" }
-          - { id: b, text: "Both are consistent: the delete came last, so it wins and the reader's late store is rejected" }
-          - { id: c, text: "The reader's store fails or is ignored because the key was deleted, so the next read reloads the row" }
-          - { id: d, text: "The cache detects the conflicting store and rolls back the database update to keep both consistent" }
+          - { id: a, text: "The old price, until the entry expires or is evicted, since writes outside Hibernate do not reach it" }
+          - { id: b, text: "The new price, as Hibernate compares the cached version with the version in the row on every read" }
+          - { id: c, text: "The new price, as the read-write strategy evicts an entry when its row is updated or deleted in the database" }
+          - { id: d, text: "An `OptimisticLockException`, since the version in the cache no longer matches the version in the row" }
         answer: a
-        explanation: "Deleting after the database commit is the usual pattern, but a slow reader can still re-populate the key with data read earlier. Typical mitigations: a TTL as a safety net, writing versions and refusing older ones, a short delayed second delete, or accepting brief staleness for data where it is harmless. Caches never make things strictly consistent; they trade freshness for load."
+        explanation: "`findById` looks in the persistence context, then in the second-level cache, and goes to the database only on a miss. The cache lives on the application side and learns about changes only from writes that go through Hibernate, so an UPDATE by another service or a manual SQL fix stays invisible until the entry expires or is evicted. Nothing compares versions on a cache hit, and the database does not notify the cache. If the entity has a `@Version` column and the outside UPDATE also bumps it, the stale copy shows up only when this application writes the entity: its UPDATE then matches no row and fails with an optimistic locking error, not on the read; if the outside UPDATE leaves the version alone, that write silently overwrites the new price. Cache entities that this application owns and that change rarely, give the regions an expiry, and evict entries explicitly when you know about an outside change."
         difficulty: hard
+        tags: [jpa, hibernate, second-level-cache, caching]
 
       - type: single
         prompt: "40 service instances each run a connection pool of up to 25 connections against one PostgreSQL primary whose `max_connections` is 500. What is the problem, and the sensible direction?"

@@ -41,13 +41,13 @@ lessons:
         hint: "Think about parent and child: what happens to children when the parent is cancelled, and to the parent when a child fails?"
         prompt: Select all guarantees of structured concurrency.
         options:
-          - { id: a, text: "A parent does not complete until all its children complete" }
+          - { id: a, text: "A parent completes as soon as its own block returns, even if children still run" }
           - { id: b, text: "Cancelling a parent cancels its children" }
           - { id: c, text: "In a regular scope, an unhandled failure in a child cancels its siblings and propagates to the parent" }
           - { id: d, text: "`GlobalScope.launch` is tied to the lifecycle of the calling function" }
           - { id: e, text: "Children may outlive their scope if they run on a different dispatcher (say, `Dispatchers.IO`)" }
-        answers: [a, b, c]
-        explanation: "The dispatcher has nothing to do with lifetime: the scope owns the child. `GlobalScope` is explicitly the opposite, an unscoped coroutine that lives until the process ends or it finishes."
+        answers: [b, c]
+        explanation: "A parent waits for its children: it completes only once its own block and every child have finished, which is why no coroutine leaks out of a scope. Cancelling a parent cancels its children, and in a regular (non-supervisor) scope a failing child cancels its siblings and the parent. The dispatcher has nothing to do with lifetime: the scope owns the child. `GlobalScope` is explicitly the opposite, an unscoped coroutine that lives until the process ends or it finishes."
 
       - type: single
         hint: "Blocking calls need a pool sized for waiting, not for CPU cores."
@@ -200,23 +200,23 @@ lessons:
         options:
           - { id: a, text: "By default, collection happens in the context of the collector (context preservation)" }
           - { id: b, text: "`flowOn` changes the context of the operators above it (upstream)" }
-          - { id: c, text: "Calling `withContext` around `emit` inside `flow {}` is the supported way to switch dispatcher" }
+          - { id: c, text: "Switching the dispatcher with `withContext` around `emit` in `flow {}` fails at runtime" }
           - { id: d, text: "`buffer()` runs the producer in a separate coroutine so it and the collector can overlap" }
-          - { id: e, text: "A Flow instance can be collected only once (like an `Iterator`)" }
-        answers: [a, b, d]
-        explanation: "Flow has context preservation: emitting from another context inside `flow {}` throws. Use `flowOn` (or `channelFlow`). Cold flows can be collected any number of times."
+          - { id: e, text: "A Flow instance can be collected only once (like an `Iterator` or a Java `Stream`)" }
+        answers: [a, b, c, d]
+        explanation: "Flow has context preservation: emitting from another dispatcher inside `flow {}` violates the flow invariant and throws an `IllegalStateException`. Use `flowOn` (or `channelFlow`) to change the producer's context. `buffer()` decouples producer and collector with a channel between them. Cold flows can be collected any number of times; each collection runs the producer again."
 
       - type: order
-        prompt: Arrange the lines of a Flow that emits a counter every second, forever.
+        prompt: Arrange the lines of a Flow that emits 0 at once and then the next number every second, forever.
         lines:
           - "fun ticker(): Flow<Int> = flow {"
           - "    var i = 0"
           - "    while (true) {"
           - "        emit(i++)"
           - "        delay(1000)"
-          - "    }"
+          - "    } // while"
           - "}"
-        explanation: "State before the loop, `emit` then `delay` inside it. The loop is infinite but cooperative: `emit` and `delay` are cancellation points, so cancelling the collector stops it."
+        explanation: "State before the loop, `emit` then `delay` inside it, so the first value arrives at once and the next one a second later. The loop is infinite but cooperative: `emit` and `delay` are cancellation points, so cancelling the collector stops it."
 
       - type: single
         prompt: Which call returns `null` instead of throwing when the block exceeds its time limit?
@@ -306,11 +306,11 @@ lessons:
         options:
           - { id: a, text: "Call `ensureActive()` at the top of each iteration" }
           - { id: b, text: "Check `isActive` on each iteration and stop when it is false" }
-          - { id: c, text: "Call `yield()` on each iteration" }
+          - { id: c, text: "Call `Thread.yield()` on each iteration" }
           - { id: d, text: "Wrap the loop body in `try { ... } catch (e: CancellationException) { }`" }
           - { id: e, text: "Run it on `Dispatchers.IO` instead of `Dispatchers.Default`" }
-        answers: [a, b, c]
-        explanation: "Cancellation is cooperative: a coroutine only notices it at a suspension point or when it checks. A loop with no suspension points runs to completion even after `cancel()`. `ensureActive()` throws if the job was cancelled, `isActive` lets you exit manually, and `yield()` is a suspension point that also checks for cancellation. Catching the exception only hides it, and the dispatcher has no influence on cooperation."
+        answers: [a, b]
+        explanation: "Cancellation is cooperative: a coroutine only notices it at a suspension point or when it checks. A loop with no suspension points runs to completion even after `cancel()`. `ensureActive()` throws if the job was cancelled, and `isActive` lets you exit manually. The coroutine `yield()` would also work, but `Thread.yield()` is only a hint to the thread scheduler: it neither suspends nor looks at the job. Catching the exception only hides it, and the dispatcher has no influence on cooperation."
 
       - type: single
         prompt: "A test written with `runTest` takes a real 10 seconds, although the code under test only calls `delay(10_000)`. What is the most likely cause?"

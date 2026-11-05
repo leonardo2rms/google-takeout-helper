@@ -31,10 +31,10 @@ lessons:
           - { id: a, text: "Cache frequently-read, rarely-changed data" }
           - { id: b, text: "Route read-only queries to read replicas" }
           - { id: c, text: "Return projections and paginate instead of loading full entities" }
-          - { id: d, text: "Raise the connection pool size to 1,000" }
+          - { id: d, text: "Index the columns that frequent slow queries filter and sort on" }
           - { id: e, text: "Retry timed-out queries at once and without a limit" }
-        answers: [a, b, c]
-        explanation: "Raising the pool to 1,000 makes the database spend more time context-switching, and retrying timed-out queries immediately and indefinitely is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
+        answers: [a, b, c, d]
+        explanation: "Caching, replicas, lean projections and the right indexes each cut the work per read or move it elsewhere. Replicas need you to tolerate replication lag on those reads. Retrying timed-out queries immediately and indefinitely is a retry storm that turns a slowdown into an outage."
 
       - type: single
         hint: "Many callers reload the same value at once. How could one caller do the work for all of them?"
@@ -204,7 +204,7 @@ lessons:
 
       - type: order
         hint: "Which attempt must be allowed to throw to the caller, and where does that call sit relative to the loop?"
-        prompt: Arrange the lines to build a retry helper with exponential backoff.
+        prompt: "Arrange the lines to build a retry helper with exponential backoff: it waits 100 ms after the first failure and doubles the wait after each further one."
         lines:
           - "suspend fun <T> retry(times: Int, block: suspend () -> T): T {"
           - "    var delayMs = 100L"
@@ -212,7 +212,7 @@ lessons:
           - "        try { return block() } catch (e: IOException) { }"
           - "        delay(delayMs)"
           - "        delayMs *= 2"
-          - "    }"
+          - "    } // repeat"
           - "    return block()"
           - "}"
         explanation: "The wait happens after a failed attempt and before doubling. The final attempt is outside the loop so its exception propagates to the caller. In production add jitter and a cap on `delayMs`, and don't swallow CancellationException."
@@ -436,35 +436,37 @@ lessons:
         explanation: "During the spike the queue grows by 1,000 - 400 = 600 per second, so 60 s leaves a backlog of 36,000 requests. Afterwards it shrinks by 400 - 100 = 300 per second: 36,000 / 300 = 120 s. A queue turns a short spike into a longer, flatter load (queue-based load levelling), but the request that arrives at the end of the spike still waits about 90 s (36,000 / 400) and the queue needs 120 s to empty, so it only suits work that can wait."
 
       - type: open
-        prompt: Design a rate limiter for a public API that runs on 20 instances behind a load balancer.
-        modelAnswer: "First I decide the policy: what is limited (API key, user or IP), the rate and the allowed burst, possibly per pricing tier. A token bucket is a good default because it allows controlled bursts and is cheap to compute; a sliding-window counter enforces more smoothly, and a plain fixed window is the simplest but can let through twice the limit around a window boundary. With 20 instances the counters must be shared, otherwise each instance enforces its own limit: I keep them in a fast central store such as Redis and update them atomically (a Lua script or atomic increment), or accept an approximation where each instance gets a share of the limit. On rejection I return 429 with a Retry-After header and rate-limit headers so well-behaved clients back off. I also decide what happens when the limiter's store is down: usually fail open for availability, but fail closed for abuse-sensitive endpoints. Finally I monitor rejections per key and give expensive endpoints their own, stricter limits."
+        difficulty: hard
+        tags: [latency, tail-latency, hedged-requests]
+        prompt: "A search fans out to 50 index shards, each with several replicas, and waits for all of them. A shard answers in 10 ms at the median but 200 ms at p99, so many searches are slow. Without making the shards faster, how would you cut the tail latency of a search?"
+        modelAnswer: "A search is as slow as its slowest shard, so with 50 shards about 40% of searches (1 - 0.99^50) wait for at least one shard's p99: a rare tail per shard becomes the common case for the whole request. A slow reply is often caused by something temporary on one replica rather than by the request (a GC pause, a noisy neighbour, a background compaction), so I would send hedged requests: if a shard has not answered within about its p95 latency, send the same request to another replica of that shard, use whichever answer arrives first and cancel the other. Waiting until the p95 means only about 5% of shard calls are duplicated, so the extra load stays small. Because the work may run twice, I hedge only idempotent reads, and I cap hedges with a budget so that a real overload, where every replica is slow, is not doubled. Where the product allows it, I also give the whole search a deadline and return the results of the shards that answered in time, marked as partial, instead of waiting for the last straggler."
         keyPoints:
-          - point: "Policy and algorithm: the key, rate and burst; token bucket or sliding window, and the fixed-window boundary flaw"
-            keywords: ["token bucket", "sliding window", "burst", "fixed window"]
-          - point: "Shared state across instances: a central store (Redis) with atomic updates, or approximate local shares"
-            keywords: ["redis", "atomic", "shared", "central"]
-          - point: "Clear client signalling: 429 with Retry-After"
-            keywords: ["429", "retry-after"]
-          - point: "Failure mode of the limiter itself (fail open or closed) and monitoring"
-            keywords: ["fail open", "fail closed", "monitor"]
+          - point: "The search waits for its slowest shard, so a rare tail per shard hits a large share of searches"
+            keywords: ["slowest", "straggler", "at least one", "0.99"]
+          - point: "Hedged requests: after about the p95 latency, send a duplicate to another replica, use the first answer and cancel the other"
+            keywords: ["hedge", "hedging", "backup request", "another replica", "duplicate request"]
+          - point: "Keep hedging safe: only idempotent reads, a small share of extra load, and a budget so an overload is not doubled"
+            keywords: ["idempotent", "budget", "extra load", "read-only"]
+          - point: "A deadline for the whole request, returning partial results from the shards that answered in time where the product allows it"
+            keywords: ["partial", "deadline", "good enough", "in time"]
         followUps:
           - when: missed
-            point: 2
-            prompt: "Why not simply let each of the 20 instances keep its own counter with a limit of one twentieth?"
-            modelAnswer: "Because the load balancer does not spread one client's requests evenly: a client may hit only a few instances, so it is throttled far below its quota. With autoscaling the number of instances also changes, so a fixed share is wrong. Per-instance counters are only an approximation, fine for coarse abuse protection, but not for exact quotas or billing."
+            point: 3
+            prompt: "You add hedging, and during an incident in which every replica is slow, the traffic to the shards almost doubles. Why, and how do you prevent it?"
+            modelAnswer: "Hedging assumes that a slow reply is a random straggler on one replica. In an overload every call crosses the hedge delay, so nearly every call is sent twice, and the duplicates add load exactly where capacity is already short, which makes the slowdown worse. Cap hedges with a budget, for example a few percent of requests enforced by a token bucket, and stop hedging when it is used up; base the delay on a measured high percentile so that normal traffic rarely triggers it, and cancel the losing request as soon as one answer arrives."
             keyPoints:
-              - point: "One client's traffic is not evenly balanced across instances"
-                keywords: ["evenly", "balanc", "uneven"]
-              - point: "Autoscaling changes the number of instances, so the share is wrong"
-                keywords: ["autoscal", "number of instances", "changes"]
-              - point: "It is only an approximation, fine for coarse protection"
-                keywords: ["approximat", "coarse"]
+              - point: "Under overload every call is slow, so nearly all are hedged and the extra load makes it worse"
+                keywords: ["overload", "every call", "twice", "worse"]
+              - point: "Cap hedges with a budget (a few percent of requests) and stop when it is used up"
+                keywords: ["budget", "few percent", "token bucket"]
+              - point: "Cancel the losing request once one answer arrives"
+                keywords: ["cancel"]
           - when: covered
-            point: 1
-            prompt: "Why can a fixed-window counter let through twice the limit, and what do you use instead?"
-            modelAnswer: "With a limit of 100 per minute, a client can send 100 requests in the last second of one window and another 100 in the first second of the next, so 200 requests pass within two seconds while every window looks legal. A sliding-window log or counter, or a token bucket, measures over a moving period or refills smoothly, so the burst is bounded."
+            point: 2
+            prompt: "In which situations does hedging fail to cut the tail, even though p99 is high?"
+            modelAnswer: "Hedging helps only when the slowness belongs to one replica at one moment, such as a GC pause, a noisy neighbour or a long queue on one machine, so that a second replica is likely to be fast. It does not help when the request itself is expensive, for example a query that scans a huge range, because it is just as slow on every replica, or when all replicas share the bottleneck, such as one database or a saturated network link. Then you have to make the work cheaper, split it or cache the result instead."
             keyPoints:
-              - point: "Requests at both sides of a window boundary add up to about twice the limit"
-                keywords: ["boundary", "twice", "200"]
-              - point: "Use a sliding window or a token bucket"
-                keywords: ["sliding", "token bucket"]
+              - point: "It works when the delay is temporary and specific to one replica (GC pause, noisy neighbour, a long local queue)"
+                keywords: ["one replica", "gc pause", "noisy neighbour", "temporary"]
+              - point: "It fails when the request itself is expensive or all replicas share the bottleneck"
+                keywords: ["expensive", "every replica", "share the bottleneck", "shared"]
