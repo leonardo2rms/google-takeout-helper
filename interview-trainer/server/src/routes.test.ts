@@ -165,9 +165,15 @@ describe('error hygiene', () => {
   });
 
   it('only exposes the documented methods', async () => {
-    expect((await s.raw('/api/grade')).status).toBe(404); // GET on a POST route
-    expect((await s.raw('/api/health', { method: 'POST' })).status).toBe(404);
+    const get = await s.raw('/api/grade'); // GET on a POST route
+    expect(get.status).toBe(405);
+    expect(get.headers.get('allow')).toBe('POST');
+    const post = await s.raw('/api/health', { method: 'POST' });
+    expect(post.status).toBe(405);
+    expect(post.headers.get('allow')).toBe('GET');
     expect((await s.raw('/api/nope')).status).toBe(404);
+    expect((await s.raw('/api')).status).toBe(404);
+    expect(await (await s.raw('/api?x=1')).json()).toEqual({ error: 'Not found.' });
   });
 });
 
