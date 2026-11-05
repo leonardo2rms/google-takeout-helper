@@ -57,6 +57,19 @@ test.describe('bookmarks and notes', () => {
     await expect(page.getByTestId('lib-empty')).toContainText('Nothing saved yet');
   });
 
+  test('a note that is typed but not saved survives pressing Continue', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    await page.goto(`/#/lesson/${LESSON}`);
+    await answerCorrectly(page, Q1);
+    await check(page);
+    await page.getByTestId('tools-note-btn').click();
+    await page.getByRole('textbox', { name: 'Your private note' }).fill('typed, never saved');
+    await next(page);
+    await expect(page.locator('.prompt')).not.toContainText('What does this print?');
+    expect((await stored(page))!.notes[Q1.id].text).toBe('typed, never saved');
+  });
+
   test('a backup carries bookmarks and notes across reset and import', async ({ page }, info) => {
     await useClock(page);
     await seed(page, {

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { questionHash } from './hash';
 import { emptyProgress, type Card, type Progress } from './progress';
 import { Course, allQuestions } from './schema';
-import { BEST_TOPIC_MIN_PCT, buildShareCard, hasShareableProgress } from './share';
+import { BEST_TOPIC_MIN_PCT, bestTopicOf, buildShareCard, hasShareableProgress } from './share';
 
 const mk = (id: string, title: string) => ({
   id, title, emoji: 'x', description: 'd',
@@ -77,5 +77,17 @@ describe('buildShareCard', () => {
 
   it('singular day', () => {
     expect(buildShareCard(course, { ...emptyProgress(), streak: 1, lastDay: TODAY }, TODAY).text).toContain('Streak: 1 day\n');
+  });
+});
+
+describe('bestTopicOf boundary', () => {
+  it('shows a topic at exactly BEST_TOPIC_MIN_PCT percent, not one point below, and picks the strongest (ties by title)', () => {
+    expect(BEST_TOPIC_MIN_PCT).toBe(50);
+    expect(bestTopicOf([{ title: 'A', strength: 0.5 }])).toEqual({ title: 'A', pct: 50 });
+    expect(bestTopicOf([{ title: 'A', strength: 0.495 }])).toEqual({ title: 'A', pct: 50 }); // rounds to 50
+    expect(bestTopicOf([{ title: 'A', strength: 0.494 }])).toBeNull(); // rounds to 49
+    expect(bestTopicOf([{ title: 'A', strength: 0.51 }])).toEqual({ title: 'A', pct: 51 });
+    expect(bestTopicOf([])).toBeNull();
+    expect(bestTopicOf([{ title: 'B', strength: 0.7 }, { title: 'A', strength: 0.9 }, { title: 'C', strength: 0.9 }])).toEqual({ title: 'A', pct: 90 });
   });
 });

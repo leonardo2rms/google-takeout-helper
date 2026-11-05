@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { KEY_V2, SHOTS, lessons, seed, stored, useClock, v2 } from './engage';
-import { solveAndContinue } from './solve';
+import { answerCorrectly, check, solveAndContinue } from './solve';
 
 /**
  * The in-app confirmation dialog replaces window.confirm everywhere. It must look like the app, trap focus, close on Escape,
@@ -68,6 +68,32 @@ test.describe('confirmation dialog', () => {
     await page.getByTestId('quit-confirm-ok').click();
     await expect(page).toHaveURL(/#\/$|\/$/);
     await expect(page.locator('.home')).toBeVisible();
+  });
+
+  test('Enter on the dialog itself does not advance the lesson behind it, and the keys of a modal stay in the modal', async ({ page }) => {
+    await startLessonAndAnswerOne(page);
+    await answerCorrectly(page, lesson.questions[1]!); // an answer is ready: Enter on the page would check it
+    const prompt = await page.locator('.prompt').textContent();
+    await page.getByRole('button', { name: 'Quit lesson' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Quit this lesson?' });
+    await dialog.getByRole('heading').click(); // focus lands on the dialog container, not on a button
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Enter');
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.prompt')).toHaveText(prompt!); // still the same question, nothing was checked behind the dialog
+    await expect(page.locator('.lesson-bar .btn.primary')).toHaveText('Check');
+  });
+
+  test('quitting after Check but before Continue asks first: the XP in the header is not silently dropped', async ({ page }) => {
+    await page.goto(`/#/lesson/${lesson.id}`);
+    await page.locator('.prompt').waitFor();
+    await answerCorrectly(page, lesson.questions[0]!);
+    await check(page);
+    await page.getByRole('button', { name: 'Quit lesson' }).click();
+    await expect(page.getByRole('alertdialog', { name: 'Quit this lesson?' })).toBeVisible();
+    await page.getByTestId('quit-confirm-cancel').click();
+    await expect(page.getByRole('button', { name: 'Continue' })).toBeVisible(); // still on the checked question
   });
 
   test('the backdrop and "Keep going" both keep the lesson', async ({ page }) => {
@@ -141,5 +167,49 @@ test.describe('confirmation dialog', () => {
     await expect(page.getByRole('alertdialog', { name: 'Quit this mock interview?' })).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('mock-run')).toBeVisible();
+  });
+
+  test('while a dialog is open everything behind it is inert and not announced, and it is all back afterwards (N-S2-9)', async ({ page }) => {
+    await startLessonAndAnswerOne(page);
+    const behind = () => page.evaluate(() => {
+      const main = document.getElementById('main') as HTMLElement;
+      const lesson = document.querySelector('.lesson') as HTMLElement;
+      return { mainInert: Boolean(main.closest('[inert]')), lessonInert: Boolean(lesson.closest('[inert]')), anyAlertdialogInert: Boolean(document.querySelector('[role="alertdialog"]')?.closest('[inert]')) };
+    });
+    expect(await behind()).toMatchObject({ lessonInert: false });
+    await page.getByRole('button', { name: 'Quit lesson' }).click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    expect(await behind()).toMatchObject({ lessonInert: true, anyAlertdialogInert: false });
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('alertdialog')).toBeHidden();
+    expect(await behind()).toMatchObject({ mainInert: false, lessonInert: false });
+  });
+
+  test('a confirm over a sheet: closing the confirm leaves the sheet usable, closing the sheet frees the page', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
+    await sheet.getByRole('button', { name: 'Reset progress' }).click();
+    await expect(page.getByRole('alertdialog', { name: 'Reset all progress?' })).toBeVisible();
+    expect(await sheet.evaluate((el) => Boolean(el.closest('[inert]')))).toBe(true); // the sheet is behind the confirm now
+    await page.keyboard.press('Escape');
+    expect(await sheet.evaluate((el) => Boolean(el.closest('[inert]')))).toBe(false);
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    expect(await page.evaluate(() => document.querySelectorAll('[inert]').length)).toBe(0);
+  });
+
+  test('when a mock ends by time-out under an open dialog, focus lands on the results heading (N-S2-9)', async ({ page }) => {
+    await page.clock.install({ time: new Date(2026, 10, 5, 10, 0, 0) });
+    await page.goto('/#/mock');
+    await page.getByTestId('mock-start').click();
+    await page.getByTestId('mock-run').waitFor();
+    await page.getByRole('button', { name: 'Quit mock interview' }).click();
+    await expect(page.getByRole('alertdialog')).toBeVisible();
+    await page.clock.runFor(60 * 60 * 1000);
+    await expect(page.getByTestId('mock-results')).toBeVisible();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Mock interview results' })).toBeFocused();
+    expect(await page.evaluate(() => document.querySelectorAll('[inert]').length)).toBe(0);
   });
 });

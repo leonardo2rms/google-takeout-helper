@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import { seededShuffle, type MultiQ, type SingleQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
 import { Icon } from './icons';
@@ -30,8 +30,21 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
     else onAnswer(multi ? { type: 'multi', selected: next } : { type: 'single', selected: next[0]! });
   }
 
+  // A radio group is operated with the arrow keys: the next or previous option is focused and chosen (wrapping at the ends).
+  function arrows(e: KeyboardEvent<HTMLDivElement>) {
+    if (multi || checked || !['ArrowDown', 'ArrowRight', 'ArrowUp', 'ArrowLeft'].includes(e.key)) return;
+    const buttons = Array.from(e.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="radio"]'));
+    const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if (at === -1) return;
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1;
+    const target = buttons[(at + step + buttons.length) % buttons.length]!;
+    target.focus();
+    target.click();
+  }
+
   return (
-    <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label={multi ? 'Answer options, select all that apply' : 'Answer options'}>
+    <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label={multi ? 'Answer options, select all that apply' : 'Answer options'} onKeyDown={arrows}>
       {options.map((o, index) => {
         const isSel = selected.includes(o.id);
         let state = '';

@@ -15,9 +15,16 @@ class FakeContainer extends EventTarget {
   registerArgs: unknown[] = [];
   update = vi.fn().mockResolvedValue(undefined);
   failRegister = false;
+  /** What `getRegistration()` reports: a worker that is already installed for this origin. */
+  installed: { active: object | null } | undefined;
+  failGetRegistration = false;
   constructor(controller: object | null) {
     super();
     this.controller = controller;
+  }
+  async getRegistration() {
+    if (this.failGetRegistration) throw new Error('denied');
+    return this.installed;
   }
   async register(...args: unknown[]) {
     this.registerArgs = args;
@@ -53,6 +60,33 @@ describe('update notice', () => {
     c.dispatchEvent(new Event('controllerchange')); // a new deploy takes over
     expect(isUpdateReady()).toBe(true);
     expect(useUpdateReady()).toBe(true);
+  });
+
+  it('after a hard reload (no controller, but a worker is installed) the first takeover is an update (N-S2-11)', async () => {
+    const c = new FakeContainer(null);
+    c.installed = { active: {} };
+    await registerServiceWorker(asContainer(c), fakeDoc(), () => 0);
+    c.dispatchEvent(new Event('controllerchange'));
+    expect(isUpdateReady()).toBe(true);
+  });
+
+  it('a registration that is still installing or missing, or a failing lookup, counts as a first visit', async () => {
+    for (const setup of [(c: FakeContainer) => { c.installed = { active: null }; }, (c: FakeContainer) => { c.installed = undefined; }, (c: FakeContainer) => { c.failGetRegistration = true; }]) {
+      resetUpdateState();
+      const c = new FakeContainer(null);
+      setup(c);
+      await registerServiceWorker(asContainer(c), fakeDoc(), () => 0);
+      c.dispatchEvent(new Event('controllerchange'));
+      expect(isUpdateReady()).toBe(false);
+    }
+  });
+
+  it('a container without getRegistration still works (first visit rules)', async () => {
+    const c = new FakeContainer(null);
+    (c as unknown as { getRegistration?: unknown }).getRegistration = undefined;
+    await registerServiceWorker(asContainer(c), fakeDoc(), () => 0);
+    c.dispatchEvent(new Event('controllerchange'));
+    expect(isUpdateReady()).toBe(false);
   });
 
   it('a page that already had a controller reports the first takeover as an update', async () => {

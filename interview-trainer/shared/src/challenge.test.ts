@@ -78,6 +78,30 @@ describe('recordChallenge / challengeResult', () => {
     const p = recordChallenge({ ...emptyProgress(), challenge: { [old]: 'pass', [addDays(today, -3)]: 'fail' } }, today, true);
     expect(Object.keys(p.challenge).sort()).toEqual([addDays(today, -3), today]);
   });
+
+  it('retention boundary: exactly CHALLENGE_KEPT days old is dropped, one day less is kept, one day more is dropped', () => {
+    const at = (offset: number) => addDays(today, -offset);
+    const base = { ...emptyProgress(), challenge: { [at(CHALLENGE_KEPT + 1)]: 'pass', [at(CHALLENGE_KEPT)]: 'pass', [at(CHALLENGE_KEPT - 1)]: 'fail', [at(3)]: 'fail' } as Record<string, 'pass' | 'fail'> };
+    const kept = Object.keys(recordChallenge(base, today, true).challenge).sort();
+    expect(kept).toEqual([at(CHALLENGE_KEPT - 1), at(3), today]);
+  });
+
+  it('a wrong clock set far ahead does not erase the history, and the log is still correct once the clock is fixed (N-S2-7)', () => {
+    let p = emptyProgress();
+    for (const offset of [-3, -2, -1, 0]) p = recordChallenge(p, addDays(today, offset), true);
+    p = recordChallenge(p, '2028-06-01', true); // the clock jumped
+    expect(Object.keys(p.challenge).sort()).toEqual([addDays(today, -3), addDays(today, -2), addDays(today, -1), today, '2028-06-01']);
+    expect(challengeStreak(p, today)).toMatchObject({ current: 4, done: 5 }); // the corrected clock sees the real days again
+  });
+
+  it('the clock-jump guard starts exactly CHALLENGE_KEPT days after the newest entry', () => {
+    const old = addDays(today, -CHALLENGE_KEPT * 3);
+    const base = { ...emptyProgress(), challenge: { [old]: 'pass', [today]: 'pass' } as Record<string, 'pass' | 'fail'> };
+    const justBefore = recordChallenge(base, addDays(today, CHALLENGE_KEPT - 1), true);
+    expect(Object.keys(justBefore.challenge)).not.toContain(old); // an ordinary gap: ageing still applies
+    const atBoundary = recordChallenge(base, addDays(today, CHALLENGE_KEPT), true);
+    expect(Object.keys(atBoundary.challenge)).toContain(old); // treated as a clock jump
+  });
 });
 
 describe('challengeStreak', () => {

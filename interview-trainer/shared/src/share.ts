@@ -31,6 +31,12 @@ export const BEST_TOPIC_MIN_PCT = 50;
 
 const pct = (x: number) => Math.round(x * 100);
 
+/** The strongest started topic, shown only when it is strong enough to be worth saying (at least `BEST_TOPIC_MIN_PCT` percent). */
+export function bestTopicOf(topics: readonly { title: string; strength: number }[]): { title: string; pct: number } | null {
+  const top = [...topics].sort((a, b) => b.strength - a.strength || a.title.localeCompare(b.title))[0];
+  return top && pct(top.strength) >= BEST_TOPIC_MIN_PCT ? { title: top.title, pct: pct(top.strength) } : null;
+}
+
 export function buildShareCard(course: Course, p: Progress, today: Day): ShareCard {
   const streak = streakStatus(p, today).streak;
   const rank = rankFor(p.xp).title;
@@ -39,8 +45,7 @@ export function buildShareCard(course: Course, p: Progress, today: Day): ShareCa
   const lessonsDone = Object.keys(p.lessons).length;
   const daysPracticed = p.stats.practiceDays;
   const started = topicStats(course, p, today).filter((t) => t.seen > 0 && t.total > 0);
-  const top = [...started].sort((a, b) => b.strength - a.strength || a.title.localeCompare(b.title))[0];
-  const bestTopic = top && pct(top.strength) >= BEST_TOPIC_MIN_PCT ? { title: top.title, pct: pct(top.strength) } : null;
+  const bestTopic = bestTopicOf(started);
   const readinessShown = ready.enough ? { score: ready.score, label: READINESS_TEXT[ready.label] } : null;
   const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
 

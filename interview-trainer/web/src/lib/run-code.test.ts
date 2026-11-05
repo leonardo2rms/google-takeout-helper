@@ -34,6 +34,8 @@ async function run() {
   return runCodeInWorker;
 }
 const last = () => FakeWorker.instances[FakeWorker.instances.length - 1]!;
+/** What the real worker does: answer with the nonce it was given. */
+const answer = (w: FakeWorker, result: CodeRunResult) => w.onmessage!({ data: { nonce: (w.posted[0] as { nonce: string }).nonce, result } } as never);
 
 beforeEach(() => {
   FakeWorker.instances = [];
@@ -46,8 +48,8 @@ describe('runCodeInWorker', () => {
   it('posts the source, entry and tests, resolves with the worker result and terminates the worker', async () => {
     const runCodeInWorker = await run();
     const p = runCodeInWorker(q, 'function f(x) { return x + 1; }');
-    expect(last().posted).toEqual([{ source: 'function f(x) { return x + 1; }', entry: 'f', tests: q.tests }]);
-    last().onmessage!({ data: pass });
+    expect(last().posted).toEqual([{ source: 'function f(x) { return x + 1; }', entry: 'f', tests: q.tests, nonce: expect.stringMatching(/^[0-9a-z]+(-[0-9a-z]+){3}$/) }]);
+    answer(last(), pass);
     expect(await p).toEqual(pass);
     expect(last().terminated).toBe(1);
   });
@@ -55,12 +57,14 @@ describe('runCodeInWorker', () => {
   it('starts a fresh worker for every run', async () => {
     const runCodeInWorker = await run();
     const a = runCodeInWorker(q, 'a');
-    last().onmessage!({ data: pass });
+    answer(last(), pass);
     await a;
     const b = runCodeInWorker(q, 'b');
-    last().onmessage!({ data: pass });
+    answer(last(), pass);
     await b;
     expect(FakeWorker.instances).toHaveLength(2);
+    const nonces = FakeWorker.instances.map((w) => (w.posted[0] as { nonce: string }).nonce);
+    expect(new Set(nonces).size).toBe(2); // never reused
   });
 
   it('kills an infinite loop after the question\'s timeout and says so', async () => {
@@ -79,11 +83,33 @@ describe('runCodeInWorker', () => {
     const runCodeInWorker = await run();
     const p = runCodeInWorker(q, 'x');
     const w = last();
-    w.onmessage!({ data: pass });
-    w.onmessage!({ data: { ok: false, results: [], fatal: 'late' } });
+    answer(w, pass);
+    answer(w, { ok: false, results: [], fatal: 'late' });
     w.onerror!({ message: 'late crash' });
     vi.advanceTimersByTime(10_000);
     expect(await p).toEqual(pass);
+    expect(w.terminated).toBe(1);
+  });
+
+  it('ignores a message the learner\'s own code posted (wrong or missing nonce, malformed result) and keeps waiting for the real one (S2-12)', async () => {
+    const runCodeInWorker = await run();
+    const p = runCodeInWorker(q, 'postMessage({ ok: true, results: [] })');
+    const w = last();
+    const forged: unknown[] = [
+      { ok: true, results: [] }, // what the old protocol accepted
+      { nonce: 'guess', result: pass },
+      { nonce: undefined, result: pass },
+      null,
+      undefined,
+    ];
+    for (const data of forged) w.onmessage!({ data } as never);
+    const nonce = (w.posted[0] as { nonce: string }).nonce;
+    w.onmessage!({ data: { nonce, result: { ok: true } } } as never); // right nonce, not a result
+    w.onmessage!({ data: { nonce, result: { ok: true, results: 'x' } } } as never);
+    expect(w.terminated).toBe(0); // still running: nothing was taken for the verdict
+    const real: CodeRunResult = { ok: false, results: [{ hidden: false, passed: false }] };
+    answer(w, real);
+    expect(await p).toEqual(real);
     expect(w.terminated).toBe(1);
   });
 

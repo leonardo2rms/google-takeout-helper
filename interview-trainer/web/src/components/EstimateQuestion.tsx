@@ -18,7 +18,6 @@ export function EstimateQuestion({ q, checked, onAnswer }: Props) {
     <div className="estimate">
       <div className="estimate-field" data-invalid={text.trim() !== '' && parsed === null}>
         <input
-          id="estimate-input"
           className="estimate-input"
           type="text"
           inputMode="decimal"

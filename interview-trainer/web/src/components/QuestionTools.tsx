@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MAX_NOTE_CHARS, dayKey, isBookmarked, noteOf, setNote, toggleBookmark, type Question } from '@trainer/shared';
 import { useProgress } from '../lib/store';
 import { Icon } from './icons';
@@ -23,6 +23,18 @@ export function QuestionTools({ q, startEditing = false, testIdPrefix = 'tools' 
   useEffect(() => {
     if (!editing) setDraft(saved ?? '');
   }, [saved, editing]);
+
+  // A note being typed is not thrown away when the learner moves on (Continue unmounts this panel): it is saved as they leave.
+  const unsaved = useRef<{ q: Question; text: string } | null>(null);
+  unsaved.current = editing && draft !== (saved ?? '') ? { q, text: draft } : null;
+  useEffect(
+    () => () => {
+      const pending = unsaved.current;
+      if (pending) update((p) => setNote(p, pending.q, pending.text, dayKey(new Date())));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- unmount only; `update` is stable
+    [],
+  );
 
   const commit = () => {
     update((p) => setNote(p, q, draft, dayKey(new Date())));

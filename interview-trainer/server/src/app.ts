@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs';
+import type { Server } from 'node:http';
 import compression from 'compression';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import {
-  ExplainRequest, GradeRequest, allQuestions, explainableQuestions, openParts,
+  ExplainRequest, GradeRequest, ImplausibleVerdictError, allQuestions, explainableQuestions, openParts,
   type Course, type ExplainResponse, type HealthResponse, type OpenQ, type Question,
 } from '@trainer/shared';
 import type { Grader } from './grader';
@@ -110,7 +111,9 @@ export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute
       res.json(await grader.grade(question, answer));
     } catch (err) {
       console.error('[grade] failed:', err instanceof Error ? err.message : err);
-      // The client falls back to self-assessment on any non-2xx, so keep the detail server-side.
+      // The client falls back to self-assessment on any non-2xx, so keep the detail server-side. It does learn that the verdict
+      // was unreliable (not that the service was down), so it can say so.
+      if (err instanceof ImplausibleVerdictError) return res.status(502).json({ error: 'AI grading returned an unreliable verdict.', code: 'implausible-verdict' });
       res.status(502).json({ error: 'AI grading failed.' });
     }
   });
@@ -143,6 +146,9 @@ export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute
   // Everything else under /api (with or without a trailing slash) is a JSON 404, never the HTML shell.
   app.use((req, res, next) => (req.path === '/api' || req.path.startsWith('/api/') ? res.status(404).json({ error: 'Not found.' }) : next()));
 
+  // The app and its files are read-only: anything but GET/HEAD on a page or asset path is a 405, not an HTML 404 page.
+  app.use((req, res, next) => (req.method === 'GET' || req.method === 'HEAD' ? next() : res.setHeader('Allow', 'GET, HEAD').status(405).json({ error: 'Method not allowed.' })));
+
   if (staticDir && existsSync(staticDir)) {
     app.use(
       express.static(staticDir, {
@@ -168,4 +174,24 @@ export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute
   });
 
   return app;
+}
+
+export interface ServerTimeouts {
+  /** How long the headers of a request may take to arrive. */
+  headersTimeoutMs?: number;
+  /** How long a whole request (headers and body) may take to arrive. A body dribbled one byte at a time is cut off here. */
+  requestTimeoutMs?: number;
+  keepAliveTimeoutMs?: number;
+}
+
+/**
+ * Bounds how long a client may hold a connection while sending a request. Node's defaults let a request body trickle in for
+ * five minutes; the largest legitimate request here is a 10 kB answer. This does not limit how long a response may take
+ * (AI grading can run for a minute).
+ */
+export function applyServerTimeouts(server: Server, { headersTimeoutMs = 15_000, requestTimeoutMs = 30_000, keepAliveTimeoutMs = 5_000 }: ServerTimeouts = {}): Server {
+  server.headersTimeout = headersTimeoutMs;
+  server.requestTimeout = requestTimeoutMs;
+  server.keepAliveTimeout = keepAliveTimeoutMs;
+  return server;
 }

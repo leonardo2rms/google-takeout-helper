@@ -55,7 +55,9 @@ async function load() {
     },
     matchMedia: () => ({ matches: false }),
   });
-  return { store: await import('./store') };
+  const store = await import('./store');
+  const fire = [...storageListeners]; // this tab's `storage` listeners (load() resets the shared array for the next tab)
+  return { store, otherTabWrote: () => fire.forEach((l) => l({ key: KEY_V2 })) };
 }
 
 const stored = (): Progress => JSON.parse(storage.data.get(KEY_V2)!);
@@ -111,6 +113,23 @@ describe('a failed write never loses unsaved sessions (S0-2)', () => {
     expect(stored().xp).toBe(10);
     expect(store.getSafetyStatus().atRisk).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('the back-off doubles from 4 s and stops growing at 60 s (retries at +4, +8, +16, +32, then every 60 s)', async () => {
+    const { store } = await load();
+    const attempts = vi.spyOn(storage, 'setItem');
+    storage.failWrites = true;
+    store.updateProgress(addXp(10));
+    const tries = () => attempts.mock.calls.length;
+    expect(tries()).toBe(1);
+    // times of the retries: 4, 12, 28, 60, then 120 and 180 (a missing cap would give 124 and 252)
+    const checkpoints: Array<[number, number]> = [[3999, 1], [4000, 2], [11_999, 2], [12_000, 3], [27_999, 3], [28_000, 4], [59_999, 4], [60_000, 5], [119_999, 5], [120_000, 6], [179_999, 6], [180_000, 7]];
+    let now = 0;
+    for (const [at, expected] of checkpoints) {
+      await vi.advanceTimersByTimeAsync(at - now);
+      now = at;
+      expect(tries(), `${at} ms`).toBe(expected);
+    }
   });
 
   it('saves when the page is hidden, closed or back online; retrySave is a no-op when nothing is pending', async () => {
@@ -284,5 +303,119 @@ describe('replace and reset keep a safety copy (S2-18)', () => {
     store.useProgress().reset();
     expect(stored().xp).toBe(0);
     expect(store.listParkedCopies().map((c) => JSON.parse(c.raw).xp)).toEqual([7]);
+  });
+});
+
+describe('a foreign value in the main key never replaces a tab\'s own profile (N-S1-1)', () => {
+  const newer = JSON.stringify({ version: 3, xp: 5000, something: 'only a newer build understands' });
+  const parkedRaws = () => parked().map((k) => storage.data.get(k));
+
+  async function tabWithTwentyXp() {
+    const tab = await load();
+    tab.store.updateProgress(addXp(10));
+    tab.store.updateProgress(addXp(10));
+    expect(stored().xp).toBe(20);
+    return tab;
+  }
+
+  it('a newer-schema value: keeps the 20 XP in memory, parks the value, and the next answer saves 30 (not 10)', async () => {
+    const { store, otherTabWrote } = await tabWithTwentyXp();
+    storage.data.set(KEY_V2, newer);
+    otherTabWrote();
+    expect(store.getProgress().xp).toBe(20);
+    expect(parkedRaws()).toEqual([newer]);
+    expect(store.getSafetyStatus().recovered).toHaveLength(1); // the recovery banner
+    expect(storage.data.get(KEY_V2)).toBe(newer); // the newer tab's value is left alone until this tab changes something
+    store.updateProgress(addXp(10));
+    expect(stored().xp).toBe(30);
+    expect(parkedRaws()).toEqual([newer]);
+  });
+
+  it('a corrupt value: parked, and the profile is written back at once (this tab may hold the only good copy)', async () => {
+    const { store, otherTabWrote } = await tabWithTwentyXp();
+    storage.data.set(KEY_V2, '{"version":2,"xp":2');
+    otherTabWrote();
+    expect(parkedRaws()).toEqual(['{"version":2,"xp":2']);
+    expect(stored().xp).toBe(20);
+    expect(store.getProgress().xp).toBe(20);
+    expect(store.getSafetyStatus().recovered).toHaveLength(1);
+  });
+
+  it('a value found while updating (no storage event) is handled the same way', async () => {
+    const { store } = await tabWithTwentyXp();
+    storage.data.set(KEY_V2, newer);
+    store.updateProgress(addXp(10));
+    expect(stored().xp).toBe(30);
+    expect(parkedRaws()).toEqual([newer]);
+  });
+
+  it('a cleared key is restored from memory', async () => {
+    const { store, otherTabWrote } = await tabWithTwentyXp();
+    storage.data.delete(KEY_V2);
+    otherTabWrote();
+    expect(stored().xp).toBe(20);
+    storage.data.delete(KEY_V2);
+    store.updateProgress(addXp(10));
+    expect(stored().xp).toBe(30);
+  });
+
+  it('an empty tab simply adopts whatever the other tab wrote (nothing to protect)', async () => {
+    const { store, otherTabWrote } = await load();
+    expect(store.getProgress().xp).toBe(0);
+    storage.data.set(KEY_V2, '{broken');
+    otherTabWrote();
+    expect(store.getProgress().xp).toBe(0);
+    expect(store.getSafetyStatus().unreadablePending).toBe(true); // handled like a fresh load: parked at the first write
+    store.updateProgress(addXp(10));
+    expect(stored().xp).toBe(10);
+    expect(parkedRaws()).toEqual(['{broken']);
+  });
+
+  it('writes nothing while the copy cannot be made, then writes once it can', async () => {
+    const { store, otherTabWrote } = await tabWithTwentyXp();
+    storage.failKey = (k) => k.includes('.backup-');
+    storage.data.set(KEY_V2, newer);
+    otherTabWrote();
+    store.updateProgress(addXp(10));
+    expect(storage.data.get(KEY_V2)).toBe(newer);
+    expect(store.getProgress().xp).toBe(30);
+    expect(store.getSafetyStatus()).toMatchObject({ unreadablePending: true, atRisk: true });
+    storage.failKey = null;
+    store.retrySave();
+    expect(stored().xp).toBe(30);
+    expect(parkedRaws()).toEqual([newer]);
+  });
+
+  it('two tabs that both see the foreign value park it once and end up agreeing', async () => {
+    const a = await tabWithTwentyXp();
+    const b = await load();
+    expect(b.store.getProgress().xp).toBe(20);
+    storage.data.set(KEY_V2, newer);
+    a.otherTabWrote();
+    b.otherTabWrote();
+    expect(parkedRaws()).toEqual([newer]);
+    a.store.updateProgress(addXp(10)); // A writes 30
+    b.otherTabWrote();
+    b.store.updateProgress(addXp(5)); // B adopts A's 30 and adds 5
+    expect(stored().xp).toBe(35);
+    a.otherTabWrote();
+    expect(a.store.getProgress().xp).toBe(35);
+    expect(parkedRaws()).toEqual([newer]);
+  });
+});
+
+describe('parked copies keep working when the clock is wrong (N-S2-3)', () => {
+  it('the newest-version data is kept as a copy even when copies from a later date already exist', async () => {
+    for (let i = 1; i <= 8; i++) storage.data.set(`interview-trainer.progress.backup-20270101-0${i}`, `later-${i}`);
+    const future = JSON.stringify({ version: 3, xp: 1 });
+    storage.data.set(KEY_V2, future);
+    const { store } = await load();
+    store.updateProgress(addXp(10));
+    const key = parked().find((k) => storage.data.get(k) === future)!;
+    expect(key).toBeDefined();
+    store.acknowledgeRecovered(); // the learner saw the banner for the old copies...
+    storage.data.set(KEY_V2, '{corrupt again');
+    store.updateProgress(addXp(1)); // ...a new copy must raise a new one even though its date is "older"
+    expect(store.getSafetyStatus().recovered.length).toBe(1);
   });
 });

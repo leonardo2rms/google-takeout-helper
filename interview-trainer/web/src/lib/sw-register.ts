@@ -37,8 +37,11 @@ interface Doc {
  * Registers `/sw.js`. `updateViaCache: 'none'` makes the browser fetch the worker file itself fresh, so a deploy is
  * noticed on the next check instead of after the HTTP cache expires.
  */
-export function registerServiceWorker(container: ServiceWorkerContainer, doc: Doc, setTimer: (fn: () => void, ms: number) => unknown = setInterval): Promise<void> {
-  let hadController = container.controller !== null;
+export async function registerServiceWorker(container: ServiceWorkerContainer, doc: Doc, setTimer: (fn: () => void, ms: number) => unknown = setInterval): Promise<void> {
+  // A hard reload (Ctrl+Shift+R) loads the page without a controller although a worker is installed. Looking at the
+  // registration tells that apart from a first visit, so the first takeover after a hard reload still raises the notice.
+  const installed = await container.getRegistration?.().then((r) => Boolean(r?.active), () => false);
+  let hadController = container.controller !== null || installed === true;
   container.addEventListener('controllerchange', () => {
     if (hadController) markReady();
     else hadController = true; // the first visit: the worker just took control, there is nothing newer to reload for

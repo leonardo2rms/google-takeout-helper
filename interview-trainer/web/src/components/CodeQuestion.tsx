@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { CodeQ, CodeRunResult } from '@trainer/shared';
 import type { Answer, RunCodeFn } from '../lib/evaluate';
 import { scrollIntoViewGently } from '../lib/a11y';
@@ -20,7 +20,11 @@ const KEYS = ['{', '}', '(', ')', '[', ']', ';', '=', '>', '<', '"', "'", '+', '
 /** A small code editor for phones and desktops, with a "Run tests" loop before the final check. */
 export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props) {
   const [source, setSource] = useState(q.starter.replace(/\n$/, ''));
-  const [result, setResult] = useState<CodeRunResult | null>(null);
+  /** The last test run and the source it ran against: edits after it make it stale. */
+  const [lastRun, setRun] = useState<{ result: CodeRunResult; source: string } | null>(null);
+  const result = lastRun?.result ?? null;
+  const stale = lastRun !== null && lastRun.source !== source;
+  const hintId = useId();
   const [running, setRunning] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -44,9 +48,10 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
   }
 
   async function runTests() {
+    const ran = source;
     setRunning(true);
-    setResult(null);
-    setResult(await run(q, source));
+    setRun(null);
+    setRun({ result: await run(q, ran), source: ran });
     setRunning(false);
   }
 
@@ -74,7 +79,7 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
         autoCapitalize="off"
         autoCorrect="off"
         aria-label="Your code"
-        aria-describedby="editor-keys-hint"
+        aria-describedby={hintId}
         onChange={(e) => update(e.target.value)}
         onBlur={() => { tabMovesFocus.current = false; }}
         onKeyDown={(e) => {
@@ -85,7 +90,7 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
           }
         }}
       />
-      <p id="editor-keys-hint" className="sr-only">In the editor, Tab inserts two spaces. Press Escape and then Tab, or Shift and Tab, to move on.</p>
+      <p id={hintId} className="sr-only">In the editor, Tab inserts two spaces. Press Escape and then Tab, or Shift and Tab, to move on.</p>
       {!blind && (
         <div className="run-row">
           <button type="button" className="btn small" disabled={checked || running} onClick={() => void runTests()}>
@@ -95,7 +100,7 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
         </div>
       )}
       <p className="sr-only" role="status" aria-live="polite">{running ? 'Running tests' : ''}</p>
-      {result && !checked && !blind && <div ref={resultsRef} className="tests-anchor" data-testid="run-results"><TestResults result={result} /></div>}
+      {result && !checked && !blind && <div ref={resultsRef} className="tests-anchor" data-testid="run-results">{stale && <p className="hint" data-testid="stale-results">You edited the code after this run. Run the tests again to see how it does now.</p>}<TestResults result={result} /></div>}
       {!checked && (
         /* One row that scrolls sideways and stays above the bottom bar while the editor is on screen, instead of four rows of keys. */
         <div className="keys" role="group" aria-label="Code symbols">

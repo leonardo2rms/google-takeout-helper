@@ -1,4 +1,4 @@
-import { allQuestions, buildPlainPrompt, cleanFeedback, openParts, type Course, type GradeResponse, type OpenQ } from '@trainer/shared';
+import { ImplausibleVerdictError, allQuestions, buildPlainPrompt, checkVerdict, openParts, type Course, type GradeResponse, type OpenQ } from '@trainer/shared';
 import type { GradeFn } from './evaluate';
 
 /**
@@ -39,11 +39,6 @@ export async function loadSample(): Promise<Sample | null> {
   }
 }
 
-interface Verdict {
-  points?: { covered?: unknown }[];
-  feedback?: unknown;
-}
-
 export function createSampleGrader(course: Course, sample: Sample): GradeFn {
   const open = new Map<string, OpenQ>();
   for (const q of allQuestions(course)) if (q.type === 'open') for (const part of openParts(q)) open.set(part.id, part);
@@ -51,14 +46,14 @@ export function createSampleGrader(course: Course, sample: Sample): GradeFn {
   return async (questionId, answer): Promise<GradeResponse> => {
     const q = open.get(questionId);
     if (!q) throw new Error('unknown question');
-    const verdict = await withTimeout(sample.json<Verdict>(buildPlainPrompt(q, answer), { cache: false }));
-    const points = verdict.points;
-    if (!Array.isArray(points) || points.length !== q.keyPoints.length) throw new Error('bad verdict shape');
-    const covered = points.map((p) => p?.covered === true);
+    const raw = await withTimeout(sample.json<unknown>(buildPlainPrompt(q, answer), { cache: false }));
+    // The host returns whatever the model produced: only a plausible verdict becomes a grade, otherwise the app self-checks.
+    const verdict = checkVerdict(q, answer, raw);
+    if (!verdict.ok) throw new ImplausibleVerdictError(verdict.reason);
     return {
-      score: covered.filter(Boolean).length / covered.length,
-      covered,
-      feedback: cleanFeedback(verdict.feedback),
+      score: verdict.covered.filter(Boolean).length / verdict.covered.length,
+      covered: verdict.covered,
+      feedback: verdict.feedback,
       graded_by: 'ai',
     };
   };

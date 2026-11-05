@@ -9,6 +9,9 @@
  *    all-or-nothing: if one file cannot be fetched the new worker does not activate and the old version keeps working.
  *  - Navigations are network-first (a deploy shows up on the next load); hashed assets are cache-first (they never change).
  *  - Old versions' caches are deleted on activate, so storage does not grow with every deploy.
+ *  - A 200 text/html is not enough to be the offline shell: a captive portal or proxy error page answers that way too. Only a
+ *    document that carries the app's own markers (its root element and a script from /assets/) replaces the stored shell, so
+ *    a good shell is never swapped for a worse one.
  */
 
 export const CACHE_PREFIX = 'interview-trainer-';
@@ -64,6 +67,21 @@ export function isStorable(url: URL, response: Response): boolean {
   return expected !== undefined && expected.test(type); // unknown extensions are never cached
 }
 
+const ROOT_MARKER = /<div\s[^>]*\bid\s*=\s*["']?root["']?[\s>/]/i;
+const SCRIPT_MARKER = /<script\s[^>]*\bsrc\s*=\s*["']\/assets\//i;
+
+/** Whether `response` really is the app's HTML shell: the right type and status, and the app's root element plus its bundle. */
+export async function isAppShell(url: URL, response: Response): Promise<boolean> {
+  if (!isStorable(url, response)) return false;
+  if (response.redirected && new URL(response.url, url).origin !== url.origin) return false;
+  try {
+    const body = await response.clone().text();
+    return ROOT_MARKER.test(body) && SCRIPT_MARKER.test(body);
+  } catch {
+    return false;
+  }
+}
+
 async function openCurrent(env: SwEnv): Promise<Cache> {
   return env.caches.open(cacheName(env.version));
 }
@@ -77,7 +95,8 @@ export async function install(env: SwEnv): Promise<void> {
       env.precache.map(async (path) => {
         const url = new URL(path, env.origin);
         const res = await env.fetch(new Request(url, { cache: 'reload' }));
-        if (!isStorable(url, res)) throw new Error(`precache: unusable response for ${path} (${res.status} ${res.headers.get('content-type')})`);
+        const usable = path === SHELL_URL ? await isAppShell(url, res) : isStorable(url, res);
+        if (!usable) throw new Error(`precache: unusable response for ${path} (${res.status} ${res.headers.get('content-type')})`);
         await cache.put(path, res);
       }),
     );
@@ -95,7 +114,7 @@ export async function activate(env: SwEnv): Promise<void> {
 }
 
 async function store(env: SwEnv, key: string, url: URL, response: Response): Promise<void> {
-  if (!isStorable(url, response)) return;
+  if (key === SHELL_URL ? !(await isAppShell(url, response)) : !isStorable(url, response)) return;
   try {
     await (await openCurrent(env)).put(key, response);
   } catch {

@@ -10,6 +10,7 @@ export * from './achievements';
 export * from './mock';
 export * from './api';
 export * from './grading-prompt';
+export * from './verdict';
 export * from './code-runner';
 export * from './interview';
 export * from './day';

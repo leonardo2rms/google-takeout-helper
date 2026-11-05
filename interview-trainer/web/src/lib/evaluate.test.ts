@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { Course, allQuestions, type OpenQ, type Question } from '@trainer/shared';
-import { evaluate, isPass, skipOutcome } from './evaluate';
+import { Course, ImplausibleVerdictError, allQuestions, type OpenQ, type Question } from '@trainer/shared';
+import { NOTE_UNAVAILABLE, NOTE_UNRELIABLE, evaluate, isPass, skipOutcome } from './evaluate';
 
 const course = Course.parse({
   units: [{
@@ -45,6 +45,24 @@ describe('evaluate', () => {
     const grade = vi.fn().mockResolvedValue({ score: 1, covered: [true], feedback: '', graded_by: 'ai' });
     const out = await evaluate(open, { type: 'open', text: 'x' }, grade);
     expect(out.open?.gradedBy).toBe('self');
+  });
+
+  it('says honestly why the AI grade is not shown: unreliable verdict, malformed response, or no service', async () => {
+    const say = async (grade: never) => (await evaluate(open, { type: 'open', text: 'ALPHA only' }, grade)).open!;
+    const unreliable = await say(vi.fn().mockRejectedValue(new ImplausibleVerdictError('junk')) as never);
+    expect(unreliable).toMatchObject({ gradedBy: 'self', needsSelfAssessment: true, note: NOTE_UNRELIABLE });
+    const down = await say(vi.fn().mockRejectedValue(new Error('503')) as never);
+    expect(down).toMatchObject({ gradedBy: 'self', note: NOTE_UNAVAILABLE });
+    const wrongLength = await say(vi.fn().mockResolvedValue({ score: 1, covered: [true], feedback: '', graded_by: 'ai' }) as never);
+    expect(wrongLength.note).toBe(NOTE_UNRELIABLE);
+    for (const bad of [
+      { score: 1, covered: ['yes', 'yes'], feedback: 'fine' },
+      { score: 7, covered: [true, true], feedback: 'fine' },
+      { score: -1, covered: [true, true], feedback: 'fine' },
+      { score: '1', covered: [true, true], feedback: 'fine' },
+      { covered: [true, true], feedback: 'fine' },
+    ]) expect((await say(vi.fn().mockResolvedValue(bad) as never)).note, JSON.stringify(bad)).toBe(NOTE_UNRELIABLE);
+    expect((await evaluate(open, { type: 'open', text: 'ALPHA only' })).open).not.toHaveProperty('note'); // no AI configured: nothing to explain
   });
 
   it('lets self-assessment edits decide the pass/fail result', async () => {

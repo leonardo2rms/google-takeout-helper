@@ -11,7 +11,7 @@ The interface is a calm "drafting sheet" (ink on paper, hairline rules, mono lab
 
 | | |
 |---|---|
-| **146 questions / 8 units / 16 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & resilience · Algorithms & complexity · AI-assisted engineering |
+| **307 questions / 13 units / 34 lessons** | Kotlin · Coroutines · Spring · JVM · DDD · Scale & performance · Algorithms & complexity · AI-assisted engineering · Data & persistence · Messaging & events · System design · Testing & quality · Security & observability |
 | **Question types** | `single`, `multi`, `fill` (tap tokens into blanks), `order` (tap lines into order), `spot` (tap the buggy line), `estimate` (type a number, tolerance-graded), `match` (connect pairs), `code` (write a function, run against tests), `open` (AI-graded, with interviewer follow-ups) |
 | **Lesson mechanics** | Check → feedback with explanation → continue. Misses return at the end of the lesson (max 2 retries). Perfect-lesson bonus. |
 | **Habit loop** | A **Today** card (8 interleaved questions: due reviews, weak spots, new material), a **daily goal ring**, a **forgiving streak** (earned freezes, chosen rest days), **ranks** (Associate to Fellow) and celebrations scaled to real milestones. See [Engagement](#engagement-and-progress). |
@@ -80,7 +80,7 @@ On the feedback card, **Ask why** opens a short chat about *that* question ("why
 ### Single-file build (no server, no install)
 
 ```bash
-npm run build:standalone    # -> dist/interview-trainer.html (fragment for artifact hosts) and dist/interview-trainer.standalone.html (complete page for file:// or any static host), ~945 kB each, of which the embedded font is about 31 kB
+npm run build:standalone    # -> dist/interview-trainer.html (a fragment for artifact hosts only: opened directly it renders in quirks mode) and dist/interview-trainer.standalone.html (the complete page: open this one from disk or put it on any static host), ~945 kB each, of which the embedded font is about 31 kB
 ```
 
 Everything (course, logic, styles) is inlined, with no service worker and no API server. Hosts that provide

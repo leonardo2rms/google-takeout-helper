@@ -205,6 +205,27 @@ test.describe('keyboard operation', () => {
     await expect(editor).toBeFocused();
   });
 
+  test('single choice is a radio group: the arrow keys move and choose, wrapping at the ends', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    await gotoQuestion(page, 'single');
+    const radios = page.getByRole('radio');
+    await radios.first().focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(radios.nth(1)).toBeFocused();
+    await expect(radios.nth(1)).toHaveAttribute('aria-checked', 'true');
+    await page.keyboard.press('ArrowRight');
+    await expect(radios.nth(2)).toHaveAttribute('aria-checked', 'true');
+    await expect(radios.nth(1)).toHaveAttribute('aria-checked', 'false');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowLeft');
+    await expect(radios.first()).toBeFocused();
+    await page.keyboard.press('ArrowUp'); // wraps to the last option
+    await expect(radios.last()).toBeFocused();
+    await expect(radios.last()).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('button', { name: 'Check', exact: true })).toBeEnabled();
+  });
+
   test('fill and single choice: results are readable without colour', async ({ page }) => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });

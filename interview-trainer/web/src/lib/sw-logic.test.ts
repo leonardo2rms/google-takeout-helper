@@ -3,7 +3,7 @@
  * all-or-nothing under a version-keyed cache name, drop old versions, network-first pages, cache-first assets.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { CACHE_PREFIX, activate, cacheName, handleFetch, install, isNavigation, isStorable, shouldHandle, type SwEnv } from './sw-logic';
+import { CACHE_PREFIX, activate, cacheName, handleFetch, install, isAppShell, isNavigation, isStorable, shouldHandle, type SwEnv } from './sw-logic';
 
 const ORIGIN = 'https://app.test';
 
@@ -34,7 +34,10 @@ class FakeCaches {
 }
 
 const js = (body = 'console.log(1)') => new Response(body, { status: 200, headers: { 'content-type': 'text/javascript' } });
-const html = (body = '<title>app</title>', status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8' } });
+const shellWith = (title: string) => `<!doctype html><html><head><title>${title}</title><script type="module" crossorigin src="/assets/index-abc.js"></script></head><body><div id="root"></div></body></html>`;
+const SHELL = shellWith('app');
+const PORTAL = '<html><head><title>Hotel WiFi login</title></head><body><form action="/login">Accept the terms</form></body></html>';
+const html = (body = SHELL, status = 200) => new Response(body, { status, headers: { 'content-type': 'text/html; charset=utf-8' } });
 
 interface Rig {
   env: SwEnv;
@@ -62,7 +65,7 @@ function rig(version = 'v1', precache = ['/', '/assets/app-1.js']): Rig {
       r.calls.push(url.pathname);
       if (r.offline) throw new TypeError('Failed to fetch');
       const make = r.net.get(url.pathname);
-      return make ? make() : html('<title>app</title>'); // the bug under test: an SPA server answering anything with the shell
+      return make ? make() : html(); // the bug under test: an SPA server answering anything with the shell
     },
   };
   return r;
@@ -193,12 +196,12 @@ describe('fetching', () => {
   it('navigations are network-first: a new deploy shows up on the next load, and the shell copy is refreshed', async () => {
     const r = rig();
     await install(r.env);
-    r.net.set('/lesson/x', () => html('<title>NEW shell</title>'));
+    r.net.set('/lesson/x', () => html(shellWith('NEW shell')));
     const pending: Promise<unknown>[] = [];
     const res = await handleFetch(r.env, nav('/lesson/x'), (p) => pending.push(p));
     await Promise.all(pending);
-    expect(await res.text()).toBe('<title>NEW shell</title>');
-    expect(await (await stored(r).match('/'))!.text()).toBe('<title>NEW shell</title>');
+    expect(await res.text()).toBe(shellWith('NEW shell'));
+    expect(await (await stored(r).match('/'))!.text()).toBe(shellWith('NEW shell'));
   });
 
   it('offline navigations get the cached shell', async () => {
@@ -206,14 +209,14 @@ describe('fetching', () => {
     await install(r.env);
     r.offline = true;
     const res = await handleFetch(r.env, nav('/progress'));
-    expect(await res.text()).toBe('<title>app</title>');
+    expect(await res.text()).toBe(SHELL);
   });
 
   it('a server error on a navigation falls back to the cached shell; with no cache the error is passed through', async () => {
     const r = rig();
     await install(r.env);
     r.net.set('/lesson/x', () => html('oops', 503));
-    expect(await (await handleFetch(r.env, nav('/lesson/x'))).text()).toBe('<title>app</title>');
+    expect(await (await handleFetch(r.env, nav('/lesson/x'))).text()).toBe(SHELL);
 
     const empty = rig('fresh');
     empty.net.set('/lesson/x', () => html('oops', 503));
@@ -239,5 +242,79 @@ describe('fetching', () => {
     await handleFetch(r.env, nav('/'), spy);
     expect(spy).toHaveBeenCalled();
     await expect(handleFetch(r.env, asset('/assets/app-1.js'))).resolves.toBeInstanceOf(Response);
+  });
+});
+
+describe('only the real app shell is stored as the offline shell (N-S2-5)', () => {
+  const navigate = async (r: Rig, path = '/') => {
+    const pending: Promise<unknown>[] = [];
+    const res = await handleFetch(r.env, nav(path), (p) => pending.push(p));
+    await Promise.all(pending);
+    return res;
+  };
+
+  it('a captive portal answering a navigation with 200 text/html is shown but never replaces the cached shell', async () => {
+    const r = rig();
+    await install(r.env);
+    r.net.set('/', () => html(PORTAL));
+    expect(await (await navigate(r)).text()).toBe(PORTAL); // the person at the hotel sees the login page they need
+    r.offline = true;
+    expect(await (await handleFetch(r.env, nav('/'))).text()).toBe(SHELL); // but the next offline start still opens the app
+  });
+
+  it('with no cached shell yet, a portal page is not stored either', async () => {
+    const r = rig();
+    r.net.set('/', () => html(PORTAL));
+    await navigate(r);
+    expect(stored(r).entries.has('/')).toBe(false);
+  });
+
+  it('a page that has the root element but no app bundle, or the bundle but no root, is not the shell', async () => {
+    const r = rig();
+    await install(r.env);
+    for (const body of ['<html><div id="root"></div></html>', '<html><script type="module" src="/assets/x.js"></script></html>', '<html><div id="rooty"></div><script src="/assets/x.js"></script></html>']) {
+      r.net.set('/', () => html(body));
+      await navigate(r);
+      expect(await (await stored(r).match('/'))!.text()).toBe(SHELL);
+    }
+  });
+
+  it('a real new shell (root element and bundle, either quote style) still replaces the old one', async () => {
+    const r = rig();
+    await install(r.env);
+    r.net.set('/', () => html(`<html><head><script type='module' src='/assets/index-new.js'></script></head><body><div class="app" id='root'></div></body></html>`));
+    await navigate(r);
+    expect(await (await stored(r).match('/'))!.text()).toContain('index-new.js');
+  });
+
+  it('installing fails when the portal answers for the shell, so the working version stays in charge', async () => {
+    const r = rig('v9');
+    r.net.set('/', () => html(PORTAL));
+    await expect(install(r.env)).rejects.toThrow(/unusable response for \//);
+    expect(r.caches.stores.has(cacheName('v9'))).toBe(false);
+  });
+
+  it('isAppShell refuses a response redirected to another origin and a body that cannot be read', async () => {
+    const u = new URL('/', ORIGIN);
+    const foreign = Object.defineProperty(html(), 'redirected', { value: true });
+    Object.defineProperty(foreign, 'url', { value: 'https://portal.example/login' });
+    expect(await isAppShell(u, foreign)).toBe(false);
+    const own = Object.defineProperty(html(), 'redirected', { value: true });
+    Object.defineProperty(own, 'url', { value: `${ORIGIN}/index.html` });
+    expect(await isAppShell(u, own)).toBe(true);
+    const broken = html();
+    Object.defineProperty(broken, 'clone', { value: () => ({ text: () => Promise.reject(new Error('stream')) }) });
+    expect(await isAppShell(u, broken)).toBe(false);
+  });
+
+  it('boundary: a navigation answered with exactly 500 falls back to the cached shell; 499 is passed through', async () => {
+    const r = rig();
+    await install(r.env);
+    r.net.set('/lesson/x', () => html('oops', 500));
+    expect(await (await handleFetch(r.env, nav('/lesson/x'))).text()).toBe(SHELL);
+    r.net.set('/lesson/x', () => html('nope', 499));
+    const res = await handleFetch(r.env, nav('/lesson/x'));
+    expect(res.status).toBe(499);
+    expect(await res.text()).toBe('nope');
   });
 });

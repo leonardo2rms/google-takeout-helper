@@ -72,6 +72,23 @@ describe('readiness', () => {
     expect(labelFor(0.95, 30)).toBe('building');
     expect(labelFor(0.95, 50)).toBe('solid');
   });
+  it('label thresholds are inclusive at exactly the boundary: one below, at, one above (coverage 30/60/80%, score 20/45/70)', () => {
+    const eps = 1e-9;
+    expect(labelFor(0.3 - eps, 99)).toBe('early');
+    expect(labelFor(0.3, 99)).toBe('building');
+    expect(labelFor(0.3 + eps, 99)).toBe('building');
+    expect(labelFor(0.6 - eps, 99)).toBe('building');
+    expect(labelFor(0.6, 99)).toBe('solid');
+    expect(labelFor(0.8 - eps, 99)).toBe('solid');
+    expect(labelFor(0.8, 99)).toBe('ready');
+    expect(labelFor(1, 20 - eps)).toBe('early');
+    expect(labelFor(1, 20)).toBe('building');
+    expect(labelFor(1, 20 + eps)).toBe('building');
+    expect(labelFor(1, 45 - eps)).toBe('building');
+    expect(labelFor(1, 45)).toBe('solid');
+    expect(labelFor(1, 70 - eps)).toBe('solid');
+    expect(labelFor(1, 70)).toBe('ready');
+  });
   it('answering well never lowers strength on the same day', () => {
     const before = withCards(emptyProgress(), [[q('k-1/1'), { interval: 3, due: addDays(today, -1) }]]);
     const s0 = strength(before.cards['k-1/1'], today);

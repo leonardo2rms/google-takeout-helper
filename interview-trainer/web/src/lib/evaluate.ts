@@ -1,4 +1,5 @@
 import {
+  ImplausibleVerdictError,
   PASS_SCORE,
   gradeFill,
   gradeMulti,
@@ -34,6 +35,8 @@ export interface OpenOutcome {
   gradedBy: 'ai' | 'self';
   /** True when AI grading was unavailable and the learner confirms the checklist themselves. */
   needsSelfAssessment: boolean;
+  /** Why the AI's grade is not shown, when grading was tried and not used. */
+  note?: string;
 }
 
 export interface Outcome {
@@ -94,23 +97,31 @@ export async function evaluate(q: Question, a: Answer, grade?: GradeFn, runCode?
   }
 }
 
+export const NOTE_UNRELIABLE = 'The AI returned a verdict that did not look reliable, so it was not used. Check your answer yourself.';
+export const NOTE_UNAVAILABLE = 'AI grading was not available for this answer. Check it yourself.';
+
 async function evaluateOpen(q: OpenQ, text: string, grade?: GradeFn): Promise<Outcome> {
+  let note: string | undefined;
   if (grade) {
     try {
       const res = await grade(q.id, text);
-      if (res.covered.length === q.keyPoints.length) {
+      const wellFormed =
+        Array.isArray(res.covered) && res.covered.length === q.keyPoints.length && res.covered.every((c) => typeof c === 'boolean') &&
+        typeof res.score === 'number' && res.score >= 0 && res.score <= 1;
+      if (wellFormed) {
         return {
           correct: res.score >= PASS_SCORE,
           open: { covered: res.covered, feedback: res.feedback, gradedBy: 'ai', needsSelfAssessment: false },
         };
       }
-    } catch {
-      /* fall through to self-assessment */
+      note = NOTE_UNRELIABLE;
+    } catch (err) {
+      note = err instanceof ImplausibleVerdictError ? NOTE_UNRELIABLE : NOTE_UNAVAILABLE;
     }
   }
   const covered = heuristicCoverage(q, text);
   return {
     correct: scoreFromCoverage(covered) >= PASS_SCORE,
-    open: { covered, gradedBy: 'self', needsSelfAssessment: true },
+    open: { covered, gradedBy: 'self', needsSelfAssessment: true, ...(note && { note }) },
   };
 }

@@ -24,6 +24,12 @@ export interface MigrationResult {
   /** True when `progress` differs from what was stored, so the caller should write it back. */
   changed: boolean;
   /**
+   * True when normalising threw away something that was stored (a field this version does not know, a malformed value, a
+   * record that was not valid), as opposed to filling in defaults or the routine ageing of old days and changed cards.
+   * The caller keeps a copy of the original before writing the normalised profile back.
+   */
+  lossy?: boolean;
+  /**
    * Set when the stored value could not be understood. The caller must NOT overwrite it
    * (a newer app version may have written it) without taking a backup first.
    */
@@ -223,6 +229,29 @@ function fromV1(v1: Obj, ctx: MigrationContext): Progress {
   };
 }
 
+/**
+ * Whether `norm` (the normalised form of `raw`) lacks something `raw` carried: a key it dropped, a string or boolean that
+ * changed, a value of another type, an array element that is gone. Numbers that were clamped and defaults that were added
+ * do not count; neither does `days` older than the retention window, which is dropped every day by design.
+ */
+function dropsData(raw: unknown, norm: unknown, today: Day, path: string): boolean {
+  if (raw === null || raw === undefined) return false;
+  if (Array.isArray(raw)) {
+    if (!Array.isArray(norm)) return true;
+    const plain = new Set(norm.filter((x) => typeof x !== 'object' || x === null));
+    return raw.some((x) => (typeof x !== 'object' || x === null ? x !== null && !plain.has(x) : !norm.some((n) => !dropsData(x, n, today, path))));
+  }
+  if (isObj(raw)) {
+    if (!isObj(norm)) return true;
+    return Object.entries(raw).some(([k, v]) => {
+      if (path === 'days' && isDay(k) && daysBetween(k, today) >= DAYS_KEPT) return false;
+      return !(k in norm) || dropsData(v, norm[k], today, path === '' ? k : `${path}.${k}`);
+    });
+  }
+  if (typeof raw === 'number') return typeof norm !== 'number';
+  return raw !== norm;
+}
+
 const failed = (problem: MigrationResult['problem'], from: 0 | 1 | 2 = 0): MigrationResult => ({ progress: emptyProgress(), from, changed: false, problem });
 
 /**
@@ -245,8 +274,10 @@ export function migrateProgress(raw: unknown, ctx: MigrationContext): MigrationR
     return { progress: pruneProgress(fromV1(value, ctx), ctx), from: 1, changed: true };
   }
   if (value.version === 2) {
-    const progress = pruneProgress(normalizeProgress(value, ctx), ctx);
-    return { progress, from: 2, changed: !sameJson(progress, value) };
+    const normalized = normalizeProgress(value, ctx);
+    const progress = pruneProgress(normalized, ctx);
+    const changed = !sameJson(progress, value);
+    return { progress, from: 2, changed, lossy: changed && dropsData(value, normalized, ctx.today, '') };
   }
   if (typeof value.version === 'number' && value.version > 2) return failed('future-version');
   return failed('corrupt');

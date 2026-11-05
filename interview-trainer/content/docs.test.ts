@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
+import { loadCourse } from '../shared/src/load-content';
 import { Course, allQuestions, heuristicCoverage, openParts, runCodeTests, scoreFromCoverage, validateCourse, type CodeQ, type OpenQ } from '../shared/src';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -133,3 +134,11 @@ describe('links between the docs', () => {
   });
 });
 
+
+describe('README facts', () => {
+  it('states the real number of questions, units and lessons', () => {
+    const course = loadCourse(resolve(root, 'content'));
+    const counts = `${allQuestions(course).length} questions / ${course.units.length} units / ${course.units.reduce((n, u) => n + u.lessons.length, 0)} lessons`;
+    expect(read('README.md')).toContain(`**${counts}**`);
+  });
+});

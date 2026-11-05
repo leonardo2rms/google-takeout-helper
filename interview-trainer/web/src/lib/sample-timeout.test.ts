@@ -82,7 +82,7 @@ describe('runaway feedback (S2-5)', () => {
   it('is capped to a few sentences worth of text', async () => {
     const huge = 'x'.repeat(4_000_000);
     const sample = Object.assign(vi.fn(), { json: vi.fn().mockResolvedValue({ points: [{ covered: true }, { covered: false }], feedback: huge }) }) as never;
-    const res = await createSampleGrader(course, sample)('l/1', 'a');
+    const res = await createSampleGrader(course, sample)('l/1', 'my own explanation');
     expect(res.feedback.length).toBe(FEEDBACK_MAX_CHARS + 1);
     expect(res.feedback.endsWith('…')).toBe(true);
   });
