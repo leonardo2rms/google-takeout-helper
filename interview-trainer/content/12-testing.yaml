@@ -22,10 +22,10 @@ lessons:
         pairs:
           - { left: "Dummy", right: "Only fills a parameter list and is never actually used" }
           - { left: "Stub", right: "Returns canned answers to the calls the test makes" }
-          - { left: "Spy", right: "Wraps a real object and records how it was called" }
-          - { left: "Mock", right: "Is set up with expectations about calls and fails if they are not met" }
+          - { left: "Spy", right: "Records how it was called (a Mockito spy does this by wrapping a real object) so the test can inspect the calls afterwards" }
+          - { left: "Mock", right: "Is set up with expectations about the calls it should receive, and the test fails if they are not met" }
           - { left: "Fake", right: "Has a real but simplified implementation, such as an in-memory repository" }
-        explanation: "Names vary between libraries (Mockito calls everything a 'mock'), but the roles differ. Prefer stubs and fakes that let you assert on outcomes; reach for mocks and spies when the interaction itself is the behavior, such as 'an email was sent'."
+        explanation: "These are Martin Fowler's definitions (after Meszaros). Names vary between libraries (Mockito calls almost everything a 'mock', and its mocks check calls with `verify` after the fact), but the roles differ. Prefer stubs and fakes that let you assert on outcomes; reach for mocks and spies when the interaction itself is the behavior, such as 'an email was sent'."
 
       - type: single
         prompt: "What does `@WebMvcTest(OrderController::class)` set up?"
@@ -45,7 +45,7 @@ lessons:
           - { id: c, text: "It starts a web server and connects to the production database" }
           - { id: d, text: "It commits at the end of every test so later tests can reuse the data" }
         answer: a
-        explanation: "The default rollback keeps tests isolated, but note that nothing may actually be flushed to the database, so constraint violations can stay hidden unless you flush explicitly. By default it may also swap in an embedded database; for production-faithful tests use a real engine via Testcontainers."
+        explanation: "The default rollback keeps tests isolated, but because the transaction never commits, Hibernate may not even send the SQL, so constraint violations can stay hidden unless you flush explicitly. Also by default `@DataJpaTest` replaces the configured DataSource with an embedded database (when one is on the classpath); for production-faithful tests use `@AutoConfigureTestDatabase(replace = NONE)` with a real engine via Testcontainers."
 
       - type: multi
         prompt: Select ALL of these that are common mocking pitfalls.
@@ -64,7 +64,7 @@ lessons:
         template: |
           @SpringBootTest
           class RepoIT {
-              // db: a started Testcontainers PostgreSQL container
+              // db: a static, started Testcontainers PostgreSQL container
 
               @[[1]]
               static void props(DynamicPropertyRegistry registry) {
@@ -73,7 +73,7 @@ lessons:
           }
         bank: ["DynamicPropertySource", "getJdbcUrl", "TestPropertySource", "getHost", "Bean", "getDatabaseName"]
         answers: ["DynamicPropertySource", "getJdbcUrl"]
-        explanation: "`@DynamicPropertySource` registers properties as suppliers evaluated after the container has started, so the random host port is known. `@TestPropertySource` only takes static values. In newer Spring Boot versions `@ServiceConnection` can do this wiring for you."
+        explanation: "`@DynamicPropertySource` registers properties as suppliers evaluated after the container has started, so the random host port is known. `@TestPropertySource` only takes static values. Since Spring Boot 3.1, `@ServiceConnection` can do this wiring for you."
 
       - type: spot
         prompt: "The second test passes or fails depending on test order. Tap the line that causes this."

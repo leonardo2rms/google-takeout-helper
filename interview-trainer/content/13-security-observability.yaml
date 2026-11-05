@@ -251,14 +251,14 @@ lessons:
 
       - type: order
         kind: steps
-        prompt: Put the typical steps of handling a production incident in order.
+        prompt: "Put the typical steps of handling a production incident in order. (Assume a recent change is the suspected cause, so rolling back is the fastest mitigation.)"
         lines:
           - "Confirm the impact: which users, which endpoints, since when"
           - "Mitigate first: roll back the change, turn off the feature flag or shed load"
           - "Check that the user-facing metrics have recovered"
           - "Find the root cause using logs, traces and the change history"
           - "Write a blameless postmortem with follow-up actions"
-        explanation: "Stabilise before you diagnose: users care that it stops hurting, and a rollback is usually faster than finding the bug. The postmortem looks at the system and the process, not at who made the change, and ends with owned, tracked actions."
+        explanation: "Stabilise before you diagnose in depth: users care that it stops hurting, and a rollback is usually faster than finding the bug. In real incidents these steps overlap (you need some diagnosis to pick the mitigation), but the priority order is impact, mitigation, verification, root cause, learning. The postmortem looks at the system and the process, not at who made the change, and ends with owned, tracked actions."
 
       - type: open
         prompt: "Users report that checkout is slow, yet no alert fired. How do you investigate, and what do you change afterwards?"
