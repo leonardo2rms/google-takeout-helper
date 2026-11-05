@@ -12,7 +12,7 @@ lessons:
         options:
           - { id: a, text: "`launch` returns a Job; `async` returns a Deferred<T>" }
           - { id: b, text: "Both return Deferred<T>" }
-          - { id: c, text: "`launch` returns Unit; `async` returns T" }
+          - { id: c, text: "`launch` returns Unit; `async` returns a plain T" }
           - { id: d, text: "`launch` returns a Deferred<Unit>; `async` returns a Job" }
         answer: a
         explanation: "`launch` is fire-and-forget work with a Job handle for cancellation and joining. `async` returns a Deferred, a Job that also carries a result you read with `await()`."
@@ -43,9 +43,9 @@ lessons:
         options:
           - { id: a, text: "A parent does not complete until all its children complete" }
           - { id: b, text: "Cancelling a parent cancels its children" }
-          - { id: c, text: "An unhandled failure in a child (in a regular scope) cancels its siblings and propagates to the parent" }
+          - { id: c, text: "In a regular scope, an unhandled failure in a child cancels its siblings and propagates to the parent" }
           - { id: d, text: "`GlobalScope.launch` is tied to the lifecycle of the calling function" }
-          - { id: e, text: "Children may outlive their scope if they run on a different dispatcher" }
+          - { id: e, text: "Children may outlive their scope if they run on a different dispatcher (say, `Dispatchers.IO`)" }
         answers: [a, b, c]
         explanation: "The dispatcher has nothing to do with lifetime: the scope owns the child. `GlobalScope` is explicitly the opposite, an unscoped coroutine that lives until the process ends or it finishes."
 
@@ -74,8 +74,8 @@ lessons:
                 }
             }
         options:
-          - { id: a, text: "It swallows CancellationException, so cancelling the coroutine won't stop it" }
-          - { id: b, text: "`delay` cannot be used inside a try block in a suspend function" }
+          - { id: a, text: "It swallows CancellationException, which means cancelling the coroutine does not stop it" }
+          - { id: b, text: "`delay` cannot be used inside a try block; the compiler rejects suspension points there" }
           - { id: c, text: "A suspend function is unable to catch exceptions from another suspend function" }
           - { id: d, text: "`log.warn` is not allowed inside a `catch` block of a suspend function" }
         answer: a
@@ -158,10 +158,10 @@ lessons:
         hint: "Compare it with a sequence: does merely declaring it do any work?"
         prompt: "`flow { emit(1) }` is declared but nobody collects it. When does the lambda run?"
         options:
-          - { id: a, text: "Only when (and each time) it is collected: Flow is cold" }
-          - { id: b, text: "Immediately on declaration" }
-          - { id: c, text: "Once, the first time anyone collects it, and the result is cached" }
-          - { id: d, text: "On the next event-loop tick" }
+          - { id: a, text: "Each time it is collected, and not before: Flow is cold" }
+          - { id: b, text: "Eagerly, at the point of declaration" }
+          - { id: c, text: "Once, on the first collection, which caches the result for later collectors" }
+          - { id: d, text: "On the next tick of the event loop: the declaring function returns first" }
         answer: a
         explanation: "A cold flow runs its producer block per collector. Use `shareIn`/`stateIn` to turn it into a hot flow shared among collectors."
 
@@ -188,21 +188,21 @@ lessons:
                 }
             }
         options:
-          - { id: a, text: "\"sibling done\" is printed; the failure of the first child doesn't cancel it" }
+          - { id: a, text: "\"sibling done\" is printed, because a failing child of a supervisor does not cancel its siblings" }
           - { id: b, text: "Nothing is printed; the failing child cancels its sibling, just like in `coroutineScope`" }
           - { id: c, text: "The exception is rethrown by `supervisorScope` after the sibling finishes" }
-          - { id: d, text: "It deadlocks, because `supervisorScope` waits for a child that already failed" }
+          - { id: d, text: "It deadlocks: `supervisorScope` waits forever for a child that already failed" }
         answer: a
         explanation: "A supervisor's children fail independently. The uncaught exception from a `launch` child goes to the CoroutineExceptionHandler (or the thread's handler); it neither cancels siblings nor is rethrown by the scope. With `coroutineScope`, the sibling would be cancelled and the exception rethrown."
 
       - type: multi
         prompt: Select all true statements about Flow.
         options:
-          - { id: a, text: "By default, collection happens in the context of the collector" }
+          - { id: a, text: "By default, collection happens in the context of the collector (context preservation)" }
           - { id: b, text: "`flowOn` changes the context of the operators above it (upstream)" }
           - { id: c, text: "Calling `withContext` around `emit` inside `flow {}` is the supported way to switch dispatcher" }
           - { id: d, text: "`buffer()` runs the producer in a separate coroutine so it and the collector can overlap" }
-          - { id: e, text: "A Flow instance can be collected only once" }
+          - { id: e, text: "A Flow instance can be collected only once (like an `Iterator`)" }
         answers: [a, b, d]
         explanation: "Flow has context preservation: emitting from another context inside `flow {}` throws. Use `flowOn` (or `channelFlow`). Cold flows can be collected any number of times."
 
@@ -286,9 +286,9 @@ lessons:
       - type: multi
         prompt: Select all true statements about Channels and Flows.
         options:
-          - { id: a, text: "Each element sent to a Channel is received by exactly one receiver, so several consumers share the work" }
+          - { id: a, text: "Each element sent to a Channel is received by exactly one receiver, which lets several consumers share the work" }
           - { id: b, text: "A cold Flow runs its producer block again for every collector" }
-          - { id: c, text: "A consumer looping with `for (x in channel)` only ends when the channel is closed or cancelled" }
+          - { id: c, text: "A consumer looping with `for (x in channel)` waits on an empty channel and ends normally only once the channel is closed" }
           - { id: d, text: "`Channel<T>()` created with no arguments buffers 64 elements by default" }
           - { id: e, text: "Collecting a `StateFlow` ends when its producer stops updating it" }
         answers: [a, b, c]
@@ -316,8 +316,8 @@ lessons:
         prompt: "A test written with `runTest` takes a real 10 seconds, although the code under test only calls `delay(10_000)`. What is the most likely cause?"
         options:
           - { id: a, text: "The code runs on a hard-coded dispatcher such as `Dispatchers.IO`, so its `delay` uses real time instead of virtual time" }
-          - { id: b, text: "`runTest` skips delays in the test body itself, but not in code started with `launch` or `async`" }
-          - { id: c, text: "Virtual time only works for delays shorter than a few seconds, so longer ones run in real time" }
+          - { id: b, text: "`runTest` skips delays in the test body itself, but not in code started with `launch` and `async`" }
+          - { id: c, text: "Virtual time only works for delays shorter than a few seconds, since longer ones fall back to real time" }
           - { id: d, text: "`delay` is only skipped after an explicit `advanceUntilIdle()` call, so without it `runTest` waits in real time" }
         answer: a
         explanation: "`runTest` runs the test body on a `TestScheduler` that advances virtual time whenever all coroutines are idle, so `delay(10_000)` costs nothing. A dispatcher the code creates or hard-codes bypasses that scheduler. Inject the `CoroutineDispatcher` (production: `Dispatchers.IO`; test: `StandardTestDispatcher(testScheduler)`) so the test controls time."
@@ -336,9 +336,9 @@ lessons:
                 42
             }
         options:
-          - { id: a, text: "It prints \"caught\", and then `load()` still throws IllegalStateException(\"boom\")" }
+          - { id: a, text: "It prints \"caught\", then `load()` throws the IllegalStateException" }
           - { id: b, text: "It prints \"caught\" and returns 42, because the catch handles the failure" }
-          - { id: c, text: "It prints \"caught\" and then suspends forever, waiting for the failed child" }
+          - { id: c, text: "It prints \"caught\" and then suspends forever: it keeps waiting for the failed child" }
           - { id: d, text: "It returns 42, and the exception goes to the default exception handler" }
         answer: a
         explanation: "A failing `async` child cancels its parent scope as soon as it fails, whether or not anyone awaits it. The `try/catch` handles the exception at `await()` but cannot undo that cancellation, so `coroutineScope` rethrows the child's failure when it completes. Fix: use `supervisorScope { }` and handle each `await()` yourself, or catch inside the `async` block and return a result type."

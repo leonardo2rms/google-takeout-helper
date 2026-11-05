@@ -28,7 +28,7 @@ lessons:
           - { id: a, text: "It can only be applied to `var` properties" }
           - { id: b, text: "It works on `Int` properties because the compiler boxes them behind the scenes" }
           - { id: c, text: "The property type must be non-nullable" }
-          - { id: d, text: "Reading it before assignment throws UninitializedPropertyAccessException" }
+          - { id: d, text: "Reading it too early throws an exception (UninitializedPropertyAccessException)" }
           - { id: e, text: "It can be applied to `val` properties that are assigned in an `init` block" }
         answers: [a, c, d]
         explanation: "`lateinit` needs a mutable, non-null, non-primitive property. Primitives (Int, Boolean...) are not allowed because the JVM field would need a null sentinel. You can test with `::prop.isInitialized`."
@@ -72,7 +72,7 @@ lessons:
             }
         options:
           - { id: a, text: "`value` is a mutable property, so the compiler can't guarantee it is still a String on the next line" }
-          - { id: b, text: "`Any` has no `length`, and `is String` never narrows a type, so an explicit `as String` is needed" }
+          - { id: b, text: "`Any` has no `length`: `is String` never narrows a type, so an explicit `as String` is needed" }
           - { id: c, text: "Smart casts only work inside `when` expressions, never after an `if` check" }
           - { id: d, text: "`Box` must be declared `open` or `data` before its properties can be smart cast" }
         answer: a
@@ -130,7 +130,7 @@ lessons:
           - { id: a, text: "`when` can be exhaustive without an `else` branch, because all subtypes are known" }
           - { id: b, text: "Calls on sealed types are devirtualised, so `when` dispatch is faster at runtime" }
           - { id: c, text: "Subclasses may live in another module, so plugins can extend the hierarchy later" }
-          - { id: d, text: "Each subtype automatically gets `copy()` and `componentN()`, like a data class" }
+          - { id: d, text: "Each subtype gets generated `copy()` and `componentN()` methods, like a data class" }
         answer: a
         explanation: "Direct subtypes of a sealed type are known at compile time, so adding a new subtype turns every non-exhaustive `when` expression into a compile error. That is a safety net for evolving domain models. Sealed is a compile-time guarantee, not a performance feature; subclasses must live in the same package and module; and `copy()` comes from `data class`, not from `sealed`."
 
@@ -140,10 +140,10 @@ lessons:
           source: |
             val sb = StringBuilder().apply { append("a"); append("b") }
         options:
-          - { id: a, text: "The StringBuilder itself (the receiver)" }
-          - { id: b, text: "The string \"ab\"" }
+          - { id: a, text: "The StringBuilder (the receiver)" }
+          - { id: b, text: "The string \"ab\" (from `toString()`)" }
           - { id: c, text: "Unit" }
-          - { id: d, text: "The result of the last `append` call, a new StringBuilder" }
+          - { id: d, text: "The result of the last `append` call: a new StringBuilder instance" }
         answer: a
         explanation: "`apply` and `also` return the receiver; `let`, `run` and `with` return the lambda result. `apply` uses `this` inside the block, `also` uses `it`."
 
@@ -153,11 +153,11 @@ lessons:
         options:
           - { id: a, text: "`equals`/`hashCode` only use properties from the primary constructor" }
           - { id: b, text: "A data class can be declared `open`" }
-          - { id: c, text: "`copy()` makes a shallow copy" }
+          - { id: c, text: "`copy()` makes a shallow copy, which shares nested mutable lists" }
           - { id: d, text: "The primary constructor must have at least one parameter" }
-          - { id: e, text: "A no-arg constructor is generated automatically" }
+          - { id: e, text: "The compiler also generates a no-arg constructor for frameworks such as JPA" }
         answers: [a, c, d]
-        explanation: "Data classes can't be open, abstract, sealed or inner. `copy()` copies references, not deep structure, so a mutable list inside is shared. No no-arg constructor is generated (that's the JPA `no-arg` plugin's job)."
+        explanation: "Data classes can't be open, abstract, sealed or inner. `copy()` copies references, not deep structure, so a mutable list inside is shared. No no-arg constructor is generated unless every constructor parameter has a default value; for JPA that's the `no-arg` plugin's job."
 
       - type: single
         prompt: How many times does the `map` lambda run?
@@ -192,9 +192,9 @@ lessons:
         hint: "Weigh what you pay at runtime against what the type system gives you at compile time."
         prompt: "What is the main purpose of `@JvmInline value class UserId(val raw: Long)`?"
         options:
-          - { id: a, text: "Distinct compile-time types (UserId vs OrderId) at little or no allocation cost" }
-          - { id: b, text: "It guarantees a `UserId` is never boxed, even inside generics or nullable types" }
-          - { id: c, text: "It generates `equals`, `copy` and `componentN` like a `data class` would" }
+          - { id: a, text: "Distinct compile-time types like UserId and OrderId, usually stored as a plain `Long`" }
+          - { id: b, text: "It guarantees a `UserId` is never boxed, even inside generic lists and nullable types" }
+          - { id: c, text: "It generates the data-class members: `equals`, `copy` and `componentN`" }
           - { id: d, text: "It makes each access to `raw` atomic, so coroutines can share it without locks" }
         answer: a
         explanation: "Value classes are erased to the underlying type where possible, avoiding allocation. They are boxed when used as a nullable, a generic type argument or through an interface, so it's not free everywhere and \"never boxed\" is false. They are not a concurrency tool (a `val` is simply immutable) and do not generate `copy` or `componentN`."
@@ -276,18 +276,18 @@ lessons:
           - { id: a, text: "The body is copied into each call site, where the real type argument is known and `is T` can be checked" }
           - { id: b, text: "`reified` makes the JVM keep generic type arguments at runtime for each class that declares them" }
           - { id: c, text: "A non-inline generic function has no way to use `is`, because the compiler forbids type checks inside generics" }
-          - { id: d, text: "`reified` type arguments are passed as hidden `Class<T>` parameters that inline functions can read" }
+          - { id: d, text: "`reified` type arguments are passed as extra hidden `Class<T>` parameters that only inline functions can read" }
         answer: a
         explanation: "On the JVM, type arguments of a normal generic function are erased, so `this is T` cannot be checked (checks like `is String` on a value are fine). Because an inline function's body is substituted at the call site, the compiler can replace `T` with the concrete type there; no hidden class token is passed and the JVM keeps nothing extra. That is also why a reified function can't be called with a type argument that is itself a non-reified type parameter."
 
       - type: multi
         prompt: Select all true statements about `inline` functions.
         options:
-          - { id: a, text: "A lambda passed to an inline function can `return` from the calling function" }
+          - { id: a, text: "A lambda passed to an inline function can `return` from the calling function (a non-local return)" }
           - { id: b, text: "`noinline` keeps a lambda parameter as a real object, e.g. when you store it" }
-          - { id: c, text: "`crossinline` forbids non-local `return` so the lambda can run from another context" }
+          - { id: c, text: "`crossinline` forbids non-local `return`, which lets the lambda run from another context" }
           - { id: d, text: "`reified` can be put on a class's type parameter, as in `class Box<reified T>`" }
-          - { id: e, text: "Marking a function `inline` always makes the program faster, because calls are removed" }
+          - { id: e, text: "Marking a function `inline` always makes the program faster: no call, no stack frame" }
         answers: [a, b, c]
         explanation: "Inlining removes the lambda allocation and call, but it duplicates the body at every call site (code bloat), so it is a trade-off, not a free win; it pays off mostly for small functions that take lambdas. `reified` works only on type parameters of inline functions (and inline property accessors), never on classes."
 
@@ -346,10 +346,10 @@ lessons:
                 runCatching { api.fetchUser(id) }   // fetchUser is a suspend function
                     .getOrNull()
         options:
-          - { id: a, text: "`runCatching` also catches CancellationException, so cancellation is swallowed and errors become null" }
-          - { id: b, text: "`runCatching` is not inline, so a suspend call inside its lambda does not compile" }
-          - { id: c, text: "`getOrNull` blocks the calling thread until the result is ready, which defeats the point of a suspend function" }
-          - { id: d, text: "`Result` cannot be used as a return type in a `suspend` function, only as a parameter" }
+          - { id: a, text: "`runCatching` also catches CancellationException, which swallows cancellation and turns errors into null" }
+          - { id: b, text: "`runCatching` is not inline; a suspend call inside its lambda does not compile" }
+          - { id: c, text: "`getOrNull` parks the calling thread until the `Result` is ready, which defeats the point of a suspend function" }
+          - { id: d, text: "Kotlin forbids `Result` as the return type of a `suspend` function and accepts it only as a parameter" }
         answer: a
         explanation: "`runCatching` is `try { Result.success(block()) } catch (e: Throwable) { Result.failure(e) }`; since the lambda is inline it may call suspend functions, but it also catches the CancellationException that a cancelled coroutine uses to unwind. Catch specific exceptions, or rethrow cancellation (`.onFailure { if (it is CancellationException) throw it }`), and model expected failures explicitly (a sealed result type) instead of collapsing them all into null. `getOrNull` just unwraps the already-computed `Result` (it never blocks), and `Result` is a legal return type since Kotlin 1.5."
 
@@ -369,9 +369,9 @@ lessons:
                 }
             }
         options:
-          - { id: a, text: "Compile error: a `when` on a sealed subject must be exhaustive, even when it is used as a statement" }
-          - { id: b, text: "It compiles, because a `when` statement does not need to cover each case; `Clear` is ignored" }
-          - { id: c, text: "It compiles with a warning only, and `Clear` falls through to a `NoWhenBranchMatchedException`" }
+          - { id: a, text: "Compile error: a `when` on a sealed subject must be exhaustive, even as a statement" }
+          - { id: b, text: "It compiles: a `when` statement does not need to cover each case, so `Clear` is ignored" }
+          - { id: c, text: "It compiles with a warning only; at runtime `Clear` falls through to a `NoWhenBranchMatchedException`" }
           - { id: d, text: "It compiles if `Clear` becomes a `data class`, because objects cannot be matched with `is`" }
         answer: a
         explanation: "Since Kotlin 1.7, non-exhaustive `when` statements over sealed, enum and Boolean subjects are errors rather than warnings. That is what makes sealed hierarchies a safety net: adding `Clear` breaks every handler that forgot it. Adding an `else` branch silences the compiler and throws that safety away, so avoid `else` on sealed `when`s."

@@ -16,9 +16,9 @@ lessons:
       - type: single
         prompt: "What ordering does Kafka guarantee?"
         options:
-          - { id: a, text: "Records within one partition are ordered, and equal keys go to the same partition, so order holds per key" }
-          - { id: b, text: "The records of a topic are globally ordered, because the broker assigns each record a topic-wide sequence number" }
-          - { id: c, text: "Records are ordered across all partitions, but only as seen by the consumers inside one consumer group" }
+          - { id: a, text: "Records in one partition are ordered, and equal keys share a partition, so order holds per key" }
+          - { id: b, text: "The records of a topic are globally ordered: the broker stamps each one with a topic-wide sequence number" }
+          - { id: c, text: "Records are ordered across partitions, as long as they are read by the consumers of one group" }
           - { id: d, text: "Ordering is guaranteed only when the topic has exactly one broker, because replicas can reorder records" }
         answer: a
         explanation: "The partition is the unit of ordering and of parallelism (and keys map to the same partition only while the partition count stays the same). A global order would force a single partition and a single reader; offsets are per partition, and the number of brokers or consumer groups does not change that. So choose a key that carries the ordering you need (for example the order id) and expect no ordering between different keys."
@@ -63,12 +63,12 @@ lessons:
             INFO  [Consumer clientId=billing-3, groupId=billing] Revoking previously assigned partitions [payments-4]
             ERROR [Consumer clientId=billing-3, groupId=billing] Offset commit failed: the group has already rebalanced and the partitions belong to another member
         options:
-          - { id: a, text: "Processing a batch took longer than max.poll.interval.ms, so the member was removed; reduce max.poll.records or speed up the work" }
-          - { id: b, text: "The broker ran out of disk space and dropped the consumer, so free disk space and restart the broker" }
-          - { id: c, text: "The topic has too many partitions for one group, so delete partitions to stop the rebalances" }
-          - { id: d, text: "Heartbeats were lost on the network, so the fix is to raise session.timeout.ms and heartbeat.interval.ms" }
+          - { id: a, text: "Processing between polls exceeded max.poll.interval.ms, so the member was removed; take fewer records per poll" }
+          - { id: b, text: "The broker ran out of disk space and fenced the consumer, so free disk space and restart the broker" }
+          - { id: c, text: "The topic has too many partitions for one group, so merge or delete partitions to stop the rebalances" }
+          - { id: d, text: "Network loss delayed the heartbeats; raise session.timeout.ms so the coordinator waits longer" }
         answer: a
-        explanation: "The log names the cause: 412 s between poll() calls against a 300 s limit. The consumer was declared failed, a rebalance gave payments-4 to someone else, and its late offset commit was rejected, so the new owner re-reads records the old one had already processed (hence duplicates, and the need for idempotent handling). Heartbeats run on a separate thread and are governed by `session.timeout.ms`; this is the poll-interval limit."
+        explanation: "The log names the cause: 412 s between poll() calls against a 300 s limit. The consumer was declared failed, a rebalance gave payments-4 to someone else, and its late offset commit was rejected, so the new owner re-reads records the old one had already processed (hence duplicates, and the need for idempotent handling). Lower `max.poll.records` so each batch finishes in time, or make the processing faster. Heartbeats run on a separate thread and are governed by `session.timeout.ms`; this is the poll-interval limit."
 
       - type: order
         kind: steps
@@ -97,19 +97,19 @@ lessons:
       - type: multi
         prompt: "Select all settings that reduce the chance of losing a write that the producer has already seen acknowledged."
         options:
-          - { id: a, text: "acks=all on the producer" }
-          - { id: b, text: "Replication factor 3 with min.insync.replicas=2 (which is enforced for acks=all writes)" }
-          - { id: c, text: "Unclean leader election disabled" }
-          - { id: d, text: "acks=1, because the leader's acknowledgment is enough" }
-          - { id: e, text: "A larger linger.ms so batches are bigger" }
+          - { id: a, text: "`acks=all` on the producer" }
+          - { id: b, text: "Replication factor 3 with `min.insync.replicas=2`, enforced for `acks=all` writes" }
+          - { id: c, text: "Unclean leader election disabled, so that a stale replica cannot become leader" }
+          - { id: d, text: "`acks=1`, because the leader's acknowledgment is enough" }
+          - { id: e, text: "A larger `linger.ms` so batches are bigger" }
         answers: [a, b, c]
         explanation: "With acks=all the leader waits for the in-sync replicas, and min.insync.replicas sets how many must be in sync for a write to be accepted at all, so an acknowledged write survives the loss of one broker. Disabling unclean leader election stops an out-of-date replica from becoming leader and discarding acknowledged records (at the price of availability). With acks=1 the leader can fail before replicating. linger.ms is a throughput knob, not a durability one."
 
       - type: single
         prompt: "A topic has 6 partitions and a consumer group of 6 instances, each at capacity. Lag keeps growing at peak. In a regular consumer group, which of these will NOT raise the group's throughput?"
         options:
-          - { id: a, text: "Starting 6 more instances of the group: each partition has one owner, so the extras sit idle" }
-          - { id: b, text: "Making per-record work cheaper, for example by batching database writes in each poll" }
+          - { id: a, text: "Starting 6 more instances of the group: a partition has only one owner, so the extras sit idle" }
+          - { id: b, text: "Making per-record work cheaper (for example, batching database writes in each poll)" }
           - { id: c, text: "Adding partitions and consumers, accepting that keys map to different partitions afterwards" }
           - { id: d, text: "Handing records from each poll to a worker pool and committing only offsets of finished records" }
         answer: a
@@ -191,10 +191,10 @@ lessons:
       - type: single
         prompt: "A colleague says: 'Kafka has exactly-once semantics, so our consumers do not need to be idempotent.' What is the best response?"
         options:
-          - { id: a, text: "Exactly-once covers read-process-write inside Kafka (idempotent producer plus transactions); external side effects such as database writes can still repeat" }
+          - { id: a, text: "Exactly-once covers read-process-write inside Kafka, but side effects outside it, such as database writes, can repeat" }
           - { id: b, text: "Exactly-once is impossible in any distributed system, so Kafka has no such feature and offers only at-least-once delivery" }
-          - { id: c, text: "Setting enable.idempotence=true on the producer makes every consumer safe from duplicates, including external side effects" }
-          - { id: d, text: "That is correct for a consumer once acks=all and min.insync.replicas are set, because no record is delivered twice then" }
+          - { id: c, text: "Setting enable.idempotence=true on the producer makes the consumers safe from duplicates, including external side effects" }
+          - { id: d, text: "That is correct for a consumer once `acks=all` and `min.insync.replicas` are set, because no record is delivered twice then" }
         answer: a
         explanation: "Kafka's exactly-once semantics are real but scoped: the idempotent producer removes duplicates caused by producer retries, and transactions make a consume-transform-produce step atomic, with consumers reading only committed data. The moment the consumer touches a system outside Kafka, a crash after the side effect but before the offset commit replays the record. Idempotent handlers (inbox table, unique constraint, natural idempotency) are still required. acks=all is about durability, not duplicates."
 
@@ -211,10 +211,10 @@ lessons:
       - type: single
         prompt: "How do a classic queue (RabbitMQ-style) and a log (Kafka-style) differ at their core?"
         options:
-          - { id: a, text: "A queue tracks acknowledgment per message and removes it once consumed; a log keeps records and each group tracks its own offset" }
-          - { id: b, text: "A queue can hold one message at a time, so producers have to wait for each consumer, while a log buffers many records on disk" }
+          - { id: a, text: "A queue deletes each message once it is acknowledged, while a log keeps it, and each group tracks its own offset" }
+          - { id: b, text: "A queue holds one message at a time, so producers stall until a consumer takes it, while a log buffers many records on disk" }
           - { id: c, text: "A log delivers each record to one consumer overall and then deletes it, while a queue retains each message and broadcasts it to the consumers" }
-          - { id: d, text: "A queue is always faster than a log, because a log has to write every record to disk and keep it for days" }
+          - { id: d, text: "A queue is always faster than a log: a log writes every record to disk and keeps it for days" }
         answer: a
         explanation: "Queue: work distribution, with per-message acks, requeueing and routing through exchanges. Log: an append-only history that consumers read at their own pace and can rewind, which suits event streaming, reprocessing and many independent readers. Neither is simply better: pick the queue for task distribution with rich routing, the log for event streams, replay and high throughput. (RabbitMQ also offers stream-style queues, so the distinction is about the model, not the product name.)"
 
@@ -222,7 +222,7 @@ lessons:
         prompt: "You add an optional field to an event that producers publish and several teams consume, using a schema registry with compatibility checks. Which kind of change is generally safe?"
         options:
           - { id: a, text: "Adding a new field with a default, which old readers ignore and new readers can fill in" }
-          - { id: b, text: "Changing a field's type from an integer to a string, since both are simple scalar values and readers can convert them" }
+          - { id: b, text: "Changing a field's type from an integer to a string: both are simple scalars that readers can convert" }
           - { id: c, text: "Making a previously optional field required, since each current producer sets it" }
           - { id: d, text: "Reusing a removed field's name or number for a different meaning, once nobody sends the old one" }
         answer: a

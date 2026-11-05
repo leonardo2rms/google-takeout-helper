@@ -9,9 +9,9 @@ lessons:
       - type: single
         prompt: "Teams following the testing 'trophy' or 'honeycomb' idea put more weight on integration tests than the classic pyramid does. What is the main reasoning?"
         options:
-          - { id: a, text: "Many real bugs live in the wiring between components (SQL, serialization, configuration) that mock-heavy tests miss" }
-          - { id: b, text: "Unit tests are slower than integration tests, because they mock more objects at runtime" }
-          - { id: c, text: "Integration tests never need test data or cleanup, because they run against the real system" }
+          - { id: a, text: "Many real bugs live in the wiring between components, which mock-heavy unit tests skip" }
+          - { id: b, text: "Unit tests are slower than integration tests: mocking frameworks generate classes at runtime" }
+          - { id: c, text: "Integration tests never need test data cleanup, because they run against the real system" }
           - { id: d, text: "Unit tests are impractical for idiomatic Kotlin code that uses coroutines, extension functions and sealed hierarchies" }
         answer: a
         explanation: "The pyramid's logic (many fast, cheap tests; few slow ones) still holds, but with modern tooling such as slices and Testcontainers, integration tests are cheaper than they were, and they check what users depend on. Unit tests are normally the faster ones, integration tests do need data and cleanup, and Kotlin code is unit-testable. Judge a test by the confidence it buys per second and per hour of maintenance, not by its label."
@@ -29,19 +29,19 @@ lessons:
       - type: single
         prompt: "What does `@WebMvcTest(OrderController::class)` set up?"
         options:
-          - { id: a, text: "Only the Spring MVC slice (controller, JSON conversion, validation, advice) with MockMvc; services must be supplied as mocks" }
+          - { id: a, text: "Just the web layer for that controller, with JSON handling, validation and MockMvc, but no service beans" }
           - { id: b, text: "The full application context with each bean, plus an embedded server on a random port, so real HTTP calls can be made" }
           - { id: c, text: "The JPA repositories alone, running against an embedded database with schema auto-creation switched on" }
-          - { id: d, text: "Nothing from Spring: it is plain JUnit with no application context, and MockMvc is created by hand" }
+          - { id: d, text: "Nothing from Spring: it is plain JUnit with no application context, and MockMvc has to be created by hand" }
         answer: a
         explanation: "Slice annotations load just one layer's auto-configuration, which is why they start fast. A full server on a random port is `@SpringBootTest(webEnvironment = RANDOM_PORT)`. Because services are not loaded, you provide them as mock beans or fakes."
 
       - type: single
         prompt: "Which statement about `@DataJpaTest` is accurate?"
         options:
-          - { id: a, text: "Each test runs in a transaction that is rolled back at the end by default, so tests do not leak data" }
-          - { id: b, text: "It loads the @Service and @Controller beans, so that you can test whole request flows" }
-          - { id: c, text: "It starts a web server and connects to the production database, so queries are checked against real data" }
+          - { id: a, text: "Each test runs in a transaction that is rolled back at the end (the default), so tests do not leak data" }
+          - { id: b, text: "It loads the @Service and @Controller beans as well, for testing whole request flows" }
+          - { id: c, text: "It starts a web server and uses the production database: queries then run against real data" }
           - { id: d, text: "It commits at the end of each test, so that later tests can reuse the data that was created by earlier tests" }
         answer: a
         explanation: "The default rollback keeps tests isolated, but because the transaction never commits, Hibernate may not even send the SQL, so constraint violations can stay hidden unless you flush explicitly. Also by default `@DataJpaTest` replaces the configured DataSource with an embedded database (when one is on the classpath); for production-faithful tests use `@AutoConfigureTestDatabase(replace = NONE)` with a real engine via Testcontainers."
@@ -52,8 +52,8 @@ lessons:
           - { id: a, text: "Verifying the exact sequence of internal calls instead of asserting on observable results" }
           - { id: b, text: "Mocking a third-party library's types directly throughout your code instead of wrapping them in an adapter you own" }
           - { id: c, text: "Chains of mocks returning other mocks (deep stubs) just to reach the one value the test needs" }
-          - { id: d, text: "Replacing a slow external HTTP dependency with a fake in tests, so that they run quickly and deterministically" }
-          - { id: e, text: "Giving each test its own freshly created stub, so that no test can influence another" }
+          - { id: d, text: "Replacing a slow external HTTP dependency with a fake in tests to keep them quick and deterministic" }
+          - { id: e, text: "Giving each test its own freshly created stub (no state shared between tests)" }
         answers: [a, b, c]
         explanation: "Interaction-heavy tests break on every refactoring that keeps behaviour the same, and mocks of types you do not own encode your guess of how the library behaves. Wrap third-party code behind your own interface; fakes for slow dependencies and per-test fixtures are good practice."
 
@@ -95,10 +95,10 @@ lessons:
       - type: single
         prompt: "Why do teams use test data builders (`anOrder().withStatus(SHIPPED).build()`) or factory functions with default arguments?"
         options:
-          - { id: a, text: "Tests name only the values that matter, defaults fill in the rest, and constructor changes are fixed once" }
-          - { id: b, text: "They make tests run faster because objects are created lazily and only when an assertion needs them" }
+          - { id: a, text: "Tests name only the values that matter; defaults cover the rest, and constructor changes are fixed once" }
+          - { id: b, text: "They make tests run faster: objects are created lazily, only when an assertion needs them" }
           - { id: c, text: "They remove the need for assertions, because the builder validates the object while building it" }
-          - { id: d, text: "JUnit requires builders or factories to create test objects, because it does not call constructors with arguments itself" }
+          - { id: d, text: "JUnit requires builders or factories to create test objects, as it does not call constructors with arguments itself" }
         answer: a
         explanation: "Noise hides intent: a test that sets twelve constructor fields makes the one relevant field hard to see. In Kotlin, a function `anOrder(status = SHIPPED)` with default parameters often replaces a full builder."
 
@@ -164,10 +164,10 @@ lessons:
         options:
           - { id: a, text: "Tests share mutable state (static fields, a database, files) and depend on execution order" }
           - { id: b, text: "Asserting after a fixed sleep instead of waiting for a condition, so the result depends on timing" }
-          - { id: c, text: "Using the real clock, time zone or random numbers without controlling them" }
+          - { id: c, text: "Relying on the real clock, the time zone and random numbers without controlling them" }
           - { id: d, text: "Calling real external services over the network" }
-          - { id: e, text: "Giving test methods descriptive names, so that a failure is easy to understand" }
-          - { id: f, text: "Building each test's fixture fresh and isolated, so tests cannot affect each other" }
+          - { id: e, text: "Giving test methods descriptive names, so a failure is easy to understand" }
+          - { id: f, text: "Building each test's fixture fresh and isolated, so tests do not affect each other" }
         answers: [a, b, c, d]
         explanation: "Flakiness is nondeterminism: shared state, concurrency and time, randomness, and the outside world. Fix the cause (inject a clock, await a condition, isolate data, fake the network) instead of adding retries."
 
@@ -269,19 +269,19 @@ lessons:
                 assertTrue(done)
             }
         options:
-          - { id: a, text: "Almost no time: `delay` inside `runTest` uses virtual time, which `advanceUntilIdle()` fast-forwards" }
-          - { id: b, text: "Ten real seconds, because `delay` waits on the wall clock, even inside `runTest`" }
-          - { id: c, text: "It fails with an exception, because `delay` is not allowed inside `runTest`, which forbids suspension in the test body" }
-          - { id: d, text: "It hangs, because `launch` needs a real dispatcher and `advanceUntilIdle()` does not return" }
+          - { id: a, text: "Almost no time, since `delay` inside `runTest` uses virtual time that `advanceUntilIdle()` fast-forwards" }
+          - { id: b, text: "Ten real seconds: `delay` waits on the wall clock, even inside `runTest`" }
+          - { id: c, text: "It fails with an exception, since `runTest` forbids suspending calls such as `delay` in the test body" }
+          - { id: d, text: "It hangs: `launch` needs a real dispatcher, and `advanceUntilIdle()` does not return" }
         answer: a
         explanation: "`runTest` runs the body on a test scheduler with a virtual clock, so delays are skipped instantly, which makes timeout, retry and debounce logic testable. It only works if the code under test uses the injected test dispatcher, so inject dispatchers instead of hard-coding `Dispatchers.IO`."
 
       - type: single
         prompt: "A mutation testing tool changes `if (age >= 18)` to `if (age > 18)` and every test still passes. What does this tell you?"
         options:
-          - { id: a, text: "No test pins the boundary at 18: the line may be covered, but nothing asserts that behaviour" }
+          - { id: a, text: "No test pins the boundary at 18, even if the line itself is covered by some test" }
           - { id: b, text: "The code is correct and the tests are excellent, since they still pass after a change to the code" }
-          - { id: c, text: "The mutation tool is broken, because a valid mutation should always make at least one test fail" }
+          - { id: c, text: "The mutation tool is broken: a valid mutation should always make at least one test fail" }
           - { id: d, text: "Line coverage must be below 100%, so add tests until each line is executed" }
         answer: a
         explanation: "A surviving mutant is a gap in the assertions. This is why mutation testing complements coverage: a test can execute a line without checking anything about it, so even 100% line coverage can sit next to surviving mutants. (Some mutants are equivalent, meaning no test could tell them apart, but this one changes behaviour at age 18.) Add a test for age 17, 18 and 19."
