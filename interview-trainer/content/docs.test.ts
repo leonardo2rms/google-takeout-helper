@@ -96,7 +96,7 @@ describe('commands and paths mentioned in the docs', () => {
       path = path.replace(/^interview-trainer\//, '').replace(/[.,;:]+$/, '');
       if (/[*<>]|NN-|\.\.\.|<|YYYY/.test(path)) continue; // a pattern or a placeholder, not a file
       if (path.endsWith('/')) path = path.slice(0, -1);
-      if (GENERATED.has(path)) continue; // produced by a build or a test run, absent in a clean checkout
+      if ([...GENERATED].some((g) => path === g || path.startsWith(`${g}/`))) continue; // produced by a build or a test run (e.g. web/dist/sw.js), absent in a clean checkout
       expect(dirs.some((d) => path === d || path.startsWith(`${d}/`)), path).toBe(true);
       expect(existsSync(resolve(root, path)), `${file}: ${path} does not exist`).toBe(true);
     }
