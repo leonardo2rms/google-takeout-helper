@@ -239,8 +239,9 @@ Learners (and interviewers who read the app's questions) learn quickly that the 
 - **Short answers are fine** (`O(n log n)`, `Dispatchers.IO`): then give every option the same shape (`O(n), since ...`) or the same kind of name instead of padding only the wrong ones.
 - **Same vocabulary.** Every option should reuse words from the prompt; an option that shares nothing with the question is easy to rule out.
 - **Mix absolutes and hedges** across right and wrong options (see above), and in `multi` questions do not let the correct set be exactly the longest options.
+- **Same style.** A second audit found that after lengths were balanced the *style* still gave answers away: correct options carried asides in brackets, after a colon or a semicolon and "X or Y" enumerations, while distractors had been padded with "because ..." clauses. Picking "the option with a bracket" scored 54% and a simple word-counting classifier 64% (chance 25%). Write asides, "or" and causal clauses into right and wrong options at the same rate, state a misconception directly instead of justifying it with "because", and do not reuse stock words that lean one way ("trade-off", "depends" only in answers; "immediately", "automatically" only in distractors). Backtick code and complexities (`O(n log n)`): what is inside a code span is not counted as style.
 
-`npm run content:lint` prints the baseline per unit: how often the answer is the strictly longest option and among the two longest, the mean correlation between option length and correctness, absolute words in answers versus distractors, answers that are the only hedged or the most detailed option, options that share no vocabulary with the prompt, the longest-to-shortest ratio, and how often a `multi` answer set is the longest options. Chance for four options is 25% (longest) and 50% (two longest), with a correlation of 0.
+`npm run content:lint` prints the baseline per unit: how often the answer is the strictly longest option and among the two longest, the mean correlation between option length and correctness, absolute words in answers versus distractors, answers that are the only hedged or the most detailed option, options that share no vocabulary with the prompt, the longest-to-shortest ratio, and how often a `multi` answer set is the longest options. Chance for four options is 25% (longest) and 50% (two longest), with a correlation of 0. It then prints the style tells: for asides (`(`, `;`, `:` outside code spans), the word "or", causal clauses (because, since, so that, which) and absolute words, how many correct options and distractors carry each, plus two attackers whose rules were fixed before measuring: the round-2 audit's combined rule (asides and "or" up; causal, absolute and the shortest option down) and a naive Bayes bag-of-words classifier trained on every other question (leave one question out). `npm run content:lint -- --unit spring,jvm` shows the detail for some units and `npm run content:lint -- --offenders` lists the questions where exactly one option differs from the rest on a feature.
 
 `content/balance.test.ts` turns the headline numbers into a ratchet that fails with the list of offending question ids:
 
@@ -251,8 +252,12 @@ Learners (and interviewers who read the app's questions) learn quickly that the 
 | Answer is among the two longest, whole course | at most 70% |
 | Mean correlation of option length and correctness | at most 0.3 |
 | `multi` answer set equals the longest options | at most 25% of `multi` questions |
+| A style feature among correct options vs distractors (rate ratio, "lift"), single and `multi` separately, once the feature is on 15+ options | between 0.55 and 1.6 (for a single, P(correct \| feature) within 25% ± 10 points) |
+| "Pick the option with the feature" / "avoid it", each feature, single | at most 35% |
+| Combined style rule, single | at most 35% |
+| Bag-of-words classifier, leave one question out, single | at most 40% |
 
-Ties do not count as "longest". Never raise a limit to make a build pass: shorten the answer or enrich the distractors in the listed questions. Changing option text does not affect cards or progress, but never change *which* option is correct or the number of options when you balance a question (see [Changing existing questions](#changing-existing-questions)).
+Ties do not count as "longest". Never raise a limit to make a build pass: shorten the answer or enrich the distractors in the listed questions, or rewrite the style of the offending options. Changing option text does not affect cards or progress, but never change *which* option is correct or the number of options when you balance a question (see [Changing existing questions](#changing-existing-questions)).
 
 ## Writing rubrics and follow-ups
 
