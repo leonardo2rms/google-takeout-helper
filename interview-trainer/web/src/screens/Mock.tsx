@@ -156,10 +156,15 @@ export function MockScreen({ course, progress, grade }: Props) {
 
       <ul className="mock-rules">
         <li>The timer is always visible and pauses if you leave the app. At zero your answers are submitted automatically.</li>
-        <li>You can flag a question, skip it and come back before you submit.</li>
-        <li>Open answers are marked at the end: by the AI when it is available, otherwise by you against the model answer.</li>
-        <li>Questions you get wrong join your review queue. Mock practice earns up to {MOCK_XP_CAP} XP for the first {MOCK_REWARDED_PER_DAY} mocks of a day and counts for at most half of your daily goal.</li>
+        <li>No feedback while it runs. You can flag a question, skip it and come back before you submit.</li>
       </ul>
+      <details className="how-calc">
+        <summary><Icon name="chevron-down" className="chev" />How scoring works</summary>
+        <ul className="mock-rules">
+          <li>Open answers are marked at the end: by the AI when it is available, otherwise by you against the model answer.</li>
+          <li>Questions you get wrong join your review queue. Mock practice earns up to {MOCK_XP_CAP} XP for the first {MOCK_REWARDED_PER_DAY} mocks of a day and counts for at most half of your daily goal.</li>
+        </ul>
+      </details>
 
       <button type="button" className="btn primary wide" data-testid="mock-start" onClick={start}>
         Start{unitTitle ? ` · ${unitTitle}` : ''} · {cfg.length} questions · {cfg.minutes} min

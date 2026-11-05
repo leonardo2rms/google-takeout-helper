@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
+  ACHIEVEMENTS, CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
 import { fetchHealth, gradeOpen } from './lib/api';
+import { type SessionKind } from './lib/summary-copy';
 import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
@@ -40,7 +41,7 @@ const go = (route: string) => {
 const MIX_SIZE = 8;
 const REVIEW_SIZE = 10;
 
-type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic' | 'one' | 'challenge';
+type PracticeKind = Exclude<SessionKind, 'lesson'>;
 
 /** Screens that put focus on their own question/prompt, so the route announcer must not steal it. */
 const OWNS_FOCUS = /^\/(lesson\/|mix$|review$|daily$|warmup$|topic\/)/;
@@ -112,13 +113,16 @@ function Screens() {
     });
   }, []);
 
-  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => {
+  const finish = useCallback((title: string, summary: SessionSummary, sessionKind: SessionKind, lessonId?: string) => {
     const today = dayKey(new Date());
+    // A session of one question (Library practice, the daily challenge) is stored as a "single".
+    const kind = sessionKind === 'one' ? 'single' : sessionKind === 'challenge' ? 'challenge' : undefined;
     const outcomes = outcomesOf(summary);
     let before: Progress = getProgress();
     let events: SessionEvent[] = [];
     // A session of one question (Library practice, the daily challenge) earns no "perfect lesson" bonus.
     const baseXp = kind && summary.perfect ? summary.xp - XP_PERFECT_BONUS : summary.xp;
+    const badgesBefore = getProgress().achievements;
     const pass = summary.accuracy >= 1;
     let challengeBonus = 0;
     updateProgress((p) => {
@@ -130,7 +134,9 @@ function Screens() {
         { today, course },
       );
       events = res.events;
-      return kind === 'challenge' ? recordChallenge(res.progress, today, pass) : res.progress;
+      // The first finished session ends first-run setup: the plan card is not shown again unless the learner asks to edit it.
+      const done = { ...res.progress, profile: { ...res.progress.profile, onboarded: true } };
+      return kind === 'challenge' ? recordChallenge(done, today, pass) : done;
     });
     const after = getProgress();
     if (before.stats.sessions === 0) requestPersistence(); // ask the browser to keep our storage once there is something worth keeping
@@ -140,7 +146,11 @@ function Screens() {
     const nextLesson = course.units.flatMap((u) => u.lessons).find((l) => !after.lessons[l.id] && l.id !== lessonId);
     setFinished({
       title,
+      kind: sessionKind,
       summary,
+      /** What was really credited (the engine's figure includes a perfect-lesson bonus that one-question sessions do not earn). */
+      xp: baseXp + challengeBonus,
+      newBadges: ACHIEVEMENTS.filter((a) => after.achievements[a.id] && !badgesBefore[a.id]).map(({ id, title: t, icon, description }) => ({ id, title: t, icon, description })),
       streak: streakStatus(after, today).streak,
       nextLessonId: nextLesson?.id,
       events,
@@ -172,7 +182,7 @@ function Screens() {
 
   if (route.startsWith('/lesson/')) {
     const found = findLesson(course, route.slice('/lesson/'.length));
-    if (!found) return <NotFound />;
+    if (!found) return <NotFound noun="Lesson" />;
     return (
       <LessonScreen
         key={found.lesson.id}
@@ -183,7 +193,7 @@ function Screens() {
         reviewHint={reviewHint}
         haptics={progress.settings.haptics}
         onExit={() => go('/')}
-        onFinish={(s) => finish(found.lesson.title, s, found.lesson.id)}
+        onFinish={(s) => finish(found.lesson.title, s, 'lesson', found.lesson.id)}
       />
     );
   }
@@ -197,13 +207,13 @@ function Screens() {
     // Today's featured question. Once it has a result, a replay is plain practice (no XP, no streak).
     const today = dayKey(new Date());
     const q = challengeQuestion(course, today);
-    if (!q) return <NotFound />;
+    if (!q) return <NotFound noun="Question" />;
     return challengeResult(progress, today) ? practice('one', 'Practise one question', q.id) : practice('challenge', 'Daily challenge');
   }
   if (route.startsWith('/q/')) {
     // One question from the Library: a session of one (it never counts as a "perfect lesson").
     const q = findQuestion(course, route.slice('/q/'.length));
-    if (!q) return <NotFound />;
+    if (!q) return <NotFound noun="Question" />;
     return practice('one', 'Practise one question', q.id);
   }
   if (route === '/mix') return practice('mix', 'Mixed practice');
@@ -213,7 +223,7 @@ function Screens() {
   if (route.startsWith('/topic/')) {
     const unitId = route.slice('/topic/'.length);
     const unit = course.units.find((u) => u.id === unitId);
-    if (!unit) return <NotFound />;
+    if (!unit) return <NotFound noun="Topic" />;
     return practice('topic', `Practise: ${unit.title}`, unit.id);
   }
   if (route === '/progress') return <ProgressScreen course={course} progress={progress} />;
@@ -267,7 +277,7 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
   grade?: GradeFn;
   explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
-  onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => void;
+  onFinish: (title: string, s: SessionSummary, kind: SessionKind) => void;
 }) {
   const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
 
@@ -290,17 +300,17 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}
-      onFinish={(s) => onFinish(title, s, undefined, kind === 'one' ? 'single' : kind === 'challenge' ? 'challenge' : undefined)}
+      onFinish={(s) => onFinish(title, s, kind)}
     />
   );
 }
 
-function NotFound() {
+function NotFound({ noun }: { noun: 'Lesson' | 'Question' | 'Topic' }) {
   return (
     <div className="summary plain">
       <p className="label">404</p>
-      <h1>Lesson not found</h1>
-      <p className="muted">That link does not point to a lesson in this course.</p>
+      <h1>{noun} not found</h1>
+      <p className="muted">That link does not point to a {noun.toLowerCase()} in this course.</p>
       <div className="summary-actions"><a className="btn primary" href="#/">Back home</a></div>
     </div>
   );

@@ -16,7 +16,7 @@ export function Hint({ text, revealed, canReveal, onReveal }: Props) {
     return (
       <p className="hint-box" role="note" data-testid="hint-text">
         <Icon name="lightbulb" />
-        <span><b>Hint</b><Inline text={text} /></span>
+        <span><b>Hint</b><Inline text={text} /> <small>(costs {HINT_COST} XP on this question)</small></span>
       </p>
     );
   }
@@ -24,7 +24,7 @@ export function Hint({ text, revealed, canReveal, onReveal }: Props) {
   return (
     <button type="button" className="btn small hint-btn" data-testid="hint-btn" onClick={onReveal}>
       <Icon name="lightbulb" />
-      <span>Hint (−{HINT_COST} XP)</span>
+      <span>Hint</span>
     </button>
   );
 }

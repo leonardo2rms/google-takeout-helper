@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { GOAL_PRESETS, isDay, setGoalTarget, type Progress, type RoleId } from '@trainer/shared';
+import { Icon } from './icons';
 
 interface Props {
   today: string;
   progress: Progress;
   update: (fn: (p: Progress) => Progress) => void;
-  /** Called after saving with whether the learner asked for the 3-question warm-up. */
-  onDone: (warmUp: boolean) => void;
+  /** Opens the form straight away (editing an existing plan); first-run shows one quiet line instead. */
+  startOpen?: boolean;
 }
 
 const ROLES: { id: RoleId; label: string; hint: string }[] = [
@@ -22,17 +23,18 @@ const GOALS: { key: keyof typeof GOAL_PRESETS; label: string }[] = [
 ];
 
 /**
- * First-run setup as an inline card on Home (never a modal or a route, so deep links keep working).
- * Every field is optional and skipping costs nothing.
+ * Plan setup as an inline card on Home (never a modal or a route, so deep links keep working). On first run it is one
+ * quiet line under the "Start your first lesson" button; the form opens on tap. Every field is optional and skipping costs nothing.
  */
-export function OnboardingCard({ today, progress, update, onDone }: Props) {
+export function OnboardingCard({ today, progress, update, startOpen = false }: Props) {
+  const [open, setOpen] = useState(startOpen);
   const [role, setRole] = useState<RoleId | null>(progress.profile.role);
   const [date, setDate] = useState(progress.profile.interviewDate ?? '');
   const [goal, setGoal] = useState<number>(progress.goal.target);
   const [time, setTime] = useState(progress.profile.practiceTime ?? '');
   const [error, setError] = useState('');
 
-  const save = (warmUp: boolean) => {
+  const save = () => {
     if (date !== '' && (!isDay(date) || date < today)) {
       setError('Pick today or a later date, or leave it empty.');
       return;
@@ -44,18 +46,28 @@ export function OnboardingCard({ today, progress, update, onDone }: Props) {
         profile: { ...p.profile, onboarded: true, role, interviewDate: date === '' ? null : date, practiceTime: time === '' ? null : time },
       };
     });
-    onDone(warmUp);
   };
 
   const skip = () => {
     update((p) => ({ ...p, profile: { ...p.profile, onboarded: true } }));
-    onDone(false);
   };
 
+  if (!open) {
+    return (
+      <section className="onboarding-line" data-testid="onboarding">
+        <button type="button" className="card action onb-toggle" aria-expanded={false} aria-controls="onb-form" onClick={() => setOpen(true)}>
+          <span className="tile-i" aria-hidden="true"><Icon name="goal" size={22} /></span>
+          <span><b>Set a goal and interview date</b><small>Optional. Shapes Today's practice; change it any time in Settings.</small></span>
+          <Icon name="chevron-down" className="go" />
+        </button>
+      </section>
+    );
+  }
+
   return (
-    <section className="onboarding card-block" aria-labelledby="onb-title" data-testid="onboarding">
-      <h2 id="onb-title">Make it yours</h2>
-      <p className="muted">Four optional taps so Today's practice fits you. You can change all of it later in Settings.</p>
+    <section className="onboarding card-block" id="onb-form" aria-labelledby="onb-title" data-testid="onboarding">
+      <h2 id="onb-title">Your plan</h2>
+      <p className="muted">Every field is optional. You can change all of it later in Settings.</p>
 
       <fieldset>
         <legend>What are you preparing for?</legend>
@@ -96,9 +108,8 @@ export function OnboardingCard({ today, progress, update, onDone }: Props) {
       </div>
 
       <div className="onb-actions">
-        <button type="button" className="btn primary wide" onClick={() => save(true)}>Save and warm up (3 questions)</button>
-        <button type="button" className="btn secondary wide" onClick={() => save(false)}>Save</button>
-        <button type="button" className="btn ghost wide" onClick={skip}>Skip for now</button>
+        <button type="button" className="btn primary wide" onClick={save}>Save plan</button>
+        <button type="button" className="btn ghost wide" onClick={skip}>Not now</button>
       </div>
     </section>
   );

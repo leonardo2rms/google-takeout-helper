@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CodeQ, CodeRunResult } from '@trainer/shared';
 import type { Answer, RunCodeFn } from '../lib/evaluate';
+import { scrollIntoViewGently } from '../lib/a11y';
 import { Icon } from './icons';
 import { TestResults } from './TestResults';
 
@@ -22,6 +23,7 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
   const [result, setResult] = useState<CodeRunResult | null>(null);
   const [running, setRunning] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
   /** Tab indents, which would trap keyboard users: Escape releases it, so Escape then Tab (or Shift+Tab) moves on. */
   const tabMovesFocus = useRef(false);
 
@@ -48,6 +50,11 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
     setRunning(false);
   }
 
+  // The results are the point of pressing Run: bring them into view (above the sticky keys and the bottom bar).
+  useEffect(() => {
+    if (result) scrollIntoViewGently(resultsRef.current, 'nearest');
+  }, [result]);
+
   // The starter counts as an answer from the start, so "Check" is available like in a real editor.
   useEffect(() => {
     onAnswer({ type: 'code', source: q.starter.replace(/\n$/, '') });
@@ -56,6 +63,7 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
 
   return (
     <div className="code-editor">
+      <p className="editor-lang" data-testid="editor-lang"><span className="mono">JavaScript</span><span>runs in your browser</span></p>
       <textarea
         ref={box}
         className="answer-box mono editor"
@@ -78,14 +86,6 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
         }}
       />
       <p id="editor-keys-hint" className="sr-only">In the editor, Tab inserts two spaces. Press Escape and then Tab, or Shift and Tab, to move on.</p>
-      {!checked && (
-        <div className="keys" role="group" aria-label="Code symbols">
-          <button type="button" className="key wide" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('  ')}>Tab</button>
-          {KEYS.map((k) => (
-            <button key={k} type="button" className="key" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(k)}>{k}</button>
-          ))}
-        </div>
-      )}
       {!blind && (
         <div className="run-row">
           <button type="button" className="btn small" disabled={checked || running} onClick={() => void runTests()}>
@@ -95,7 +95,16 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
         </div>
       )}
       <p className="sr-only" role="status" aria-live="polite">{running ? 'Running tests' : ''}</p>
-      {result && !checked && !blind && <TestResults result={result} />}
+      {result && !checked && !blind && <div ref={resultsRef} className="tests-anchor" data-testid="run-results"><TestResults result={result} /></div>}
+      {!checked && (
+        /* One row that scrolls sideways and stays above the bottom bar while the editor is on screen, instead of four rows of keys. */
+        <div className="keys" role="group" aria-label="Code symbols">
+          <button type="button" className="key wide" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('  ')}>Tab</button>
+          {KEYS.map((k) => (
+            <button key={k} type="button" className="key" onMouseDown={(e) => e.preventDefault()} onClick={() => insert(k)}>{k}</button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

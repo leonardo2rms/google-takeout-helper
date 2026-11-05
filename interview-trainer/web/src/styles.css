@@ -72,6 +72,8 @@
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px; --s7: 48px;
   --r1: 3px; --r2: 6px; --r3: 10px;
   --ease: cubic-bezier(.2, 0, 0, 1);
+  /* width of the page column: a phone-sized sheet everywhere, a little wider and centred on a desk */
+  --col: 640px;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -100,7 +102,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); -webkit-text-size-adjust: 100%; }
 body { min-height: 100dvh; font-size: var(--fs-16); line-height: 1.5; font-optical-sizing: auto; }
-#root { max-width: 640px; margin: 0 auto; min-height: 100dvh; }
+#root { max-width: var(--col); margin: 0 auto; min-height: 100dvh; }
 h1, h2, h3, p { margin: 0; }
 h1, h2, h3 { font-weight: 600; letter-spacing: -.01em; }
 a { color: var(--cobalt); text-underline-offset: 3px; text-decoration-thickness: 1px; }
@@ -183,6 +185,18 @@ button.stat:active { background: var(--hairline); }
 .card.disabled .tile-i, .card.disabled b { opacity: .55; }
 .hero-text { flex: 1; min-width: 0; }
 .card.hero { border-color: var(--ink); margin: 0 0 var(--s2); }
+/* First run: the one thing to do is the biggest thing on the page. */
+.card.hero.first { min-height: 76px; padding: 14px; box-shadow: inset 0 0 0 1px var(--ink); }
+.card.hero.first b { font-size: var(--fs-18); }
+button.card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
+.onboarding-line { margin: 0 0 var(--s2); }
+.onboarding-line .card { margin-bottom: 0; border-style: dashed; }
+.more-practice { margin: var(--s2) 0 0; }
+.more-practice > summary { min-height: 48px; padding: 0 4px; color: var(--graphite); font-weight: 500; }
+.more-practice[open] > summary { color: var(--ink); }
+.more-practice > .practice { margin-top: var(--s2); }
+.practice + .more-practice { margin-top: var(--s2); }
+.practice > .card.challenge { margin-bottom: 0; }
 .cta { flex: none; padding: 10px 16px; border-radius: var(--r2); background: var(--ink); color: var(--paper); font: 600 var(--fs-14)/1 var(--sans); }
 .count { font: 600 var(--fs-13)/1 var(--mono); padding: 3px 7px; border-radius: var(--r1); background: var(--vermilion-tint); color: var(--vermilion); border: 1px solid var(--vermilion); margin-left: auto; font-variant-numeric: tabular-nums slashed-zero; }
 .countdown { display: grid; gap: 4px; margin: var(--s3) 0; justify-items: start; }
@@ -336,6 +350,11 @@ button.stat:active { background: var(--hairline); }
 .feedback.bad .verdict { color: var(--vermilion); }
 .feedback.meh .verdict { color: var(--ochre); }
 .feedback h2 { font-size: var(--fs-18); line-height: 1.3; }
+/* The verdict heading: icon + one word, the only place the verdict is written out. */
+.feedback h2.verdict { font: 600 var(--fs-13)/1.2 var(--mono); letter-spacing: .08em; }
+.feedback.good .verdict.neutral, .feedback.bad .verdict.neutral, .feedback.meh .verdict.neutral { color: var(--ink); }
+.rubric-title { font-weight: 600; }
+.multi-count { font-family: var(--mono); font-size: var(--fs-13); font-variant-numeric: tabular-nums slashed-zero; }
 .feedback .explanation, .feedback p { font-size: var(--fs-16); }
 .feedback .score { font: 600 var(--fs-14) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
 .feedback .hint { color: var(--graphite); font-size: var(--fs-14); }
@@ -363,7 +382,7 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 .steps-solution { margin: 0; padding-left: 22px; display: grid; gap: 4px; }
 
 .lesson-bar {
-  position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; justify-content: space-between; align-items: center; max-width: 640px; margin: 0 auto;
+  position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; justify-content: space-between; align-items: center; max-width: var(--col); margin: 0 auto;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--sheet); border-top: 1px solid var(--hairline); box-shadow: inset 0 3px 0 var(--bar, transparent); z-index: 10;
 }
 .lesson-bar .btn.primary:not(.wide) { flex: 1; }
@@ -379,6 +398,8 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 .result-big { font: 500 var(--fs-72)/1 var(--mono); font-variant-numeric: tabular-nums slashed-zero; letter-spacing: -.04em; margin-top: var(--s4); overflow-wrap: anywhere; }
 .result-big small { font-size: calc(28px * var(--text-scale, 1)); color: var(--graphite); letter-spacing: 0; }
 .result-cap { color: var(--graphite); font-size: var(--fs-14); margin-top: -4px; }
+.ending-line { font-size: var(--fs-14); }
+.milestone.badges-won { border-left-color: var(--ochre); background: var(--ochre-tint); }
 .tiles { display: grid; margin: var(--s2) 0; border-top: 1px solid var(--ink); }
 .tile { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--hairline); }
 .tile small { font: 500 var(--fs-12) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); }
@@ -453,7 +474,15 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 /* ---------- code questions ---------- */
 .code-editor { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
 .answer-box.editor { overflow: auto; line-height: 1.5; }
-.keys { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Keys: one row that scrolls sideways and sits above the bottom bar while the editor is on screen. */
+.editor-lang { display: flex; gap: 8px; align-items: baseline; margin: 0; font: 500 var(--fs-12)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); }
+.editor-lang .mono { color: var(--ink); font-weight: 600; }
+.keys {
+  display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+  position: sticky; bottom: calc(80px + env(safe-area-inset-bottom, 0px)); z-index: 4; padding: 6px 0; margin: 0 -16px; padding-inline: 16px;
+  background: var(--paper); border-top: 1px solid var(--hairline);
+}
+.key { flex: none; scroll-snap-align: start; }
 .key { min-width: 44px; height: 44px; padding: 0 8px; font: 600 var(--fs-15) var(--mono); background: var(--sheet); color: var(--ink); border: 1px solid var(--edge); border-radius: var(--r2); }
 .key:active { background: var(--hairline); }
 .key.wide { padding: 0 12px; font-family: var(--sans); }
@@ -461,6 +490,10 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 .tests ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 8px; }
 .tests li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 8px; align-items: start; font-size: var(--fs-14); }
 .tests li .i { stroke-width: 2.5; margin-top: 2px; }
+.tests .t-state { font: 600 var(--fs-11)/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; margin-right: 8px; }
+.tests li.pass .t-state { color: var(--teal); }
+.tests li.fail .t-state { color: var(--vermilion); }
+.tests-anchor { scroll-margin-bottom: 170px; }
 .tests li.pass .i { color: var(--teal); }
 .tests li.fail .i { color: var(--vermilion); }
 .tests code { font-size: var(--fs-13); word-break: break-all; }
@@ -483,7 +516,7 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 
 /* sheets */
 .sheet-backdrop { position: fixed; inset: 0; background: var(--backdrop); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { width: 100%; max-width: 640px; max-height: 88dvh; overflow-y: auto; background: var(--paper); border: 1px solid var(--edge); border-bottom: 0; border-radius: var(--r3) var(--r3) 0 0; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); outline: none; animation: rise .16s var(--ease); }
+.sheet { width: 100%; max-width: var(--col); max-height: 88dvh; overflow-y: auto; background: var(--paper); border: 1px solid var(--edge); border-bottom: 0; border-radius: var(--r3) var(--r3) 0 0; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); outline: none; animation: rise .16s var(--ease); }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--paper); padding: 8px 0; z-index: 1; border-bottom: 1px solid var(--hairline); margin-bottom: var(--s3); }
 .sheet-head h2 { font-size: var(--fs-18); }
 .sheet-body { display: grid; gap: 14px; }
@@ -614,3 +647,14 @@ html { scroll-padding-top: 84px; scroll-padding-bottom: 140px; }
 /* Large text keeps the fixed lesson bar inside the phone. */
 :root[data-text-size="L"] .lesson-bar .btn, :root[data-text-size="XL"] .lesson-bar .btn { flex: 1 1 0; min-width: 0; padding: 0 12px; text-align: center; overflow-wrap: anywhere; }
 :root[data-text-size="L"] .lesson-body, :root[data-text-size="XL"] .lesson-body { padding-bottom: 220px; }
+
+/*
+ * Desktop: the same single column, made deliberate. The page is a sheet of paper on a slightly darker desk: centred, a touch wider,
+ * with hairline edges. (Two-column layouts are not worth their cost for a one-question-at-a-time app.)
+ */
+@media (min-width: 900px) {
+  :root { --col: 720px; }
+  html, body { background: var(--code); }
+  #root { background: var(--paper); border-inline: 1px solid var(--hairline); }
+  .lesson-bar { border-inline: 1px solid var(--hairline); }
+}

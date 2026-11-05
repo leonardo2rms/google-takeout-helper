@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WEEKDAYS, cappedCount, forecastText, inDays, plural, prefersReducedMotion } from './format';
+import { WEEKDAYS, cappedCount, forecastText, inDays, listNames, plural, prefersReducedMotion } from './format';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -43,8 +43,15 @@ describe('format helpers', () => {
     expect(plural(2, 'person', 'people')).toBe('2 people');
   });
   it('forecastText lists the buckets', () => {
-    expect(forecastText([{ inDays: 1, count: 5 }, { inDays: 3, count: 4 }])).toBe('tomorrow (5), in 3 days (4)');
+    expect(forecastText([{ inDays: 1, count: 5 }, { inDays: 3, count: 4 }])).toBe('5 questions tomorrow, 4 in 3 days');
+    expect(forecastText([{ inDays: 1, count: 1 }])).toBe('1 question tomorrow');
     expect(forecastText([])).toBe('');
+  });
+  it('listNames reads like a sentence', () => {
+    expect(listNames([])).toBe('');
+    expect(listNames(['A'])).toBe('A');
+    expect(listNames(['A', 'B'])).toBe('A and B');
+    expect(listNames(['A', 'B', 'C'])).toBe('A, B and C');
   });
   it('counts are capped so a long break never shows a scary number', () => {
     expect(cappedCount(12)).toBe('12');

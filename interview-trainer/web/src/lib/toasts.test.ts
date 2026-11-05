@@ -33,6 +33,20 @@ describe('badge toast queue', () => {
     expect(Object.keys(t.useBadgeToast()!.badges[0]!).sort()).toEqual(['description', 'icon', 'id', 'title']);
   });
 
+  it('clearing drops everything pending, and says nothing when there is nothing to drop', async () => {
+    const t = await import('./toasts');
+    t.useBadgeToast();
+    const listener = vi.fn();
+    subscribe(listener);
+    t.clearBadgeToasts();
+    expect(listener).not.toHaveBeenCalled();
+    t.pushBadgeToast([badge('a')]);
+    t.pushBadgeToast([badge('b')]);
+    t.clearBadgeToasts();
+    expect(t.useBadgeToast()).toBeUndefined();
+    expect(listener).toHaveBeenCalledTimes(3);
+  });
+
   it('ignores an empty push', async () => {
     const t = await import('./toasts');
     const listener = vi.fn();

@@ -6,11 +6,17 @@ import { Confetti } from '../components/Confetti';
 import { Icon, type IconName } from '../components/icons';
 import { Inline } from '../components/Inline';
 import { AnimatedRing } from '../components/Ring';
-import { forecastText, plural, prefersReducedMotion } from '../lib/format';
+import { forecastText, listNames, plural, prefersReducedMotion } from '../lib/format';
+import { endingLine, failedCount, resultHeading, type SessionKind } from '../lib/summary-copy';
 
 export interface Finished {
   title: string;
+  kind: SessionKind;
   summary: SessionSummary;
+  /** XP actually credited (the engine's figure includes a perfect-lesson bonus that one-question sessions do not earn). */
+  xp: number;
+  /** Badges this session unlocked, shown here instead of as a floating notice. */
+  newBadges: { id: string; title: string; icon: string; description: string }[];
   streak: number;
   nextLessonId?: string;
   events: SessionEvent[];
@@ -65,7 +71,7 @@ function note(e: SessionEvent, headlineType: string | undefined): Note | null {
     case 'unit-mastered':
       return { text: `${e.title} mastered` };
     case 'goal-met':
-      return { text: 'Daily goal met' };
+      return null; // the goal ring above says it
     case 'readiness':
       return { text: `Readiness: ${READINESS_TEXT[e.label]}` };
     case 'streak':
@@ -81,7 +87,7 @@ let lastBurst = -Infinity;
 export function Summary({ finished, settings, onHome }: { finished: Finished; settings: Settings; onHome: () => void }) {
   const { summary, streak, events } = finished;
   const pct = Math.round(summary.accuracy * 100);
-  const outstanding = summary.missed.filter((id) => !summary.recovered.includes(id)).length;
+  const outstanding = failedCount(summary);
   const celebration = pickCelebration(events);
   const big = isLargeCelebration(celebration);
   const [burst, setBurst] = useState(false);
@@ -101,16 +107,22 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
   const top = celebration && celebration.type !== 'tip' ? headline(celebration) : null;
   const notes: Note[] = [...events.map((e) => note(e, celebration?.type)).filter((n): n is Note => n !== null), ...(finished.extraNotes ?? []).map((text) => ({ text }))];
   const g = finished.goalAfter;
-  const heading = summary.perfect ? 'Clean run' : pct >= 70 ? 'Lesson complete' : 'Another pass needed';
+  const heading = resultHeading(finished.kind, summary);
+  const ending = endingLine(summary);
+  const isLesson = finished.kind === 'lesson';
   const hasNext = Boolean(finished.nextLessonId);
+  const warn = heading === 'Another pass needed';
+  const goalDone = Math.min(g.done, g.target);
+  const bonus = Math.max(0, g.done - g.target);
 
   return (
-    <div className={`summary ${pct < 70 && !summary.perfect ? 'warn' : ''}`}>
+    <div className={`summary ${warn ? 'warn' : ''}`}>
       {burst && <Confetti onDone={() => setBurst(false)} />}
       <p className="label">Result · {finished.title}</p>
       <h1>{heading}</h1>
       <p className="result-big" aria-label={`${pct} percent first-try accuracy`}>{pct}<small>%</small></p>
       <p className="result-cap" aria-hidden="true">first-try accuracy</p>
+      {ending && <p className="muted ending-line" data-testid="ending-line">{ending}</p>}
 
       {top && (
         <section className="milestone" data-testid="celebration" data-kind={celebration!.type} aria-label="Milestone">
@@ -119,18 +131,28 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
         </section>
       )}
 
+      {finished.newBadges.length > 0 && (
+        <section className="milestone badges-won" data-testid="summary-badges" aria-label="New badges">
+          <b>{finished.newBadges.length === 1 ? `New badge: ${finished.newBadges[0]!.title}` : `${finished.newBadges.length} new badges`}</b>
+          <span>
+            {finished.newBadges.length === 1 ? finished.newBadges[0]!.description : listNames(finished.newBadges.map((b) => b.title))}
+            {' '}<a href="#/progress">See all badges</a>
+          </span>
+        </section>
+      )}
+
       <div className="tiles">
-        <div className="tile xp"><small>XP earned</small><b>+{summary.xp}</b></div>
+        <div className="tile xp"><small>XP earned</small><b>+{finished.xp}</b></div>
         <div className="tile acc"><small>Accuracy</small><b>{pct}%</b></div>
-        <div className="tile fire"><small>Streak</small><b><Icon name="flame" size="1em" /> {streak} d</b></div>
+        <div className="tile fire"><small>Streak</small><b><Icon name="flame" size="1em" /> {plural(streak, 'day')}</b></div>
         {outstanding > 0 && <div className="tile todo"><small>To revisit</small><b>{outstanding}</b></div>}
       </div>
 
       <div className="summary-goal" data-testid="summary-goal">
-        <AnimatedRing from={finished.goalBefore.fraction} to={g.fraction} size={56}>{g.done}/{g.target}</AnimatedRing>
+        <AnimatedRing from={finished.goalBefore.fraction} to={g.fraction} size={56}>{goalDone}/{g.target}</AnimatedRing>
         <span>
-          <b>{g.done} of {g.target} questions today</b>
-          <small className="muted">{g.met ? 'Daily goal met.' : `${plural(g.target - g.done, 'more question')} to reach today's goal.`}</small>
+          <b>{goalDone} of {g.target} questions today</b>
+          <small className="muted">{g.met ? (bonus > 0 ? `Goal met, plus ${plural(bonus, 'bonus question')}.` : 'Goal met.') : `${plural(g.target - g.done, 'more question')} to reach today's goal.`}</small>
         </span>
       </div>
 
@@ -158,8 +180,10 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       )}
 
       <div className="summary-actions">
-        {hasNext && <a className="btn primary" href={`#/lesson/${finished.nextLessonId}`} autoFocus>Next lesson <Icon name="arrow-right" size="1.1em" /></a>}
-        <button type="button" className={`btn ${hasNext ? '' : 'primary'}`} onClick={onHome} autoFocus={!hasNext}>Continue</button>
+        {/* After a lesson the next one is the way forward; after review, a challenge or a mix the way forward is home. */}
+        {isLesson && hasNext && <a className="btn primary" href={`#/lesson/${finished.nextLessonId}`} autoFocus>Next lesson <Icon name="arrow-right" size="1.1em" /></a>}
+        <button type="button" className={`btn ${isLesson && hasNext ? 'secondary' : 'primary'}`} onClick={onHome} autoFocus={!(isLesson && hasNext)}>Back home</button>
+        {!isLesson && hasNext && <a className="btn secondary" href={`#/lesson/${finished.nextLessonId}`}>Next lesson <Icon name="arrow-right" size="1.1em" /></a>}
       </div>
     </div>
   );

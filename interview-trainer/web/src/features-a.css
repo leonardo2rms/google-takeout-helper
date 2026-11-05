@@ -7,6 +7,7 @@
 .btn.hint-btn { min-height: 44px; margin: 4px 0 12px; width: fit-content; align-self: flex-start; justify-self: start; gap: 8px; padding: 0 16px; }
 .hint-box { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 12px; padding: 10px 14px; border-radius: var(--r2); background: var(--ochre-tint); color: var(--ink); border-left: 4px solid var(--ochre); overflow-wrap: anywhere; }
 .hint-box > .i { color: var(--ochre); margin-top: 2px; }
+.hint-box small { color: var(--graphite); margin-left: 6px; font-size: var(--fs-13); }
 .hint-box b { font: 600 var(--fs-12) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ochre); margin-right: 6px; }
 
 /* ---------- confidence ---------- */
@@ -23,6 +24,7 @@
 .btn.tool-btn { min-height: 44px; padding: 0 14px; color: var(--ink); }
 .btn.tool-btn.on { border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); background: var(--cobalt-tint); }
 .btn.tool-btn.on .i { fill: currentColor; }
+.q-note b { display: block; font: 500 var(--fs-12)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); margin-bottom: 2px; }
 .q-note { margin: 0; padding: 8px 12px; border-radius: var(--r2); background: var(--sheet); border: 1px solid var(--hairline); color: var(--ink); overflow-wrap: anywhere; white-space: pre-wrap; }
 .q-note-editor { display: grid; gap: 8px; }
 .q-note-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
@@ -39,6 +41,15 @@
 .link.inline { padding: 8px 4px; min-height: 44px; }
 .lib-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
 .lib-item { padding: 12px 14px; border: 1px solid var(--edge); border-radius: var(--r2); background: var(--sheet); display: grid; gap: 8px; min-width: 0; }
+.lib-top { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.lib-type { font: 500 var(--fs-12)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); }
+.lib-marks { margin-left: auto; display: inline-flex; gap: 6px; color: var(--ink); }
+.lib-mark { display: inline-grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--edge); border-radius: var(--r1); }
+.lib-code { margin: 0; padding: 6px 10px; background: var(--code); border: 1px solid var(--hairline); border-radius: var(--r1); font: var(--fs-13)/1.5 var(--mono); color: var(--ink); overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+.lib-code code { font: inherit; }
+.lib-lesson { color: var(--graphite); }
+.lib-lesson .mono { color: var(--ink); }
+mark { background: var(--ochre-tint); color: var(--ink); border-bottom: 2px solid var(--ochre); border-radius: 0; padding: 0 1px; }
 .lib-prompt { margin: 0; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .lib-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--graphite); font-size: var(--fs-13); align-items: center; }
 .lib-meta .unit-tag { display: inline-flex; gap: 6px; align-items: center; color: var(--graphite); }
@@ -54,7 +65,7 @@
 .card.challenge .btn { flex: none; min-height: 44px; }
 
 /* ---------- achievements ---------- */
-.badge-toast-region { position: fixed; z-index: 70; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 8px); display: grid; justify-items: center; padding: 0 16px; pointer-events: none; }
+.badge-toast-region { position: fixed; z-index: 70; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 88px); display: grid; justify-items: center; padding: 0 16px; pointer-events: none; }
 .badge-toast {
   pointer-events: none; display: flex; align-items: center; gap: 10px; max-width: 460px; width: 100%; padding: 8px 4px 8px 10px; border-radius: var(--r2);
   border: 1px solid var(--edge); border-left: 4px solid var(--ochre); background: var(--sheet); color: var(--ink); animation: badge-in .16s var(--ease);
@@ -62,7 +73,7 @@
 .badge-toast .icon-btn { pointer-events: auto; flex: none; color: var(--graphite); }
 .badge-toast-text { display: grid; min-width: 0; overflow-wrap: anywhere; flex: 1; }
 .badge-toast-text small { font-size: var(--fs-13); color: var(--graphite); }
-@keyframes badge-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes badge-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .badge-toast { animation: none; } }
 .badge-icon { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 1.5px solid var(--ochre); border-radius: var(--r2); color: var(--ochre); }
 .trophies { margin: 8px 0 18px; display: grid; gap: 10px; }
@@ -82,7 +93,7 @@
 .mock-timer { display: inline-flex; gap: 6px; align-items: center; font: 600 var(--fs-15) var(--mono); font-variant-numeric: tabular-nums slashed-zero; padding: 0 12px; border-radius: var(--r2); border: 1px solid var(--edge); background: var(--sheet); min-height: 44px; }
 .mock-timer.low { border: 1px dashed var(--ochre); background: var(--ochre-tint); color: var(--ink); }
 .mock-timer.low .i { color: var(--ochre); }
-.mock-palette { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.mock-palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; margin-top: 8px; }
 .mock-dot { position: relative; min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: var(--r2); border: 1px solid var(--edge); background: var(--sheet); color: var(--ink); font: 600 var(--fs-14) var(--mono); display: inline-flex; gap: 3px; align-items: center; justify-content: center; font-variant-numeric: tabular-nums slashed-zero; }
 .mock-dot.answered { background: var(--cobalt-tint); border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); }
 .mock-dot.flagged { border-style: dashed; border-color: var(--ochre); }
@@ -124,3 +135,10 @@
 .mock-saved { border: 1px solid var(--edge); border-left: 4px solid var(--teal); border-radius: var(--r2); padding: 14px; display: grid; gap: 8px; background: var(--sheet); color: var(--ink); }
 .mock-results-bar { justify-content: space-between; }
 .answer-area[hidden] { display: none; }
+
+/* ---------- progress: how the number is worked out, topics not started ---------- */
+.how-calc, .idle-topics { margin: 4px 0 0; }
+.how-calc > summary, .idle-topics > summary { color: var(--graphite); font-weight: 500; }
+.topics-note { font-size: var(--fs-14); margin: 4px 0 8px; }
+.idle-topics { margin-top: 12px; }
+.idle-topics > .topics { margin-top: 4px; }

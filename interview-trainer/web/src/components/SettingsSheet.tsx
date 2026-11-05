@@ -134,8 +134,8 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
         <p className="muted">Everything is stored on this device only. A backup file is the way to move to a new phone or to be safe if the browser clears its storage.</p>
         <div className="stack">
           <button type="button" className="btn secondary wide" onClick={download}>Download backup</button>
-          <button type="button" className="btn ghost wide" onClick={() => void copy()}>Copy backup text</button>
-          <label className="btn ghost wide file-btn">
+          <button type="button" className="btn secondary wide" onClick={() => void copy()}>Copy backup text</button>
+          <label className="btn secondary wide file-btn">
             Import backup file
             <input ref={fileRef} type="file" accept=".json,application/json,text/plain" data-testid="import-file" onChange={(e) => void onFile(e.target.files?.[0])} />
           </label>

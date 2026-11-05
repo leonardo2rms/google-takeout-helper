@@ -31,9 +31,9 @@ export function AskWhy({ questionId, answer, correct, explain }: Props) {
 
   if (!explain) {
     return (
-      <div className="ask-why">
+      <div className="ask-why off">
         <button type="button" className="btn ghost small" disabled aria-describedby="ask-why-off" data-testid="ask-why">Ask why</button>
-        <p id="ask-why-off" className="hint" data-testid="ask-why-off">Needs the AI tutor, which is off while you are offline or no AI is set up.</p>
+        <span id="ask-why-off" className="hint" data-testid="ask-why-off">Needs the AI tutor (off)</span>
       </div>
     );
   }

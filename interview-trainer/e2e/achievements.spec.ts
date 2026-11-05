@@ -6,21 +6,34 @@ const LESSON = 'kotlin-null-types';
 const toast = (page: import('@playwright/test').Page) => page.getByTestId('badge-toast');
 
 test.describe('achievements', () => {
-  test('finishing a perfect first lesson unlocks three badges with one calm toast that never blocks the page', async ({ page }) => {
+  /** Library: save the first result for `term` with a private note, which unlocks Note taker. */
+  async function saveNote(page: import('@playwright/test').Page, term: string) {
+    await page.goto('/#/library');
+    await page.getByRole('searchbox', { name: 'Search questions' }).fill(term);
+    await page.getByRole('button', { name: 'Save or note' }).first().click();
+    await page.getByTestId(/^lib-.*-note-btn$/).first().click();
+    await page.getByRole('textbox', { name: 'Your private note' }).fill('x');
+    await page.getByTestId(/^lib-.*-note-save$/).first().click();
+  }
+
+  test('finishing a perfect first lesson shows its three badges on the summary, not in a notice over it', async ({ page }) => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     await page.goto('/');
     await playLesson(page, LESSON);
     await expect(page.locator('.summary h1')).toHaveText('Clean run');
-    await expect(toast(page)).toBeVisible();
-    await expect(toast(page)).toContainText('3 badges unlocked');
-    await expect(toast(page)).toContainText('First lesson');
+    const badges = page.getByTestId('summary-badges');
+    await expect(badges).toContainText('3 new badges');
+    await expect(badges).toContainText('First lesson');
+    await expect(toast(page)).toHaveCount(0); // nothing floats over the result
+    // the heading, the badges and the actions are all reachable on screen without overlap
+    const h1 = (await page.locator('.summary h1').boundingBox())!;
+    expect(h1.y).toBeGreaterThanOrEqual(0);
     await expectNoOverflow(page);
-    await page.screenshot({ path: `${SHOTS}/badge-toast.png` });
+    await page.screenshot({ path: `${SHOTS}/badge-summary.png` });
 
-    // the toast never intercepts taps: Continue and the Settings gear work while it is still on screen
     await homeAfterSummary(page);
-    await expect(toast(page)).toBeVisible();
+    await expect(toast(page)).toHaveCount(0); // and nothing follows the learner home
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Settings', exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Close' }).click();
@@ -43,33 +56,53 @@ test.describe('achievements', () => {
     await page.screenshot({ path: `${SHOTS}/trophy-case.png` });
   });
 
-  test('the toast can be dismissed, and goes away by itself', async ({ page }) => {
+  test('outside a session a new badge is a short notice above the bottom bar, and it can be dismissed', async ({ page }) => {
     await useClock(page);
-    await seed(page, { [KEY_V2]: v2({ stats: { ...v2().stats, perfect: 0 } }) });
-    await page.goto('/');
-    await playLesson(page, LESSON);
-    await expect(toast(page)).toBeVisible();
+    await seed(page, { [KEY_V2]: v2() });
+    await saveNote(page, 'lateinit');
+    await expect(toast(page)).toContainText('New badge: Note taker');
+    // above the bottom edge of the screen, clear of the title at the top
+    const box = (await toast(page).boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(box.y + box.height).toBeLessThanOrEqual(view.height - 60);
+    expect(box.y).toBeGreaterThan(100);
+    await page.screenshot({ path: `${SHOTS}/badge-toast.png` });
     await toast(page).getByRole('button', { name: 'Dismiss badge notification' }).click();
-    await expect(toast(page)).toHaveCount(0);
-
-    // a second unlock, left alone, times out
-    await page.goto('/#/library');
-    await page.getByRole('searchbox', { name: 'Search questions' }).fill('lateinit');
-    await page.getByRole('button', { name: 'Save or note' }).first().click();
-    await page.getByTestId(/^lib-.*-note-btn$/).first().click();
-    await page.getByRole('textbox', { name: 'Your private note' }).fill('x');
-    await page.getByTestId(/^lib-.*-note-save$/).first().click();
-    await expect(toast(page)).toContainText('Note taker');
-    await page.clock.fastForward(7000);
     await expect(toast(page)).toHaveCount(0);
   });
 
-  test('motion: the toast slides in only when the device allows motion', async ({ page }) => {
+  /** The fifth saved question unlocks Curator: four are already saved. */
+  async function saveFifth(page: import('@playwright/test').Page) {
+    const some = questions.slice(20, 24);
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2({ bookmarks: Object.fromEntries(some.map((q) => [q.id, { h: questionHash(q), day: day(-1) }])) }) });
+    await page.goto('/#/library');
+    const fifth = page.getByTestId('lib-item').nth(4); // the first four are the ones already saved
+    await fifth.getByRole('button', { name: 'Save or note' }).click();
+    await fifth.getByTestId(/-star$/).click();
+    await expect(toast(page)).toContainText('Curator');
+  }
+
+  test('a notice goes away by itself after a few seconds', async ({ page }) => {
+    await saveFifth(page);
+    await page.clock.fastForward(2000);
+    await expect(toast(page)).toHaveCount(1);
+    await page.clock.fastForward(3000);
+    await expect(toast(page)).toHaveCount(0);
+  });
+
+  test('a notice does not follow the learner to another screen', async ({ page }) => {
+    await saveFifth(page);
+    await page.goto('/#/progress');
+    await expect(page.locator('.progress-page')).toBeVisible();
+    await expect(toast(page)).toHaveCount(0);
+  });
+
+  test('motion: the notice slides in only when the device allows motion', async ({ page }) => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto('/');
-    await playLesson(page, LESSON);
+    await saveNote(page, 'lateinit');
     await expect(toast(page)).toBeVisible();
     expect(await toast(page).evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
 
@@ -79,7 +112,7 @@ test.describe('achievements', () => {
     await second.goto('/');
     await second.evaluate(() => localStorage.clear());
     await second.reload();
-    await playLesson(second, LESSON);
+    await saveNote(second, 'lateinit');
     await expect(toast(second)).toBeVisible();
     expect(await toast(second).evaluate((el) => getComputedStyle(el).animationName)).toBe('badge-in');
   });

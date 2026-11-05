@@ -5,7 +5,8 @@ import { Icon } from './icons';
 import { Inline } from './Inline';
 import { ResultCue, type ResultState } from './ResultCue';
 
-const TAG = { correct: 'Correct', wrong: 'Incorrect', missed: 'Answer' } as const;
+/** The marker says whose answer it is; the verdict itself is said once, in the feedback panel. */
+const TAG = { correct: 'Your answer', wrong: 'Your answer', missed: 'Answer' } as const;
 
 interface Props {
   q: SingleQ | MultiQ;
@@ -30,8 +31,7 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
   }
 
   return (
-    <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label="Answer options">
-      {multi && <p className="hint">Select all that apply</p>}
+    <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label={multi ? 'Answer options, select all that apply' : 'Answer options'}>
       {options.map((o, index) => {
         const isSel = selected.includes(o.id);
         let state = '';
@@ -57,6 +57,19 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
           </button>
         );
       })}
+      {checked && multi && <p className="hint multi-count" data-testid="multi-count">{countLine(selected, correct)}</p>}
     </div>
   );
+}
+
+/** "Right: 2 of 3 · Missed: 1 · Not an answer: 1": what the colours alone would leave the learner to count. */
+function countLine(selected: readonly string[], correct: ReadonlySet<string>): string {
+  const right = selected.filter((id) => correct.has(id)).length;
+  const wrong = selected.length - right;
+  const missed = correct.size - right;
+  if (wrong === 0 && missed === 0) return `All ${correct.size} correct answers chosen.`;
+  const parts = [`Right: ${right} of ${correct.size}`];
+  if (missed > 0) parts.push(`Missed: ${missed}`);
+  if (wrong > 0) parts.push(`Not an answer: ${wrong}`);
+  return parts.join(' · ');
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addDays, allQuestions, emptyProgress, labelFor, pickMix, planFor, readiness, ROLE_WEIGHTS, strength, topicStats, unitIndex, unitOfFor, weakSpots,
+  addDays, allQuestions, emptyProgress, isGentleFormat, labelFor, pickMix, planFor, readiness, READINESS_MIN_COVERAGE, ROLE_WEIGHTS, strength, topicStats, unitIndex, unitOfFor, weakSpots,
   type Progress,
 } from './index';
 import { card, mkCourse, withCards } from './fixtures';
@@ -36,11 +36,11 @@ describe('topicStats', () => {
 
 describe('readiness', () => {
   it('empty: score 0, early estimate, no weakest unit', () => {
-    expect(readiness(course, emptyProgress(), today)).toEqual({ score: 0, coverage: 0, label: 'early', weakestUnitId: null });
+    expect(readiness(course, emptyProgress(), today)).toEqual({ score: 0, coverage: 0, label: 'early', enough: false, weakestUnitId: null });
   });
   it('is the mean unit strength x 100 with coverage next to it', () => {
     const r = readiness(course, known(['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4']), today);
-    expect(r).toMatchObject({ score: 50, coverage: 0.5, weakestUnitId: 'k' });
+    expect(r).toMatchObject({ score: 50, coverage: 0.5, enough: true, weakestUnitId: 'k' });
   });
   it('weights units by role and by explicit weights', () => {
     const p = known(['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4']);
@@ -49,9 +49,19 @@ describe('readiness', () => {
     expect(readiness(course, { ...p, profile: { ...p.profile, role: 'generalist' } }, today).score).toBe(50);
     expect(ROLE_WEIGHTS['staff-architect']).toMatchObject({ ddd: 1.5 });
   });
-  it('weakest unit is the lowest strength among units that have been started', () => {
-    const p = withCards(known(['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4']), [[q('s-1/1'), { interval: 3, due: addDays(today, 1) }]]);
+  it('weakest unit is the lowest strength among units with at least three questions seen', () => {
+    const weak = (ids: string[]) => ids.map((id) => [q(id), { interval: 3, due: addDays(today, 1) }] as [ReturnType<typeof q>, object]);
+    const p = withCards(known(['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4']), weak(['s-1/1', 's-1/2', 's-1/3']));
     expect(readiness(course, p, today).weakestUnitId).toBe('s');
+    // one or two questions of a topic are not enough to call it weak
+    const few = withCards(known(['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4']), weak(['s-1/1', 's-1/2']));
+    expect(readiness(course, few, today).weakestUnitId).toBe('k');
+    expect(readiness(course, known(['k-1/1', 'k-1/2']), today).weakestUnitId).toBeNull();
+  });
+  it('the score only counts as an estimate once a quarter of the course has been seen', () => {
+    expect(readiness(course, known(['k-1/1']), today)).toMatchObject({ coverage: 0.125, enough: false });
+    expect(readiness(course, known(['k-1/1', 'k-1/2']), today)).toMatchObject({ coverage: 0.25, enough: true });
+    expect(READINESS_MIN_COVERAGE).toBe(0.25);
   });
   it('label needs both coverage and score', () => {
     expect(labelFor(0.1, 90)).toBe('early');
@@ -108,6 +118,15 @@ describe('pickMix', () => {
     expect(a).toEqual(pickMix(course, emptyProgress(), today, 5, 7));
     expect(new Set(a.map((x) => x.id)).size).toBe(5);
     expect(pickMix(course, emptyProgress(), today, 100, 7)).toHaveLength(8);
+  });
+  it('can be limited to gentle formats: never an open or code question for a first session', () => {
+    const typed = new Set(['k-1/1', 'k-1/2', 'k-1/3']);
+    const pool = qs.map((x) => (typed.has(x.id) ? ({ ...x, type: 'open' } as typeof x) : x));
+    const mixed = { ...course, units: course.units.map((u) => ({ ...u, lessons: u.lessons.map((l) => ({ ...l, questions: l.questions.map((x) => pool.find((y) => y.id === x.id)!) })) })) };
+    for (let seed = 0; seed < 50; seed++) for (const x of pickMix(mixed, emptyProgress(), today, 5, seed, isGentleFormat)) expect(typed.has(x.id)).toBe(false);
+    expect(pickMix(mixed, emptyProgress(), today, 100, 1, isGentleFormat)).toHaveLength(5); // 8 questions minus the 3 typed ones
+    expect(isGentleFormat({ type: 'code' } as never)).toBe(false);
+    expect(isGentleFormat({ type: 'single' } as never)).toBe(true);
   });
   it('favours weak material over strong material across many seeded draws', () => {
     const strong = ['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4'];

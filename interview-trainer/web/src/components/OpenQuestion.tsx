@@ -34,8 +34,8 @@ export function OpenQuestion({ q, checked, aiAvailable, onAnswer }: Props) {
       />
       <div className="open-meta">
         <span>
-          <Icon name={aiAvailable ? 'bot' : 'wifi-off'} />
-          {aiAvailable ? 'AI grading against a rubric' : 'AI grading off. You self-check against the model answer.'}
+          <Icon name={aiAvailable ? 'bot' : 'square-pen'} />
+          {aiAvailable ? 'AI grading against a rubric' : 'Self-check: you compare with the model answer.'}
         </span>
         <span className="count-chars">{text.length}/{q.maxChars}</span>
       </div>

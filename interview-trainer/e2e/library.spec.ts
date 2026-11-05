@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { KEY_V2, SHOTS, cardFor, day, dueCards, expectNoOverflow, lessons, questions, seed, stored, useClock, v2 } from './engage';
+import { KEY_V2, SHOTS, cardFor, day, dueCards, expectNoOverflow, lessons, openMore, questions, seed, stored, useClock, v2 } from './engage';
 import { answerCorrectly, check, next, solveAndContinue } from './solve';
 
 const LESSON = 'kotlin-null-types';
@@ -181,6 +181,7 @@ test.describe('library', () => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2({ bookmarks: { [Q1.id]: { h: 'x', day: day(-1) } }, cards: { [Q1.id]: cardFor(Q1) } }) });
     await page.goto('/');
+    await openMore(page); // a learner who has only just started finds the Library under "More ways to practise"
     await expect(page.getByTestId('library-link')).toContainText('1 saved');
     await page.getByTestId('library-link').click();
     await expect(page).toHaveURL(/#\/library$/);

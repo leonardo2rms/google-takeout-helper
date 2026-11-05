@@ -299,8 +299,8 @@ test.describe('Daily Practice', () => {
     await page.goto('/');
 
     await expect(page.getByTestId('daily-card')).toContainText('8 questions');
-    await expect(page.getByTestId('daily-card')).toContainText('5 due');
-    await expect(dueCount(page)).toHaveText('12 ready to review');
+    await expect(page.getByTestId('daily-card')).toContainText('5 of 12 due'); // Today has room for 5 of the 12 that are due
+    await expect(dueCount(page)).toHaveText('12 ready · 10 at a time');
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/home-daily-card.png` });
 
@@ -317,7 +317,7 @@ test.describe('Daily Practice', () => {
     await homeAfterSummary(page);
     await expect(goalText(page)).toHaveText('8/8');
     const stillDue = ids.filter((id) => !played.some((q) => q.id === id)).length;
-    await expect(dueCount(page)).toHaveText(stillDue ? `${stillDue} ready to review` : 'All caught up');
+    await expect(dueCount(page)).toHaveText(stillDue > 10 ? `${stillDue} ready · 10 at a time` : stillDue ? `${stillDue} ready to review` : 'All caught up');
   });
 
   test('a new learner is invited to start the first lesson, with no fake due items', async ({ page }) => {
@@ -331,18 +331,23 @@ test.describe('Daily Practice', () => {
 });
 
 test.describe('onboarding card', () => {
-  test('is inline (not a modal), saves the plan, shows the countdown and never comes back', async ({ page }) => {
+  test('first run is one quiet line under the lesson; it opens inline (not a modal), saves the plan, shows the countdown and never comes back', async ({ page }) => {
     await useClock(page);
     await page.goto('/');
     const card = page.getByTestId('onboarding');
     await expect(card).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(card.getByLabel('Interview date (optional)')).toHaveCount(0); // the fields are not in the way
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/home-onboarding.png` });
 
+    await card.getByRole('button', { name: /Set a goal and interview date/ }).click();
+    await expect(card.getByRole('button', { name: /Set a goal/ })).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/home-onboarding-open.png` });
+
     // a past date is refused with a friendly message
     await card.getByLabel('Interview date (optional)').fill(day(-3));
-    await card.getByRole('button', { name: 'Save', exact: true }).click();
+    await card.getByRole('button', { name: 'Save plan', exact: true }).click();
     await expect(card.getByRole('alert')).toContainText('today or a later date');
     await expect(card).toBeVisible();
 
@@ -350,7 +355,7 @@ test.describe('onboarding card', () => {
     await card.getByLabel('Interview date (optional)').fill(day(10));
     await card.getByLabel(/^16/).check();
     await card.getByLabel(/When will you usually practise/).fill('07:30');
-    await card.getByRole('button', { name: 'Save', exact: true }).click();
+    await card.getByRole('button', { name: 'Save plan', exact: true }).click();
 
     await expect(card).toHaveCount(0);
     await expect(page.getByTestId('countdown')).toContainText('10 days to interview');
@@ -370,7 +375,8 @@ test.describe('onboarding card', () => {
   test('skipping is free and permanent; a direct lesson link still works with no setup', async ({ page }) => {
     await useClock(page);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Skip for now' }).click();
+    await page.getByRole('button', { name: /Set a goal and interview date/ }).click();
+    await page.getByRole('button', { name: 'Not now' }).click();
     await expect(page.getByTestId('onboarding')).toHaveCount(0);
     await expect(page.getByTestId('countdown')).toHaveCount(0); // no date, no countdown, no nagging
     await page.reload();
@@ -378,12 +384,10 @@ test.describe('onboarding card', () => {
     expect(await stored(page)).toMatchObject({ goal: { target: 8 }, profile: { onboarded: true, role: null, interviewDate: null } });
   });
 
-  test('the warm-up counts towards today: 3 questions, ring at 3/8', async ({ page }) => {
+  test('the warm-up link still works and counts towards today: 3 questions, ring at 3/8', async ({ page }) => {
     test.setTimeout(60_000);
     await useClock(page);
-    await page.goto('/');
-    await page.getByRole('button', { name: /Save and warm up/ }).click();
-    await expect(page).toHaveURL(/#\/warmup/);
+    await page.goto('/#/warmup');
     await playSession(page, 3);
     await expect(page.getByTestId('summary-goal')).toContainText('3 of 8 questions today');
     await homeAfterSummary(page);
@@ -412,7 +416,8 @@ test.describe('export and import', () => {
   test('download a backup, reset, import it back; garbage is rejected and changes nothing', async ({ page }, info) => {
     await useClock(page);
     await page.goto('/');
-    await page.getByRole('button', { name: 'Skip for now' }).click();
+    await page.getByRole('button', { name: /Set a goal and interview date/ }).click();
+    await page.getByRole('button', { name: 'Not now' }).click();
     await playLesson(page, LESSON);
     await homeAfterSummary(page);
     const before = await stored(page);
@@ -597,7 +602,7 @@ test.describe('celebrations', () => {
 
 test.describe('progress and readiness', () => {
   test('shows an honest readiness estimate that matches the engine, a weakest topic and per-topic practice', async ({ page }) => {
-    const { cards } = dueCards(40, { interval: 14, due: day(5), last: day(-9) });
+    const { cards } = dueCards(100, { interval: 14, due: day(5), last: day(-9) }); // a third of the course: enough for a score
     const p = v2({ cards });
     await useClock(page);
     await seed(page, { [KEY_V2]: p });
@@ -619,15 +624,28 @@ test.describe('progress and readiness', () => {
     expect(q && unitOf(q)).toBe(expected.weakestUnitId);
   });
 
-  test('an empty profile is calm: zero, early estimate, nothing red', async ({ page }) => {
+  test('with too little seen there is no score, only what it needs; nothing red', async ({ page }) => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     await page.goto('/#/progress');
-    await expect(page.getByTestId('readiness-score')).toHaveText('0');
-    await expect(page.getByTestId('readiness-label')).toHaveText('Early estimate');
+    await expect(page.getByTestId('readiness-score')).toHaveAccessibleName('No score yet');
+    await expect(page.getByTestId('readiness-label')).toHaveText('Not enough data yet');
+    await expect(page.getByText('about 25% of the course has been seen')).toBeVisible();
     await expect(page.getByTestId('weakest-topic')).toHaveCount(0);
     await page.getByRole('link', { name: 'Back to home' }).click();
-    await expect(page.getByTestId('readiness-line')).toHaveText('Readiness 0 · Early estimate');
+    await expect(page.getByTestId('readiness-line')).toHaveText('Readiness: not enough data yet (0% of the course seen)');
+  });
+
+  test('a perfect first lesson does not leave a contradictory score: readiness waits, topic strength is explained', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    await page.goto('/');
+    await playLesson(page, LESSON);
+    await page.goto('/#/progress');
+    await expect(page.getByTestId('readiness-label')).toHaveText('Not enough data yet');
+    await expect(page.getByTestId('idle-topics')).toBeVisible(); // topics not started are folded away
+    await expect(page.locator('.topics-note')).toContainText('not how many you got right');
+    expect(await page.locator('details.idle-topics li').count()).toBe(course.units.length - 1);
   });
 });
 
