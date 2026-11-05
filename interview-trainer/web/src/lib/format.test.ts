@@ -69,4 +69,12 @@ describe('format helpers', () => {
     expect(formatCount(1260)).toBe((1260).toLocaleString());
     expect(formatCount(7)).toBe('7');
   });
+  it('formatDay and formatCount fall back to plain text when Intl misbehaves', () => {
+    vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(() => { throw new Error('no intl'); });
+    expect(formatDay('2026-11-04')).toBe('2026-11-04');
+    vi.restoreAllMocks();
+    const spy = vi.spyOn(Number.prototype, 'toLocaleString').mockImplementation(() => { throw new Error('no locale'); });
+    expect(formatCount(1260)).toBe('1260');
+    spy.mockRestore();
+  });
 });

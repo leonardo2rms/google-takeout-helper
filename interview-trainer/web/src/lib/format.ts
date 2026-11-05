@@ -31,7 +31,6 @@ export function formatDay(key: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
   if (!m) return key;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  if (Number.isNaN(d.getTime())) return key;
   try {
     return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
   } catch {
