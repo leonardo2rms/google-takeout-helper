@@ -61,3 +61,19 @@ test.describe('a host whose sample capability never answers', () => {
     await expect(page.locator('.rubric input[type="checkbox"]').first()).toBeVisible(); // self-check, the learner decides
   });
 });
+
+test.describe('a host whose sample capability returns a well-shaped but junk verdict (N-S2-6)', () => {
+  test('the learner is asked to self-check, with an honest note, instead of seeing a confident INCORRECT', async ({ page }) => {
+    await page.addInitScript(() => {
+      // Right shape, right length, nothing behind it: every point false, empty feedback.
+      const junk = Object.assign(() => Promise.resolve({ text: '' }), { json: () => Promise.resolve({ points: [{ covered: false }, { covered: false }, { covered: false }, { covered: false }, { covered: false }, { covered: false }], feedback: '' }) });
+      (window as unknown as { claude: unknown }).claude = { use: async (name: string) => (name === 'sample' ? junk : null) };
+    });
+    await page.goto(`${FILE}#/q/${open.id}`);
+    await page.getByRole('textbox', { name: 'Your answer' }).fill('A thorough answer that mentions the main points of the question in some detail.');
+    await page.getByRole('button', { name: 'Check', exact: true }).click();
+    await expect(page.getByTestId('grading-note')).toContainText('did not look reliable');
+    await expect(page.locator('.rubric input[type="checkbox"]').first()).toBeVisible();
+    await expect(page.getByTestId('verdict')).not.toContainText(/incorrect/i);
+  });
+});

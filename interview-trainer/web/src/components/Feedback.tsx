@@ -63,6 +63,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
             {open.gradedBy === 'ai' ? ' · graded by AI' : ''}
           </p>
           {open.feedback && <p className="ai-feedback"><Inline text={open.feedback} /></p>}
+          {selfCheck && open.note && <p className="hint" data-testid="grading-note">{open.note}</p>}
           {selfCheck && <p className="hint">Compare your answer with the model answer, then tick the points you made.</p>}
           {/* Self-checking is comparing: the model answer is open for it, and for any miss or skip. */}
           {selfCheck && modelAnswer}

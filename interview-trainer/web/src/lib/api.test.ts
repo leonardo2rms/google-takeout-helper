@@ -44,6 +44,13 @@ describe('gradeOpen', () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'x' }, { status })));
       await expect(gradeOpen('l/1', 'abc')).rejects.toThrow(`grading failed (${status})`);
     }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>bad gateway</html>', { status: 502 })));
+    await expect(gradeOpen('l/1', 'abc')).rejects.toThrow('grading failed (502)'); // a body that is not JSON
+  });
+
+  it('tells an unreliable AI verdict apart from an outage', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ error: 'x', code: 'implausible-verdict' }, { status: 502 })));
+    await expect(gradeOpen('l/1', 'abc')).rejects.toMatchObject({ name: 'ImplausibleVerdictError' });
   });
 });
 

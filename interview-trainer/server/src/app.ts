@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import compression from 'compression';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import {
-  ExplainRequest, GradeRequest, allQuestions, explainableQuestions, openParts,
+  ExplainRequest, GradeRequest, ImplausibleVerdictError, allQuestions, explainableQuestions, openParts,
   type Course, type ExplainResponse, type HealthResponse, type OpenQ, type Question,
 } from '@trainer/shared';
 import type { Grader } from './grader';
@@ -110,7 +110,9 @@ export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute
       res.json(await grader.grade(question, answer));
     } catch (err) {
       console.error('[grade] failed:', err instanceof Error ? err.message : err);
-      // The client falls back to self-assessment on any non-2xx, so keep the detail server-side.
+      // The client falls back to self-assessment on any non-2xx, so keep the detail server-side. It does learn that the verdict
+      // was unreliable (not that the service was down), so it can say so.
+      if (err instanceof ImplausibleVerdictError) return res.status(502).json({ error: 'AI grading returned an unreliable verdict.', code: 'implausible-verdict' });
       res.status(502).json({ error: 'AI grading failed.' });
     }
   });

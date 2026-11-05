@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { Course, type GradeResponse, type OpenQ } from '@trainer/shared';
+import { Course, ImplausibleVerdictError, type GradeResponse, type OpenQ } from '@trainer/shared';
 import { createApp } from './app';
 import { AnthropicGrader, buildUserPrompt, sanitizeAnswer, type Grader } from './grader';
 
@@ -65,6 +65,19 @@ describe('API', () => {
       s.server.close();
     }
   });
+  it('says so when the AI verdict was implausible, so the client can explain the fallback (N-S2-6)', async () => {
+    const junk: Grader = { model: 'junk', async grade() { throw new ImplausibleVerdictError('feedback is empty'); } };
+    const s = serve(junk);
+    try {
+      const res = await s.post({ questionId: 'l/1', answer: 'it is y' });
+      expect(res.status).toBe(502);
+      const body = (await res.json()) as { error: string; code?: string };
+      expect(body.code).toBe('implausible-verdict');
+      expect(JSON.stringify(body)).not.toContain('feedback is empty'); // detail stays server-side
+    } finally {
+      s.server.close();
+    }
+  });
   it('503s without credentials so the client can fall back', async () => {
     expect((await off.post({ questionId: 'l/1', answer: 'it is y' })).status).toBe(503);
   });
@@ -100,16 +113,16 @@ describe('prompt construction', () => {
 
   it('turns model verdicts into a score and rejects mismatched rubric length', async () => {
     const reply = (points: boolean[]) => ({
-      messages: { parse: async () => ({ stop_reason: 'end_turn', parsed_output: { points: points.map((covered) => ({ covered })), feedback: ' nice ' } }) },
+      messages: { parse: async () => ({ stop_reason: 'end_turn', parsed_output: { points: points.map((covered) => ({ covered })), feedback: '  Nice, you covered the main idea.  ' } }) },
     });
-    const ok = await new AnthropicGrader({ client: reply([true, false]) as never }).grade(q, 'y');
-    expect(ok).toMatchObject({ score: 0.5, covered: [true, false], feedback: 'nice' });
-    await expect(new AnthropicGrader({ client: reply([true]) as never }).grade(q, 'y')).rejects.toThrow(/rubric/);
+    const ok = await new AnthropicGrader({ client: reply([true, false]) as never }).grade(q, 'It keeps state in one place');
+    expect(ok).toMatchObject({ score: 0.5, covered: [true, false], feedback: 'Nice, you covered the main idea.' });
+    await expect(new AnthropicGrader({ client: reply([true]) as never }).grade(q, 'It keeps state in one place')).rejects.toThrow(/rubric/);
   });
 
   it('caps runaway feedback from the model (QA S2-5)', async () => {
     const huge = { messages: { parse: async () => ({ stop_reason: 'end_turn', parsed_output: { points: [{ covered: true }, { covered: true }], feedback: 'x'.repeat(100_000) } }) } };
-    const out = await new AnthropicGrader({ client: huge as never }).grade(q, 'y');
+    const out = await new AnthropicGrader({ client: huge as never }).grade(q, 'It keeps state in one place');
     expect(out.feedback.length).toBeLessThanOrEqual(1001);
   });
 

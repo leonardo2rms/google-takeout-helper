@@ -1,4 +1,4 @@
-import type { GradeResponse, HealthResponse } from '@trainer/shared';
+import { ImplausibleVerdictError, type GradeResponse, type HealthResponse } from '@trainer/shared';
 
 /** Set VITE_API_URL when the API is hosted on another origin; empty means same origin / dev proxy. */
 const BASE = import.meta.env.VITE_API_URL ?? '';
@@ -36,6 +36,10 @@ export async function gradeOpen(questionId: string, answer: string): Promise<Gra
     body: JSON.stringify({ questionId, answer }),
     signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new Error(`grading failed (${res.status})`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { code?: unknown } | null;
+    if (body?.code === 'implausible-verdict') throw new ImplausibleVerdictError('the server judged the AI verdict unreliable');
+    throw new Error(`grading failed (${res.status})`);
+  }
   return (await res.json()) as GradeResponse;
 }
