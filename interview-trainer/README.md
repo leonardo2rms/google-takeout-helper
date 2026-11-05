@@ -80,7 +80,7 @@ On the feedback card, **Ask why** opens a short chat about *that* question ("why
 ### Single-file build (no server, no install)
 
 ```bash
-npm run build:standalone    # -> dist/interview-trainer.html (fragment for artifact hosts) and dist/interview-trainer.standalone.html (complete page for file:// or any static host), ~945 kB each, of which the embedded font is about 31 kB
+npm run build:standalone    # -> dist/interview-trainer.html (a fragment for artifact hosts only: opened directly it renders in quirks mode) and dist/interview-trainer.standalone.html (the complete page: open this one from disk or put it on any static host), ~945 kB each, of which the embedded font is about 31 kB
 ```
 
 Everything (course, logic, styles) is inlined, with no service worker and no API server. Hosts that provide
