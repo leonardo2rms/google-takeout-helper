@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  ACHIEVEMENTS, CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
+  ACHIEVEMENTS, CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, mixFilterFor, pickMix, previewInterval,
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
@@ -265,7 +265,7 @@ function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string):
       return [...weak, ...seededShuffle(unseen, seed)].slice(0, MIX_SIZE);
     }
     default:
-      return pickMix(course, progress, today, MIX_SIZE, seed);
+      return pickMix(course, progress, today, MIX_SIZE, seed, mixFilterFor(progress));
   }
 }
 

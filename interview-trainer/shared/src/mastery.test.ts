@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  addDays, allQuestions, emptyProgress, isGentleFormat, labelFor, pickMix, planFor, readiness, READINESS_MIN_COVERAGE, ROLE_WEIGHTS, strength, topicStats, unitIndex, unitOfFor, weakSpots,
+  addDays, allQuestions, emptyProgress, isGentleFormat, labelFor, mixFilterFor, pickMix, planFor, readiness, READINESS_MIN_COVERAGE, ROLE_WEIGHTS, strength, topicStats, unitIndex, unitOfFor, weakSpots,
   type Progress,
 } from './index';
 import { card, mkCourse, withCards } from './fixtures';
@@ -127,6 +127,18 @@ describe('pickMix', () => {
     expect(pickMix(mixed, emptyProgress(), today, 100, 1, isGentleFormat)).toHaveLength(5); // 8 questions minus the 3 typed ones
     expect(isGentleFormat({ type: 'code' } as never)).toBe(false);
     expect(isGentleFormat({ type: 'single' } as never)).toBe(true);
+  });
+  it('uses gentle formats for the first sessions only', () => {
+    expect(mixFilterFor(emptyProgress())).toBe(isGentleFormat);
+    const early = emptyProgress();
+    early.stats.sessions = 2;
+    expect(mixFilterFor(early)).toBe(isGentleFormat);
+    const seasoned = emptyProgress();
+    seasoned.stats.sessions = 3;
+    expect(mixFilterFor(seasoned)).toBeUndefined();
+    const lessons = emptyProgress();
+    lessons.lessons = { a: {}, b: {}, c: {} } as never;
+    expect(mixFilterFor(lessons)).toBeUndefined();
   });
   it('favours weak material over strong material across many seeded draws', () => {
     const strong = ['k-1/1', 'k-1/2', 'k-1/3', 'k-1/4'];

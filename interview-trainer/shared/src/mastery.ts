@@ -151,6 +151,14 @@ export function weakSpots(course: Course, p: Progress, today: Day, n: number, se
 /** Formats that need no typing or coding: what a first mixed session is drawn from, so the first question is never a blank page. */
 export const isGentleFormat = (q: Question): boolean => q.type !== 'open' && q.type !== 'code';
 
+/** Sessions after which Mixed practice may draw open and code questions. */
+export const GENTLE_SESSIONS = 3;
+
+/** The pool limit for Mixed practice: gentle formats only while the learner is brand new (fewer than 3 sessions, no lessons or cards beyond the first few). */
+export function mixFilterFor(p: Pick<Progress, 'stats' | 'lessons'>): ((q: Question) => boolean) | undefined {
+  return p.stats.sessions < GENTLE_SESSIONS && Object.keys(p.lessons).length < GENTLE_SESSIONS ? isGentleFormat : undefined;
+}
+
 /**
  * Mixed practice: a seeded draw without replacement, weighted by `1 + 2 * (1 - strength)` so weak material shows up more.
  * `only` limits the pool (a first-ever session passes `isGentleFormat`).
