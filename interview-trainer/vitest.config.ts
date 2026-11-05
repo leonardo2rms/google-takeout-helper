@@ -27,6 +27,7 @@ export default defineConfig({
         '**/*.test.ts',
         '**/__fixtures__/**',
         '**/fixtures.ts',
+        '**/arbitraries.ts', // test generators
         '**/*.d.ts',
         '**/*.worker.ts', // runs only inside a real Web Worker; exercised by e2e
         '**/index.ts', // barrel re-exports

@@ -348,3 +348,11 @@ generated, so it works offline and is deterministic; the AI only grades.
 - Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, a weekly recap card. (Reminders, the share card, the Ask why tutor and the accessibility pass are done.)
 - Later: timed "mock interview" mode, teach-back prompts, a transfer code / QR for moving between devices.
 - Real code execution for coding challenges (sandboxed Kotlin runner) instead of AI grading.
+
+## Documentation
+
+- [Architecture](docs/architecture.md): components, the data flow of a lesson, the `Progress` schema and migrations, the grading contract, the code sandbox, offline strategy, build variants and the reasons behind the key decisions.
+- [Testing](docs/testing.md): the test pyramid, how to run each layer, e2e ports and workers, committed screenshots, content tests, the flaky-test policy and the coverage ratchet.
+- [Content guide](docs/content-guide.md): how to write each of the nine question types, good distractors, rubrics and follow-ups, the fact-checking checklist and how to add a unit or lesson.
+- [Contributing](docs/contributing.md): setup, branch and commit conventions, the definition of done, adding a question type end to end, and releasing.
+- Design notes: [engagement](docs/engagement.md), [learning features](docs/learning-features.md), [accessibility](docs/accessibility.md); research drafts: [competitors](docs/COMPETITORS.md), [monetization](docs/MONETIZATION.md).
