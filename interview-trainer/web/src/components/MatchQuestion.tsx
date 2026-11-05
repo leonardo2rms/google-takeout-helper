@@ -70,7 +70,7 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 disabled={checked}
                 onClick={() => pickLeft(i)}
               >
-                <Inline text={p.left} />
+                <span className="match-text"><Inline text={p.left} /></span>
                 {chosen[i] !== null && <span className="sr-only">, paired with {chosen[i]}</span>}
                 <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} />
                 {state && <Icon name={state === 'correct' ? 'check' : 'x'} className="vmark" strokeWidth={2.5} />}
@@ -93,7 +93,7 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 disabled={checked}
                 onClick={() => pickRight(r)}
               >
-                <Inline text={r} />
+                <span className="match-text"><Inline text={r} /></span>
                 {owner !== -1 && <span className="sr-only">, paired with {q.pairs[owner]!.left}</span>}
                 <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} />
                 {state && <Icon name={state === 'correct' ? 'check' : 'x'} className="vmark" strokeWidth={2.5} />}

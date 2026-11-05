@@ -133,11 +133,9 @@ test.describe('mock interview: running', () => {
     const qs = planned();
     await startMock(page);
     await answer(page, qs[0]!, 'right');
-    page.once('dialog', (d) => {
-      expect(d.message()).toContain('Nothing is saved');
-      void d.accept();
-    });
     await page.getByRole('button', { name: 'Quit mock interview' }).click();
+    await expect(page.getByTestId('quit-confirm')).toContainText('Nothing is saved');
+    await page.getByTestId('quit-confirm-ok').click();
     await expect(page.getByTestId('mock-start')).toBeVisible();
     expect((await stored(page))?.mocks ?? []).toEqual([]);
   });

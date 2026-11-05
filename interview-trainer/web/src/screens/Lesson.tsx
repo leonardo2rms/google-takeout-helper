@@ -4,6 +4,7 @@ import {
   type Confidence, type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
 import { AskWhy } from '../components/AskWhy';
+import { useConfirm } from '../components/ConfirmDialog';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
@@ -69,6 +70,7 @@ function hash(s: string): number {
 
 export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
+  const confirm = useConfirm();
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [phase, setPhase] = useState<Phase>('answer');
@@ -176,8 +178,18 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
           type="button"
           className="icon-btn"
           aria-label="Quit lesson"
-          onClick={() => {
-            if (window.confirm('Quit this lesson? Progress in it will be lost.')) onExit();
+          onClick={async () => {
+            // Nothing answered yet means nothing to lose: leave without asking.
+            if (Object.keys(session.attempts).length === 0) return onExit();
+            const ok = await confirm({
+              title: 'Quit this lesson?',
+              body: 'Your answers in it are not saved. You would start again from the first question.',
+              confirmLabel: 'Quit and lose progress',
+              cancelLabel: 'Keep going',
+              tone: 'danger',
+              testId: 'quit-confirm',
+            });
+            if (ok) onExit();
           }}
         >
           <Icon name="x" />

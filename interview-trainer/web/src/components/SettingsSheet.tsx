@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
 import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
+import { useConfirm } from './ConfirmDialog';
 import { ReadingSection } from './ReadingSection';
 import { RemindersSection } from './RemindersSection';
 import { RestDays } from './RestDays';
@@ -40,6 +41,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
   const [pending, setPending] = useState<Pending | null>(null);
   const [pasted, setPasted] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const confirm = useConfirm();
 
   const say = (m: string) => {
     setError('');
@@ -158,7 +160,24 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
               <button type="button" className="btn primary wide" onClick={() => { mergeIntoProgress(pending.progress); setPending(null); say('Merged. The best of both is now on this device.'); }}>
                 Merge (keep the best of both)
               </button>
-              <button type="button" className="btn secondary wide" onClick={() => { replaceProgress(pending.progress); setPending(null); say('Progress replaced with the backup.'); }}>
+              <button
+                type="button"
+                className="btn secondary wide"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Replace your progress?',
+                    body: `This overwrites the ${progress.xp} XP, ${Object.keys(progress.lessons).length} lessons and review schedule on this device with the backup. Merge keeps the best of both instead.`,
+                    confirmLabel: 'Replace with the backup',
+                    cancelLabel: 'Keep mine',
+                    tone: 'danger',
+                    testId: 'replace-confirm',
+                  });
+                  if (!ok) return;
+                  replaceProgress(pending.progress);
+                  setPending(null);
+                  say('Progress replaced with the backup.');
+                }}
+              >
                 Replace my progress
               </button>
               <button type="button" className="btn ghost wide" onClick={() => setPending(null)}>Cancel</button>
@@ -168,7 +187,21 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
       </section>
 
       <section>
-        <button type="button" className="link" onClick={() => window.confirm('Reset all progress, XP and streak? This cannot be undone. Download a backup first if unsure.') && onReset()}>
+        <button
+          type="button"
+          className="link danger-link"
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Reset all progress?',
+              body: 'XP, streak, lessons, notes and the review schedule on this device are erased. This cannot be undone. Download a backup first if you are unsure.',
+              confirmLabel: 'Reset everything',
+              cancelLabel: 'Keep my progress',
+              tone: 'danger',
+              testId: 'reset-confirm',
+            });
+            if (ok) onReset();
+          }}
+        >
           Reset progress
         </button>
       </section>

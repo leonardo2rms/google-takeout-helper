@@ -73,13 +73,14 @@ test.describe('bookmarks and notes', () => {
     await download.saveAs(file);
     expect(JSON.parse(readFileSync(file, 'utf8')).progress.notes[Q1.id].text).toBe('portable note');
 
-    page.once('dialog', (d) => void d.accept());
     await sheet.getByRole('button', { name: 'Reset progress' }).click();
+    await page.getByTestId('reset-confirm-ok').click();
     expect((await stored(page))!.notes).toEqual({});
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByTestId('import-file').setInputFiles(file);
     await page.getByTestId('import-confirm').getByRole('button', { name: 'Replace my progress' }).click();
+    await page.getByTestId('replace-confirm-ok').click();
     await expect(page.getByTestId('import-message')).toContainText('replaced');
     const after = await stored(page);
     expect(after!.notes[Q1.id].text).toBe('portable note');

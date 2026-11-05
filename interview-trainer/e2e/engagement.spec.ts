@@ -430,8 +430,8 @@ test.describe('export and import', () => {
     expect(JSON.parse(text)).toMatchObject({ app: 'interview-trainer', format: 2, progress: { xp: 80 } });
 
     // reset wipes it
-    page.once('dialog', (d) => void d.accept());
     await sheet.getByRole('button', { name: 'Reset progress' }).click();
+    await page.getByTestId('reset-confirm-ok').click();
     await expect(page.locator('.stat[aria-label="0 XP"]')).toBeVisible();
     expect(await stored(page)).toMatchObject({ version: 2, xp: 0 });
 
@@ -456,6 +456,7 @@ test.describe('export and import', () => {
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/settings-import-confirm.png` });
     await confirm.getByRole('button', { name: 'Replace my progress' }).click();
+    await page.getByTestId('replace-confirm-ok').click();
     await expect(page.getByTestId('import-message')).toContainText('replaced');
     await page.getByRole('button', { name: 'Close' }).click();
     await expect(page.locator('.stat[aria-label="80 XP"]')).toBeVisible();
@@ -494,6 +495,7 @@ test.describe('export and import', () => {
     await page.getByLabel('Backup text').fill(JSON.stringify(v2({ xp: 777 })));
     await page.getByRole('button', { name: 'Check pasted text' }).click();
     await page.getByRole('button', { name: 'Replace my progress' }).click();
+    await page.getByTestId('replace-confirm-ok').click();
     await page.getByRole('button', { name: 'Close' }).click();
     await expect(page.locator('.stat[aria-label="777 XP"]')).toBeVisible();
   });

@@ -132,6 +132,8 @@ button:disabled { cursor: default; }
 .btn.secondary { background: var(--sheet); }
 .btn.ghost { border-color: transparent; background: none; color: var(--graphite); }
 .btn.ghost:active:not(:disabled) { background: var(--hairline); }
+.btn.danger { background: var(--sheet); border-color: var(--vermilion); color: var(--vermilion); }
+.btn.danger:active:not(:disabled) { background: var(--vermilion-tint); }
 .btn.wide { width: 100%; }
 .btn.small { min-height: 44px; padding: 0 16px; font-size: var(--fs-14); }
 .icon-btn { display: inline-grid; place-items: center; background: none; border: 0; color: var(--graphite); width: 44px; height: 44px; border-radius: var(--r2); text-decoration: none; flex: none; }
@@ -426,6 +428,12 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 .match { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .match-col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; align-content: start; min-width: 0; }
 .match-item { position: relative; display: flex; gap: 8px; align-items: center; text-align: left; min-height: 48px; padding: 10px 12px; font-size: var(--fs-15); line-height: 1.3; background: var(--sheet); color: var(--ink); border: 1px solid var(--edge); border-radius: var(--r2); overflow-wrap: anywhere; }
+.match-item .match-text { flex: 1 1 0; min-width: 0; display: block; overflow-wrap: break-word; }
+/* On a phone two columns leave each item about 90px of text next to its badge: stack them, terms first and descriptions under them. */
+@media (max-width: 479px) {
+  .match { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .match-col + .match-col { padding-top: 14px; border-top: 1px dashed var(--edge); }
+}
 .match-item:active:not(:disabled) { background: var(--hairline); }
 .match-item.active { border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); background: var(--cobalt-tint); }
 .match-item.paired { --pair: var(--pen-complexity); border-color: var(--pair); box-shadow: inset 0 0 0 1px var(--pair); }
@@ -491,6 +499,15 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 .bar-col.met { fill: var(--ink); stroke: var(--ink); }
 .bar-col.zero { fill: var(--hairline); stroke: none; }
 .day-chart figcaption { font-size: var(--fs-13); }
+
+/* confirmation dialog (replaces window.confirm) */
+.confirm-backdrop { align-items: center; padding: 16px; z-index: 80; }
+.confirm { width: 100%; max-width: 420px; max-height: 88dvh; overflow-y: auto; display: grid; gap: var(--s3); padding: 20px; outline: none; background: var(--sheet); color: var(--ink); border: 1px solid var(--edge); border-radius: var(--r3); animation: rise .16s var(--ease); }
+.confirm h2 { font-size: var(--fs-18); line-height: 1.3; }
+.confirm-body { color: var(--ink); font-size: var(--fs-15); overflow-wrap: anywhere; }
+.confirm-actions { display: grid; gap: var(--s2); margin-top: var(--s2); }
+.confirm-actions .btn.primary { order: -1; }
+.link.danger-link { color: var(--vermilion); }
 
 /* forms and choices */
 .rest-days { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -588,6 +605,8 @@ html { scroll-padding-top: 84px; scroll-padding-bottom: 140px; }
 /* Containing block for the screen-reader-only spans inside these buttons: an absolutely positioned span after a long scrolling code line would otherwise widen the whole page. */
 .option, .match-item, .code-line, .chip, .src-line, .blank, .bubble { position: relative; }
 .feedback h2:focus { outline: none; }
+/* Programmatic focus (a new question, a new screen) moves the cursor for screen readers; only keyboard focus draws a ring. */
+[tabindex="-1"]:focus:not(:focus-visible) { outline: none; }
 .feedback h2:focus-visible { outline: 2px solid var(--cobalt); outline-offset: 4px; border-radius: var(--r1); }
 .reading-sizes .choice { padding: 8px 4px; gap: 6px; justify-content: center; }
 .reading-sizes .choice span { font-weight: 600; }

@@ -12,6 +12,7 @@ import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { AchievementToasts } from './components/AchievementToasts';
+import { ConfirmProvider } from './components/ConfirmDialog';
 import { useReminderCheck } from './lib/reminders';
 import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
@@ -55,10 +56,10 @@ function titleFor(route: string): string {
 export function App() {
   useEffect(() => backfillBadges(), []);
   return (
-    <>
+    <ConfirmProvider>
       <Shell />
       <AchievementToasts />
-    </>
+    </ConfirmProvider>
   );
 }
 

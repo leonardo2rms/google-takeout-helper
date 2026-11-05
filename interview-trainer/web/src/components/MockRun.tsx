@@ -4,6 +4,7 @@ import { isAnswered } from '../lib/mock-marking';
 import { runCodeInWorker } from '../lib/run-code';
 import type { Answer } from '../lib/evaluate';
 import { CodeBlock } from './CodeBlock';
+import { useConfirm, useDismissConfirm } from './ConfirmDialog';
 import { ChoiceQuestion } from './ChoiceQuestion';
 import { CodeQuestion } from './CodeQuestion';
 import { EstimateQuestion } from './EstimateQuestion';
@@ -60,10 +61,14 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
   const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set([0]));
   const [answers, setAnswers] = useState<Record<string, Answer | null>>({});
   const [flagged, setFlagged] = useState<ReadonlySet<string>>(() => new Set());
-  const [confirming, setConfirming] = useState(false);
+  const confirm = useConfirm();
+  const dismissConfirm = useDismissConfirm();
   const [announcement, setAnnouncement] = useState('');
   const submitted = useRef(false);
   const lastRemaining = useRef(Infinity);
+
+  // The mock can end by itself (time up) while a question is open: take the question away with it.
+  useEffect(() => dismissConfirm, [dismissConfirm]);
 
   const submit = useCallback(
     (timedOut: boolean) => {
@@ -105,7 +110,6 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
   const go = (i: number) => {
     setIndex(i);
     setVisited((v) => new Set(v).add(i));
-    setConfirming(false);
     window.scrollTo(0, 0);
   };
   const setAnswer = (id: string) => (a: Answer | null) => setAnswers((prev) => ({ ...prev, [id]: a }));
@@ -116,6 +120,23 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
       return n;
     });
   const isLast = index === questions.length - 1;
+  /** Asks in a dialog (not an inline panel that can hide behind the bottom bar) and submits on yes. */
+  const askSubmit = async () => {
+    const ok = await confirm({
+      title: 'Submit your answers?',
+      body: (
+        <>
+          {unanswered === 0 ? 'Every question has an answer.' : `${unanswered} ${unanswered === 1 ? 'question has' : 'questions have'} no answer yet and will count as zero.`}
+          {flagged.size > 0 ? ` ${flagged.size} flagged.` : ''}
+        </>
+      ),
+      confirmLabel: 'Submit',
+      cancelLabel: 'Keep going',
+      testId: 'mock-confirm',
+      okTestId: 'mock-submit',
+    });
+    if (ok) submit(false);
+  };
 
   return (
     <div className="lesson mock-run" data-testid="mock-run">
@@ -124,8 +145,16 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
           type="button"
           className="icon-btn"
           aria-label="Quit mock interview"
-          onClick={() => {
-            if (window.confirm('Quit this mock interview? Nothing is saved and nothing is lost: it is only practice.')) onQuit();
+          onClick={async () => {
+            const ok = await confirm({
+              title: 'Quit this mock interview?',
+              body: 'Nothing is saved and nothing is lost: it is only practice.',
+              confirmLabel: 'Quit mock',
+              cancelLabel: 'Keep going',
+              tone: 'danger',
+              testId: 'quit-confirm',
+            });
+            if (ok) onQuit();
           }}
         >
           <Icon name="x" />
@@ -137,7 +166,7 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
       </header>
       <p className="sr-only" role="status" aria-live="polite" data-testid="mock-announce">{announcement}</p>
 
-      <main className="lesson-body">
+      <div className="lesson-body">
         <p className="kicker">{LABEL[q.type]}{flagged.has(q.id) ? ' · flagged' : ''}</p>
         <h1 className="prompt"><Inline text={q.prompt} /></h1>
         {q.code && <CodeBlock source={q.code.source} lang={q.code.lang} />}
@@ -177,24 +206,10 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
           })}
         </nav>
         <p className="hint mock-legend">Filled = answered · dashed with a flag = flagged to come back to · {answeredCount} of {questions.length} answered</p>
-        {!isLast && !confirming && (
-          <button type="button" className="btn ghost small" data-testid="mock-finish-early" onClick={() => setConfirming(true)}>Finish early</button>
+        {!isLast && (
+          <button type="button" className="btn ghost small" data-testid="mock-finish-early" onClick={() => void askSubmit()}>Finish early</button>
         )}
-
-        {confirming && (
-          <section className="mock-confirm" role="alertdialog" aria-labelledby="mock-confirm-title" data-testid="mock-confirm">
-            <h2 id="mock-confirm-title">Submit your answers?</h2>
-            <p>
-              {unanswered === 0 ? 'Every question has an answer.' : `${unanswered} ${unanswered === 1 ? 'question has' : 'questions have'} no answer yet and will count as zero.`}
-              {flagged.size > 0 ? ` ${flagged.size} flagged.` : ''}
-            </p>
-            <div className="mock-confirm-actions">
-              <button type="button" className="btn ghost" onClick={() => setConfirming(false)}>Keep going</button>
-              <button type="button" className="btn primary" data-testid="mock-submit" onClick={() => submit(false)}>Submit</button>
-            </div>
-          </section>
-        )}
-      </main>
+      </div>
 
       <footer className="lesson-bar mock-bar">
         <button type="button" className={`btn ghost mock-flag ${flagged.has(q.id) ? 'on' : ''}`} aria-pressed={flagged.has(q.id)} data-testid="mock-flag" onClick={toggleFlag}>
@@ -202,7 +217,7 @@ export function MockRun({ questions, minutes, aiAvailable, onQuit, onDone }: Pro
         </button>
         <button type="button" className="btn ghost" data-testid="mock-prev" disabled={index === 0} onClick={() => go(index - 1)}>Back</button>
         {isLast ? (
-          <button type="button" className="btn primary" data-testid="mock-finish" onClick={() => setConfirming(true)}>Finish</button>
+          <button type="button" className="btn primary" data-testid="mock-finish" onClick={() => void askSubmit()}>Finish</button>
         ) : (
           <button type="button" className="btn primary" data-testid="mock-next" onClick={() => go(index + 1)}>
             {isAnswered(q, answers[q.id]) ? 'Next' : 'Skip'}
