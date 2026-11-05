@@ -34,14 +34,14 @@ lessons:
           - { id: d, text: "Raise the connection pool size to 1,000" }
           - { id: e, text: "Retry timed-out queries immediately and indefinitely" }
         answers: [a, b, c]
-        explanation: "Option D makes the database spend more time context-switching, and E is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
+        explanation: "Raising the pool to 1,000 makes the database spend more time context-switching, and retrying timed-out queries immediately and indefinitely is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
 
       - type: single
         hint: "Many callers reload the same value at once. How could one caller do the work for all of them?"
         prompt: A very popular cache key expires and 5,000 concurrent requests all miss and hit the database. What is this called, and what's a good mitigation?
         options:
           - { id: a, text: "Cache stampede; coalesce loads per key (single-flight) and add TTL jitter" }
-          - { id: b, text: "Cache poisoning; sign the cached values and validate every entry when it is read" }
+          - { id: b, text: "Cache poisoning; sign the cached values and validate each entry when it is read" }
           - { id: c, text: "Cache eviction; use a bigger cache and a smarter eviction policy such as LFU" }
           - { id: d, text: "Write-through; switch to write-behind so that the database sees fewer synchronous writes" }
         answer: a
@@ -53,7 +53,7 @@ lessons:
         options:
           - { id: a, text: "Averages hide the slow tail; with fan-out (one request calling many services) most users hit the tail" }
           - { id: b, text: "p99 is cheaper to compute than an average because it only needs the largest samples" }
-          - { id: c, text: "The average cannot be computed across several instances, while percentiles can be merged" }
+          - { id: c, text: "The average is hard to compute across several instances, while percentiles can be merged" }
           - { id: d, text: "p99 excludes network time, so it shows what the service itself is doing" }
         answer: a
         explanation: "If a page makes 20 backend calls, each with 1% slow outliers, ~18% of page loads hit at least one slow call (1 - 0.99^20). Tail latency amplifies with fan-out. It is the other way round for aggregation: averages combine easily, percentiles of separate instances cannot simply be merged. A percentile needs the whole distribution and includes network time like any other latency."
@@ -62,8 +62,8 @@ lessons:
         prompt: "You want to add more instances of a service behind a load balancer, but users randomly get logged out. What is the likely blocker?"
         options:
           - { id: a, text: "Session state lives in one instance's memory; make it stateless or move it to a shared store" }
-          - { id: b, text: "Load balancers only forward raw TCP and cannot route HTTP requests to several instances at once" }
-          - { id: c, text: "Spring Boot applications can't run as more than one instance against the same database" }
+          - { id: b, text: "Load balancers forward raw TCP and do not route HTTP requests to several instances at once" }
+          - { id: c, text: "Spring Boot applications are unable to run as more than one instance against the same database" }
           - { id: d, text: "Cookies are bound to a single server, so each instance would need its own cookie domain" }
         answer: a
         explanation: "Stateless services scale horizontally. Put session/state in Redis, a database, or a signed token (e.g. JWT) so that any instance can serve any request."
@@ -141,8 +141,8 @@ lessons:
         prompt: A circuit breaker has been OPEN and its wait time elapses. What does it do next?
         options:
           - { id: a, text: "Moves to HALF-OPEN and lets a few trial calls through to test the dependency" }
-          - { id: b, text: "Closes immediately and lets all traffic through, because the wait time has elapsed and counters reset" }
-          - { id: c, text: "Stays open until the next deployment, because only a restart can reset the breaker" }
+          - { id: b, text: "Closes immediately and lets the full traffic through, because the wait time has elapsed and counters reset" }
+          - { id: c, text: "Stays open until the next deployment, because a restart is needed to reset the breaker" }
           - { id: d, text: "Replays every request that was rejected while it was open, all at once" }
         answer: a
         explanation: "CLOSED (normal) → OPEN (fail fast) → HALF-OPEN (probe) → CLOSED if the probes succeed, else back to OPEN. Failing fast gives the struggling dependency room to recover."
@@ -152,9 +152,9 @@ lessons:
         prompt: "A client retries `POST /payments` after a timeout and the customer is charged twice. What is the standard fix?"
         options:
           - { id: a, text: "Add an idempotency key so the server replays the original result for a repeated request" }
-          - { id: b, text: "Disable retries on the client, since the payment API cannot be called twice" }
+          - { id: b, text: "Disable retries on the client, since the payment API should not be called twice" }
           - { id: c, text: "Use GET instead of POST so that caches and proxies deduplicate any repeated request automatically" }
-          - { id: d, text: "Increase the timeout to 10 minutes so that the client never has to retry" }
+          - { id: d, text: "Increase the timeout to 10 minutes so that the client does not have to retry" }
         answer: a
         explanation: "The client can't know whether the first attempt succeeded, so never retrying loses payments and a longer timeout only delays the same problem. The server stores the idempotency key with the outcome (in the same transaction as the charge) and replays it on duplicates. Changing the verb does not help: a charge is not safe to repeat blindly."
 
@@ -197,8 +197,8 @@ lessons:
         options:
           - { id: a, text: "A saga: local transactions chained by events or commands, with compensating actions on failure" }
           - { id: b, text: "Two-phase commit across all databases as the default, since it gives atomic commits" }
-          - { id: c, text: "A shared database for all three services, so that a single local transaction covers everything" }
-          - { id: d, text: "Retry each step forever without compensation and hope every service eventually succeeds" }
+          - { id: c, text: "A shared database for the three services, so that a single local transaction covers everything" }
+          - { id: d, text: "Retry each step forever without compensation and hope each service eventually succeeds" }
         answer: a
         explanation: "Sagas trade atomicity for availability and give eventual consistency. Design compensations (refund, release stock) and make every step idempotent."
 
@@ -367,7 +367,7 @@ lessons:
         prompt: "An overloaded service has a request queue that is 30 seconds deep, while its clients time out after 2 seconds. What is wrong with simply serving the queue in FIFO order, and what should you do?"
         options:
           - { id: a, text: "Most queued work belongs to clients that already gave up, wasting capacity; bound the queue and shed excess load early (503 or 429)" }
-          - { id: b, text: "Nothing is wrong: FIFO is the fairest order, so the system should keep every request until it can serve it, however long that takes and whatever the client does" }
+          - { id: b, text: "Nothing is wrong: FIFO is the fairest order, so the system should keep each request until it can serve it, however long that takes and whatever the client does" }
           - { id: c, text: "Add client retries, so that requests which timed out are repeated and eventually served from the queue" }
           - { id: d, text: "Make the queue unbounded and size the workers for peak load, so no request is ever rejected, however long it waits" }
         answer: a
@@ -403,8 +403,8 @@ lessons:
         options:
           - { id: a, text: "After the user gives up at 1 s, A, B and C keep working for nobody; propagate the remaining deadline" }
           - { id: b, text: "Nothing: timeouts should grow along the call chain so that deeper services get more time to finish their work" }
-          - { id: c, text: "Timeouts only matter for the first service in the chain; the others simply follow its decision" }
-          - { id: d, text: "Adding retries at every hop will compensate for the mismatch between the user's limit and the timeouts" }
+          - { id: c, text: "Timeouts matter for the first service in the chain; the others simply follow its decision" }
+          - { id: d, text: "Adding retries at each hop will compensate for the mismatch between the user's limit and the timeouts" }
         answer: a
         explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC deadlines are designed for this: the client sets one, it travels with the call as the remaining time, and servers can propagate it to downstream calls, in some languages through the call context; with plain HTTP you pass the deadline or remaining budget in a header yourself). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
 
@@ -412,7 +412,7 @@ lessons:
         prompt: "With cache-aside, a write must update the database and invalidate the cached entry. Which order is generally safer, and why?"
         options:
           - { id: a, text: "Update the database first, then delete the cache entry: the stale window is only the gap" }
-          - { id: b, text: "Delete the cache entry first, then update the database: this guarantees that no stale value is ever read" }
+          - { id: b, text: "Delete the cache entry first, then update the database: this ensures that no stale value is read" }
           - { id: c, text: "Write the new value into the cache first, then the database, so that readers see it immediately" }
           - { id: d, text: "The order does not matter, because the cache and the database converge after the TTL anyway" }
         answer: a
