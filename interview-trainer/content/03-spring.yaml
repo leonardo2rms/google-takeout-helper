@@ -26,9 +26,9 @@ lessons:
             }
         options:
           - { id: a, text: "Self-invocation bypasses the Spring proxy, so the transactional advice never runs" }
-          - { id: b, text: "`@Transactional` only takes effect on `private` helpers called from a public method" }
+          - { id: b, text: "`@Transactional` takes effect on `private` helpers called from a public method" }
           - { id: c, text: "Spring only starts transactions for methods on repository interfaces, not on services" }
-          - { id: d, text: "`@Transactional` must be placed on the interface, as class-level proxies ignore it" }
+          - { id: d, text: "`@Transactional` belongs on the interface, as class-level proxies ignore it" }
         answer: a
         explanation: "Spring AOP wraps the bean in a proxy; only calls that come through the proxy are intercepted. A call from inside the same instance goes straight to `this.save`. Fix: move `save` to another bean, annotate `placeOrder`, or use programmatic `TransactionTemplate`. The annotation works on public methods of any Spring bean, not only repositories, and not only on interfaces."
 
@@ -37,7 +37,7 @@ lessons:
         prompt: "A Kotlin `@Service` class fails at startup because Spring can't create a CGLIB proxy for a final class. What is the idiomatic fix?"
         options:
           - { id: a, text: "Apply the kotlin-spring (all-open) plugin so Spring-annotated classes become open" }
-          - { id: b, text: "Mark every method `public` so the proxy can intercept it from outside the class" }
+          - { id: b, text: "Mark each method `public` so the proxy can intercept it from outside the class" }
           - { id: c, text: "Switch the bean to `@Scope(\"prototype\")` so Spring creates a fresh, unproxied instance each time" }
           - { id: d, text: "Annotate the class with `@JvmStatic` so Spring can generate the proxy at compile time" }
         answer: a
@@ -59,7 +59,7 @@ lessons:
         prompt: "A singleton bean has a `@Scope(\"prototype\")` bean injected through its constructor. How many prototype instances does the singleton use?"
         options:
           - { id: a, text: "One: it is injected only once, when the singleton itself is created" }
-          - { id: b, text: "A new one on every method call, because the bean is declared as prototype" }
+          - { id: b, text: "A new one on each method call, because the bean is declared as prototype" }
           - { id: c, text: "One per HTTP request, because the singleton is mostly called from web threads" }
           - { id: d, text: "One per thread that calls the singleton, since prototype beans are bound to threads" }
         answer: a
@@ -77,7 +77,7 @@ lessons:
             }
         options:
           - { id: a, text: "The record is committed anyway: by default only unchecked exceptions (RuntimeException or Error) trigger a rollback" }
-          - { id: b, text: "The transaction rolls back, because every exception triggers a rollback by default" }
+          - { id: b, text: "The transaction rolls back, because each exception triggers a rollback by default" }
           - { id: c, text: "The code does not compile, because Kotlin has no checked exceptions to throw" }
           - { id: d, text: "The record is saved in a separate transaction and survives only if REQUIRES_NEW is set" }
         answer: a
@@ -191,9 +191,9 @@ lessons:
         prompt: "Spring Boot enables `spring.jpa.open-in-view` by default. What is its main production risk?"
         options:
           - { id: a, text: "The DB connection is held for the whole web request, and lazy loading in the view layer hides N+1s" }
-          - { id: b, text: "It disables the second-level cache for every entity that is loaded during the request" }
-          - { id: c, text: "It makes every transaction read-only unless the service explicitly marks it otherwise" }
-          - { id: d, text: "It opens a separate transaction for every repository call during the request, multiplying commits and locks" }
+          - { id: b, text: "It disables the second-level cache for each entity that is loaded during the request" }
+          - { id: c, text: "It makes each transaction read-only unless the service explicitly marks it otherwise" }
+          - { id: d, text: "It opens a separate transaction for each repository call during the request, multiplying commits and locks" }
         answer: a
         explanation: "Many teams set it to false and fetch what they need explicitly (projections or fetch joins) inside the service layer. The setting only keeps the persistence session (and with it the connection) open for the whole request; it does not touch caching, read-only mode or how many transactions run."
 
@@ -270,7 +270,7 @@ lessons:
         options:
           - { id: a, text: "N+1: items are lazy-loaded one order at a time; use a join fetch, entity graph or batch fetching" }
           - { id: b, text: "A missing index on `order_item.order_id`, so each lookup does a full table scan" }
-          - { id: c, text: "A connection leak: each lazy load opens another connection that is never closed" }
+          - { id: c, text: "A connection leak: each lazy load opens another connection that stays open" }
           - { id: d, text: "A cache stampede: 100 requests missed the cache and hit the database at once" }
         answer: a
         explanation: "One statement for the parent rows followed by the same child query once per row is the signature of N+1. An index would make each statement faster, but you'd still run 100 of them. Connections are reused here and there is no cache involved: the repeated statements come from lazy loading inside one request."
@@ -346,8 +346,8 @@ lessons:
         options:
           - { id: a, text: "UnexpectedRollbackException: the inner proxy marked the shared transaction rollback-only, so the outer commit fails" }
           - { id: b, text: "The good rows are committed and only the failing row is skipped, as the log message says" }
-          - { id: c, text: "Only the failing row's changes are rolled back, because the inner call used a savepoint" }
-          - { id: d, text: "The outer commit succeeds, because the exception was caught inside the loop and never reached the caller" }
+          - { id: c, text: "The failing row's changes are rolled back alone, because the inner call used a savepoint" }
+          - { id: d, text: "The outer commit succeeds, because the exception was caught inside the loop and did not reach the caller" }
         answer: a
         explanation: "With `REQUIRED` the inner call joins the outer transaction. When the exception leaves the inner proxy, Spring marks the whole transaction rollback-only, and catching it in the caller does not clear that mark. To skip bad rows independently use `REQUIRES_NEW` (or `NESTED`) on `importRow`, or validate before writing."
 
@@ -409,7 +409,7 @@ lessons:
           - { id: a, text: "Each distinct path and user pair creates a new time series, so unbounded tag values blow up memory" }
           - { id: b, text: "`counter()` is not thread-safe, so concurrent increments are lost under load" }
           - { id: c, text: "Tag keys must be unique across the whole application, so a second registration with other values fails at runtime" }
-          - { id: d, text: "Counters cannot carry tags at all, so Micrometer silently drops `path` and `user` from the output" }
+          - { id: d, text: "Counters are unable to carry tags, so Micrometer silently drops `path` and `user` from the output" }
         answer: a
         explanation: "Each unique tag combination is its own series. Keep tag values low-cardinality and bounded: the route template (`/orders/{id}`), the status class, the outcome. Spring's own `http.server.requests` metric tags the URI template, not the raw URI, for exactly this reason. Put per-user detail into logs and traces instead."
 
@@ -417,9 +417,9 @@ lessons:
         prompt: "`@WebMvcTest(OrderController::class)` fails with `NoSuchBeanDefinitionException: OrderService`. What is the idiomatic fix?"
         options:
           - { id: a, text: "Provide the collaborator as a mock bean (`@MockBean` or `@MockitoBean`): the slice loads only web-layer beans" }
-          - { id: b, text: "Replace it with `@SpringBootTest` for every controller test, so that the whole application context is available" }
+          - { id: b, text: "Replace it with `@SpringBootTest` for each controller test, so that the whole application context is available" }
           - { id: c, text: "Annotate `OrderService` with `@Controller` so that the web slice picks it up as a web-layer bean" }
-          - { id: d, text: "Disable component scanning in the test, so that no bean definitions are looked up at all" }
+          - { id: d, text: "Disable component scanning in the test, so that bean definitions are looked up nowhere" }
         answer: a
         explanation: "Test slices (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`, ...) start only the part of the context they are about: for MVC that is controllers, advice, converters and filters, but no `@Service` or `@Repository`. That keeps them fast and focused, and the missing collaborators become explicit test doubles. Use `@SpringBootTest` for the few tests that need the whole wiring."
 
