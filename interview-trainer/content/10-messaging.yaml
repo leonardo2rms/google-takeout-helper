@@ -1,7 +1,6 @@
 id: messaging
 title: Messaging & Events
-emoji: "📨"
-color: "#e8479b"
+icon: mail
 description: Kafka partitions, consumer groups and offsets, delivery guarantees, retries and dead letters, plus events, outbox, inbox and sagas.
 lessons:
   - id: msg-kafka

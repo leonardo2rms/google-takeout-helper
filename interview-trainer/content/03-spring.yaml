@@ -1,7 +1,6 @@
 id: spring
 title: Spring in Depth
-emoji: "🍃"
-color: "#58cc02"
+icon: leaf
 description: Proxies, transactions, auto-configuration, JPA pitfalls and the Spring + Kotlin gotchas.
 lessons:
   - id: spring-core

@@ -1,7 +1,6 @@
 id: scale
 title: Scale & Performance
-emoji: "⚡"
-color: "#ffc800"
+icon: network
 description: Load, caching, pools and the resilience patterns that keep microservices alive under pressure.
 lessons:
   - id: scale-load

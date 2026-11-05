@@ -21,7 +21,7 @@ export type AchievementGroup = 'start' | 'habit' | 'skills' | 'review' | 'explor
 export interface AchievementDef {
   id: string;
   title: string;
-  emoji: string;
+  icon: string;
   /** What it takes, in plain words (shown on locked badges too). */
   description: string;
   group: AchievementGroup;
@@ -72,47 +72,47 @@ export class Facts {
   }
 }
 
-const def = (id: string, group: AchievementGroup, emoji: string, title: string, description: string, test: (f: Facts) => boolean): AchievementDef => ({
-  id, group, emoji, title, description, test,
+const def = (id: string, group: AchievementGroup, icon: string, title: string, description: string, test: (f: Facts) => boolean): AchievementDef => ({
+  id, group, icon, title, description, test,
 });
 
 export const ACHIEVEMENTS: readonly AchievementDef[] = [
   // first steps
-  def('first-lesson', 'start', '🌱', 'First lesson', 'Finish any lesson.', (f) => f.lessonsDone >= 1),
-  def('perfect-lesson', 'start', '🏆', 'Perfect lesson', 'Answer every question of a lesson right on the first try.', (f) => f.p.stats.perfect >= 1),
-  def('perfect-5', 'skills', '🎯', 'Sharpshooter', 'Five perfect lessons.', (f) => f.p.stats.perfect >= 5),
-  def('rank-senior', 'skills', '🎖️', 'Senior', 'Reach the Senior rank.', (f) => rankFor(f.p.xp).index >= 2),
+  def('first-lesson', 'start', 'sprout', 'First lesson', 'Finish any lesson.', (f) => f.lessonsDone >= 1),
+  def('perfect-lesson', 'start', 'award', 'Perfect lesson', 'Answer every question of a lesson right on the first try.', (f) => f.p.stats.perfect >= 1),
+  def('perfect-5', 'skills', 'target', 'Sharpshooter', 'Five perfect lessons.', (f) => f.p.stats.perfect >= 5),
+  def('rank-senior', 'skills', 'medal', 'Senior', 'Reach the Senior rank.', (f) => rankFor(f.p.xp).index >= 2),
 
   // habit (days practised, never "days in a row without a miss")
-  def('streak-7', 'habit', '🔥', 'A week in a row', 'Practise 7 days in a row (rest days and freezes count).', (f) => f.p.longestStreak >= 7),
-  def('streak-30', 'habit', '🌋', 'A month in a row', 'Practise 30 days in a row (rest days and freezes count).', (f) => f.p.longestStreak >= 30),
-  def('practice-days-10', 'habit', '📅', 'Ten days practised', 'Practise on 10 different days.', (f) => f.p.stats.practiceDays >= 10),
-  def('practice-days-30', 'habit', '🗓️', 'Thirty days practised', 'Practise on 30 different days, in any order.', (f) => f.p.stats.practiceDays >= 30),
-  def('goal-getter', 'habit', '⭕', 'Goal getter', 'Reach your daily goal on 7 different days.', (f) => f.goalDays >= 7),
-  def('comeback', 'habit', '👋', 'Welcome back', 'Practise again after a week or more away.', (f) => f.cameBack),
+  def('streak-7', 'habit', 'flame', 'A week in a row', 'Practise 7 days in a row (rest days and freezes count).', (f) => f.p.longestStreak >= 7),
+  def('streak-30', 'habit', 'mountain', 'A month in a row', 'Practise 30 days in a row (rest days and freezes count).', (f) => f.p.longestStreak >= 30),
+  def('practice-days-10', 'habit', 'calendar-days', 'Ten days practised', 'Practise on 10 different days.', (f) => f.p.stats.practiceDays >= 10),
+  def('practice-days-30', 'habit', 'calendar-check', 'Thirty days practised', 'Practise on 30 different days, in any order.', (f) => f.p.stats.practiceDays >= 30),
+  def('goal-getter', 'habit', 'goal', 'Goal getter', 'Reach your daily goal on 7 different days.', (f) => f.goalDays >= 7),
+  def('comeback', 'habit', 'hand', 'Welcome back', 'Practise again after a week or more away.', (f) => f.cameBack),
 
   // skills: one badge per format that is hard to fake
-  def('first-code', 'skills', '💻', 'Code challenge passed', 'Pass a code challenge.', (f) => f.passed('code') >= 1),
-  def('first-spot', 'skills', '🐞', 'Bug spotter', 'Find your first bug in a spot-the-bug question.', (f) => f.passed('spot') >= 1),
-  def('first-estimate', 'skills', '🧮', 'Back of the envelope', 'Get a numeric estimate right.', (f) => f.passed('estimate') >= 1),
-  def('first-open', 'skills', '🎤', 'In your own words', 'Pass an open question.', (f) => f.passed('open') >= 1),
-  def('all-formats', 'skills', '🧩', 'Every format', 'Pass at least one question of each of the nine formats.', (f) => TYPES.every((t) => f.passed(t) >= 1)),
-  def('topic-mastery', 'skills', '⭐', 'Topic mastered', 'Bring any topic to 80% recall strength.', (f) => f.topics.some((t) => t.strength >= 0.8)),
+  def('first-code', 'skills', 'terminal', 'Code challenge passed', 'Pass a code challenge.', (f) => f.passed('code') >= 1),
+  def('first-spot', 'skills', 'bug', 'Bug spotter', 'Find your first bug in a spot-the-bug question.', (f) => f.passed('spot') >= 1),
+  def('first-estimate', 'skills', 'calculator', 'Back of the envelope', 'Get a numeric estimate right.', (f) => f.passed('estimate') >= 1),
+  def('first-open', 'skills', 'mic', 'In your own words', 'Pass an open question.', (f) => f.passed('open') >= 1),
+  def('all-formats', 'skills', 'puzzle', 'Every format', 'Pass at least one question of each of the nine formats.', (f) => TYPES.every((t) => f.passed(t) >= 1)),
+  def('topic-mastery', 'skills', 'star', 'Topic mastered', 'Bring any topic to 80% recall strength.', (f) => f.topics.some((t) => t.strength >= 0.8)),
 
   // review
-  def('reviews-50', 'review', '🔁', '50 reviews', 'Answer and schedule 50 reviews in total.', (f) => f.reviews >= 50),
-  def('reviews-250', 'review', '♻️', '250 reviews', 'Answer and schedule 250 reviews in total.', (f) => f.reviews >= 250),
-  def('questions-100', 'review', '💯', '100 questions', 'Answer 100 questions.', (f) => f.p.stats.answered >= 100),
-  def('calibrated', 'review', '🧭', 'Self-aware', 'Rate your confidence on 30 questions.', (f) => f.ratings >= 30),
+  def('reviews-50', 'review', 'repeat', '50 reviews', 'Answer and schedule 50 reviews in total.', (f) => f.reviews >= 50),
+  def('reviews-250', 'review', 'repeat-2', '250 reviews', 'Answer and schedule 250 reviews in total.', (f) => f.reviews >= 250),
+  def('questions-100', 'review', 'hash', '100 questions', 'Answer 100 questions.', (f) => f.p.stats.answered >= 100),
+  def('calibrated', 'review', 'compass', 'Self-aware', 'Rate your confidence on 30 questions.', (f) => f.ratings >= 30),
 
   // explore
-  def('topic-explorer', 'explore', '🗺️', 'Explorer', 'Try at least one question in every topic.', (f) => f.topics.length > 0 && f.topics.every((t) => t.seen > 0)),
-  def('mock-first', 'explore', '⏱️', 'Mock interview done', 'Finish a timed mock interview.', (f) => f.p.mocks.length >= 1),
-  def('mock-strong', 'explore', '🥇', 'Strong mock', 'Score 80% or more in a mock interview.', (f) => f.p.mocks.some((m) => m.score >= 80)),
-  def('curator', 'explore', '🔖', 'Curator', 'Save 5 questions to your library.', (f) => Object.keys(f.p.bookmarks).length >= 5),
-  def('note-taker', 'explore', '📝', 'Note taker', 'Write your first note on a question.', (f) => Object.keys(f.p.notes).length >= 1),
-  def('challenge-first', 'explore', '🧩', 'Daily challenger', 'Take a daily challenge.', (f) => f.challenge.done >= 1),
-  def('challenge-7', 'explore', '📆', 'Challenge week', 'Take the daily challenge 7 days in a row.', (f) => f.challenge.best >= 7),
+  def('topic-explorer', 'explore', 'map', 'Explorer', 'Try at least one question in every topic.', (f) => f.topics.length > 0 && f.topics.every((t) => t.seen > 0)),
+  def('mock-first', 'explore', 'timer', 'Mock interview done', 'Finish a timed mock interview.', (f) => f.p.mocks.length >= 1),
+  def('mock-strong', 'explore', 'gauge', 'Strong mock', 'Score 80% or more in a mock interview.', (f) => f.p.mocks.some((m) => m.score >= 80)),
+  def('curator', 'explore', 'bookmark', 'Curator', 'Save 5 questions to your library.', (f) => Object.keys(f.p.bookmarks).length >= 5),
+  def('note-taker', 'explore', 'square-pen', 'Note taker', 'Write your first note on a question.', (f) => Object.keys(f.p.notes).length >= 1),
+  def('challenge-first', 'explore', 'puzzle', 'Daily challenger', 'Take a daily challenge.', (f) => f.challenge.done >= 1),
+  def('challenge-7', 'explore', 'calendar-range', 'Challenge week', 'Take the daily challenge 7 days in a row.', (f) => f.challenge.best >= 7),
 ];
 
 export const ACHIEVEMENT_GROUPS: Record<AchievementGroup, string> = {

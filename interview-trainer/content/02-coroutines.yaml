@@ -1,7 +1,6 @@
 id: coroutines
 title: Coroutines & Concurrency
-emoji: "🧵"
-color: "#1cb0f6"
+icon: workflow
 description: Structured concurrency, dispatchers, Flow and the failure modes interviewers love.
 lessons:
   - id: coroutines-basics

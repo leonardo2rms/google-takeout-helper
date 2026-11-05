@@ -1,7 +1,6 @@
 id: data
 title: Data & Persistence
-emoji: "🗄️"
-color: "#14b8a6"
+icon: database
 description: Indexes and query plans, isolation levels, optimistic and pessimistic locking, JPA pitfalls, pagination, migrations and caching.
 lessons:
   - id: data-sql
