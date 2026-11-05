@@ -25,7 +25,7 @@ lessons:
         hint: "What would the JVM need in order to represent \"not assigned yet\" for a primitive? And which keyword allows reassignment?"
         prompt: Select all statements that are true about `lateinit`.
         options:
-          - { id: a, text: "It can only be applied to `var` properties" }
+          - { id: a, text: "It can only be applied to a `var`, not to a `val`" }
           - { id: b, text: "It works on `Int` properties because the compiler boxes them behind the scenes" }
           - { id: c, text: "The property type must be non-nullable" }
           - { id: d, text: "Reading it too early throws an exception (UninitializedPropertyAccessException)" }
