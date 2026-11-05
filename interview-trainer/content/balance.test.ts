@@ -157,6 +157,13 @@ describe('style tells: the lint itself', () => {
     expect([...bagOfWords(unique).values()].every((x) => Math.abs(x - 0.25) < 1e-9)).toBe(true);
   });
 
+  it('the bag-of-words attacker is not fooled into preferring options with more unseen words', () => {
+    // The answer is always the option with one word; distractors have many words nobody else uses. A classifier that
+    // rewarded unseen words would pick a distractor every time; a neutral one ties at chance or learns nothing worse.
+    const wordy = Array.from({ length: 12 }, (_, i) => q(`w/${i}`, 'u', [uniq(i, 0), ...[1, 2, 3].map((j) => `${uniq(i, j)} ${uniq(i + 100, j)} ${uniq(i + 200, j)}`)], [0]));
+    expect([...bagOfWords(wordy).values()].every((x) => Math.abs(x - 0.25) < 1e-9)).toBe(true);
+  });
+
   it('fails a course whose answers are styled differently, and names the fix', () => {
     const biased = Array.from({ length: 20 }, (_, i) =>
       q(`s/${i}`, 'u', [`Retry (with backoff) or fail ${i}`, `It fails because of locks ${i}`, `It fails since it waits ${i}`, `It fails which is slow ${i}`], [0]),

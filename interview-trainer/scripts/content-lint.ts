@@ -252,7 +252,7 @@ export function combinedScore(c: Choice, o: Opt): number {
 export const tokens = (t: string): Set<string> => new Set(t.toLowerCase().match(/[a-z]+|[(;:]/g) ?? []);
 
 /**
- * Leave-one-question-out Bernoulli naive Bayes on option tokens: trained on every other single, it picks the option
+ * Leave-one-question-out naive Bayes on the tokens present in an option (add-one smoothing spread by class size): trained on every other single, it picks the option
  * whose tokens look most like correct options. Returns the expected accuracy per question id.
  */
 export function bagOfWords(singles: Choice[]): Map<string, number> {
@@ -276,7 +276,10 @@ export function bagOfWords(singles: Choice[]): Map<string, number> {
       let s = 0;
       for (const w of tokens(o.text)) {
         const cw = (inC.get(w) ?? 0) - (dC.get(w) ?? 0), dw = (inD.get(w) ?? 0) - (dD.get(w) ?? 0);
-        s += Math.log((cw + 1) / (NC + 2)) - Math.log((dw + 1) / (ND + 2));
+        // Smoothed towards the pooled rate, so a word never seen in training scores exactly 0 instead of favouring
+        // the smaller class (there are three distractors per answer) and with it options that use more rare words.
+        // One pseudo-observation split by class size: an unseen word has rate 1/N in both classes.
+        s += Math.log((cw + NC / (NC + ND)) / NC) - Math.log((dw + ND / (NC + ND)) / ND);
       }
       return s;
     };
