@@ -376,8 +376,7 @@ The look is documented in [`docs/design-system.md`](docs/design-system.md). In s
 ## Roadmap
 
 The complete list of what is built and what is pending (prioritised, with context, files and acceptance criteria for each
-item) is in the [handoff](docs/HANDOFF.md). Headlines: remove the remaining answer-style tells in choice questions,
-verify real AI grading and the hosted page outside the sandbox, upgrade zod, resume a quit lesson, the architecture
+item) is in the [handoff](docs/HANDOFF.md). Headlines: verify real AI grading and the hosted page outside the sandbox, upgrade zod, resume a quit lesson, the architecture
 board question type, a sandboxed Kotlin runner, and monetization.
 
 ## Documentation

@@ -27,7 +27,7 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,492 unit/content/docs tests (vitest) |
+| `npm test` | 1,504 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
 | `npm run e2e` | 302 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
@@ -62,10 +62,12 @@ use the viewer's own Claude account through `sample`; exports use `downloads`).
 - **Machine-checked integrity** (all in `npm test`): every code question's reference solution passes its tests and its
   starter fails; every open answer and follow-up model answer satisfies its own offline rubric; every lesson mixes 3+
   types and ends with an open question that has a "missed" and a "covered" follow-up; option balance ratchet in
-  `content/balance.test.ts` (correct answer strictly longest in at most 30% overall; it was 83%); British spelling;
+  `content/balance.test.ts` (correct answer strictly longest in at most 30% overall, it was 83%; no style feature or
+  fixed attacker beats chance by much, see P1-1); British spelling;
   README counts match the course; docs examples and paths are valid (`content/docs.test.ts`).
 - **Human-style review done:** two fact-check passes over all new content (1 hard error fixed, ~15 claims softened), a
-  fact-check of the 458 rewritten answer options (0 accidental second answers, 9 fixes). Residual uncertainty: P1-7.
+  fact-check of the 458 rewritten answer options (0 accidental second answers, 9 fixes), and a fact-check of the 354
+  options restyled for P1-1 (0 errors, 9 tightened). Residual uncertainty: P1-7.
 
 ### 2.2 Lessons and question types
 
@@ -159,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,492 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
+1,504 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -191,17 +193,21 @@ Ids are stable so commits and sessions can refer to them. Audit ids in brackets 
 
 ### P1: do next
 
-**P1-1 Remove the remaining answer-style tells in choice questions** [N-S1-2]
-- *Why:* the training value of choice questions depends on not being gameable. After rebalancing lengths, the round-2
-  audit measured: an option containing `(`, `;` or `:` is correct 53% of the time (chance 25%); options containing
-  "or" 40%; 57% of distractors now carry a causal clause ("because ...", up from 14%), so "because" marks wrong
-  answers; a hand-written rule scores 63.5% and a bag-of-words classifier 58.6%.
-- *Where:* `scripts/content-lint.ts` (measure), `content/balance.test.ts` (ratchet), `content/` YAML, the
-  "Balanced options" section of [content-guide.md](content-guide.md).
-- *Done when:* the lint reports these features per unit; the ratchet bounds each (e.g. correct-given-feature within 25%
-  ± 10 points, causal-clause share similar for answers and distractors) and a simple leave-one-out classifier stays near
-  chance; offending options rewritten without changing answer keys; a fact-check pass confirms no distractor became
-  defensible; full test suite green. *Size:* M-L (content-heavy).
+**P1-1 Remove the remaining answer-style tells in choice questions** [N-S1-2]: **done** (2026-11-05).
+- `scripts/content-lint.ts` now measures asides (`(`, `;`, `:` outside code spans), "or", causal clauses and absolute
+  words for correct options vs distractors, plus three attackers fixed in advance: the audit's combined rule, the same
+  rule reversed (catches over-correction), and a leave-one-question-out naive Bayes bag of words.
+  `content/balance.test.ts` ratchets all of them on the real course (limits in the "Balanced options" section of
+  [content-guide.md](content-guide.md)); `npm run content:lint -- --unit <ids>` and `-- --offenders` help authors.
+- 354 options in 139 questions were rewritten by four writers in parallel, then reviewed by three independent
+  fact-checkers (150 questions: 0 wrong facts, 0 second defensible answers, 9 loose wordings tightened). A script
+  confirmed no answer key, option id, prompt or other field changed.
+- Before → after (single questions, chance 25%): "pick the option with ( ; :" 54% → 19%; "pick the one with 'or'" 40%
+  → 25%; "avoid the causal one" 37% → 23%; combined rule 64% → 15% (reversed 23%); bag of words 55% → 32% (the
+  audit's own classifier reported 58.6%); the answer is the shortest option 12% → 20%.
+- Left as is: per unit the bag of words still reaches 44-50% in spring, ddd, complexity and data (6 to 14 single
+  questions each, so a couple of questions move it 10 points; the ratchet bounds the whole course at 40%), and in data
+  the answer is never the shortest option (0 of 6). Worth a look when those units next get new questions.
 
 **P1-2 Content clean-ups the audits listed** [S2-25, N-S2-13, round-1 content notes]
 - Duplicate open question "Design a rate limiter for a public API..." in `content/06-scale.yaml` (lesson
