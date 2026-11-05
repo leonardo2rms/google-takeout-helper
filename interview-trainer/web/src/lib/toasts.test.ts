@@ -9,7 +9,7 @@ vi.mock('react', () => ({
   },
 }));
 
-const badge = (id: string): AchievementDef => ({ id, title: `T-${id}`, emoji: 'e', description: `D-${id}`, group: 'start', test: () => true });
+const badge = (id: string): AchievementDef => ({ id, title: `T-${id}`, icon: 'sprout', description: `D-${id}`, group: 'start', test: () => true });
 
 describe('badge toast queue', () => {
   beforeEach(() => vi.resetModules());
@@ -30,7 +30,7 @@ describe('badge toast queue', () => {
   it('copies only the display fields (never the test function)', async () => {
     const t = await import('./toasts');
     t.pushBadgeToast([badge('a')]);
-    expect(Object.keys(t.useBadgeToast()!.badges[0]!).sort()).toEqual(['description', 'emoji', 'id', 'title']);
+    expect(Object.keys(t.useBadgeToast()!.badges[0]!).sort()).toEqual(['description', 'icon', 'id', 'title']);
   });
 
   it('ignores an empty push', async () => {

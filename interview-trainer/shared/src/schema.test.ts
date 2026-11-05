@@ -89,9 +89,12 @@ describe('structure limits', () => {
     expect(parse([noType]).success).toBe(false);
   });
 
-  it('unit colour defaults to green and any string is accepted', () => {
+  it('unit colour is a legacy optional field: no default any more (the UI uses design tokens), any string is accepted', () => {
     const c = Course.parse(courseWith(filler(3)));
-    expect(c.units[0]!.color).toBe('#58cc02');
+    expect(c.units[0]!.color).toBeUndefined();
+    const withColour = courseWith(filler(3));
+    (withColour.units[0] as Record<string, unknown>)['color'] = 'rebeccapurple';
+    expect(Course.parse(withColour).units[0]!.color).toBe('rebeccapurple');
   });
 });
 

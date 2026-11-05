@@ -54,11 +54,15 @@ function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number
   }
 }
 
-/** A gauge of `ticks` segments, filled in proportion to `pct` (the same idiom as the in-app progress gauges). */
+/**
+ * A gauge of `ticks` segments, filled in proportion to `pct` (the same idiom as the in-app progress gauges).
+ * Any progress above zero lights at least one segment, so 1-2% never looks the same as "nothing yet".
+ */
 function gauge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pct: number, ticks = 20): void {
   const gap = 4;
   const seg = (w - gap * (ticks - 1)) / ticks;
-  const on = Math.round((Math.min(100, Math.max(0, pct)) / 100) * ticks);
+  const clamped = Math.min(100, Math.max(0, pct));
+  const on = clamped > 0 ? Math.max(1, Math.round((clamped / 100) * ticks)) : 0;
   for (let i = 0; i < ticks; i++) {
     ctx.fillStyle = i < on ? C.ink : C.hairline;
     ctx.fillRect(x + i * (seg + gap), y, seg, h);
