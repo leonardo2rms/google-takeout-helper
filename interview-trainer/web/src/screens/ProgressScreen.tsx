@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
-import { READINESS_TEXT, readiness, topicStats, type Course, type Progress, type TopicStat } from '@trainer/shared';
+import { READINESS_TEXT, canNameWeakest, readiness, topicStats, type Course, type Progress, type TopicStat } from '@trainer/shared';
 import { Calibration } from '../components/Calibration';
 import { Icon } from '../components/icons';
 import { MockHistory } from '../components/MockHistory';
 import { TrophyCase } from '../components/TrophyCase';
 import { ShareCardButton } from '../components/ShareCardButton';
-import { READINESS_NEEDS } from '../lib/home-copy';
+import { READINESS_NEEDS, dueText } from '../lib/home-copy';
 import { useToday } from '../lib/today';
 import { unitStyle } from '../lib/unit-style';
 
@@ -21,7 +21,8 @@ export function ProgressScreen({ course, progress }: Props) {
   const ready = useMemo(() => readiness(course, progress, today), [course, progress, today]);
   const topics = useMemo(() => topicStats(course, progress, today), [course, progress, today]);
   const styleOf = (id: string) => unitStyle(course.units.find((u) => u.id === id) ?? { id });
-  const weakest = topics.find((t) => t.unitId === ready.weakestUnitId);
+  // "Weakest" is only said once three topics are under way; with fewer it is just the only topic you have started.
+  const weakest = canNameWeakest(topics) ? topics.find((t) => t.unitId === ready.weakestUnitId) : undefined;
   const started = topics.filter((t) => t.seen > 0);
   const idle = topics.filter((t) => t.seen === 0);
   const topicRow = (t: TopicStat) => (
@@ -42,7 +43,7 @@ export function ProgressScreen({ course, progress }: Props) {
         <div style={{ width: `${pct(t.strength)}%` }} />
       </div>
       <div className="topic-foot">
-        <small className="muted">{t.seen}/{t.total} seen{t.due > 0 ? ` · ${t.due} due` : ''}{t.mastered > 0 ? ` · ${t.mastered} mastered` : ''}</small>
+        <small className="muted">{t.seen}/{t.total} seen{t.due > 0 ? ` · ${dueText(t.due)}` : ''}{t.mastered > 0 ? ` · ${t.mastered} mastered` : ''}</small>
         <a href={`#/topic/${t.unitId}`} aria-label={`Practise ${t.title}`} className="practise-link">Practise</a>
       </div>
     </li>
@@ -62,6 +63,9 @@ export function ProgressScreen({ course, progress }: Props) {
           <>
             <p className="big-number" data-testid="readiness-score">{ready.score}</p>
             <p><b data-testid="readiness-label">{READINESS_TEXT[ready.label]}</b> · {pct(ready.coverage)}% of the course seen</p>
+            {weakest && ready.heldBack && (
+              <p className="muted" data-testid="readiness-held-back">Held at {READINESS_TEXT[ready.label]} by {weakest.title} ({pct(weakest.strength)}%), your weakest topic.</p>
+            )}
           </>
         ) : (
           <>

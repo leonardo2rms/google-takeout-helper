@@ -133,7 +133,7 @@ test.describe('reminders: notification when the app is opened', () => {
     await expect.poll(() => notes(page)).toHaveLength(1);
     const [n] = await notes(page);
     expect(n!.title).toBe('Interview Trainer');
-    expect(n!.body).toMatch(/^5 questions are ready to review/);
+    expect(n!.body).toMatch(/^5 questions are due for review/);
     expect(n!.body).not.toMatch(/streak|lose|miss|!/i);
     expect((await stored(page))!.prefs.reminders.lastNotified).toBe('2026-11-04');
 

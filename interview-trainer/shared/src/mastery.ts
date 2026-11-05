@@ -65,7 +65,7 @@ export const READINESS_TEXT: Record<ReadinessLabel, string> = {
   early: 'Early estimate',
   building: 'Building',
   solid: 'Solid',
-  ready: 'Interview-ready',
+  ready: 'Strong',
 };
 const LABELS: ReadinessLabel[] = ['early', 'building', 'solid', 'ready'];
 
@@ -73,6 +73,14 @@ const LABELS: ReadinessLabel[] = ['early', 'building', 'solid', 'ready'];
 export const READINESS_MIN_COVERAGE = 0.25;
 /** A topic needs this many seen questions before it can be called the weakest: one wrong answer is not a weak topic. */
 export const WEAKEST_MIN_SEEN = 3;
+/** ...and this many topics must be started before one is called "your weakest": with one topic started it is simply the only one. */
+export const WEAKEST_MIN_TOPICS = 3;
+/** A topic below this strength holds the readiness label down to "Solid" at most, so a high average cannot hide a weak topic. */
+export const WEAKEST_CAP_BELOW = 0.5;
+
+/** Whether enough topics are started for "weakest topic" to mean something. */
+export const canNameWeakest = (topics: readonly Pick<TopicStat, 'seen'>[]): boolean =>
+  topics.filter((t) => t.seen >= WEAKEST_MIN_SEEN).length >= WEAKEST_MIN_TOPICS;
 
 export interface Readiness {
   /** 0-100: an estimate of how much of THIS COURSE you would recall today. Not a prediction of any outcome. */
@@ -83,13 +91,19 @@ export interface Readiness {
   /** Whether enough of the course has been seen (`READINESS_MIN_COVERAGE`) for the score to be worth showing. */
   enough: boolean;
   weakestUnitId: string | null;
+  /** The label was lowered because the weakest topic is below `WEAKEST_CAP_BELOW`. */
+  heldBack: boolean;
 }
 
-/** Both coverage and score have to support a label, so "Interview-ready" cannot be reached by seeing everything once. */
-export function labelFor(coverage: number, score: number): ReadinessLabel {
+/**
+ * Coverage, score and the weakest topic all have to support a label, so "Strong" cannot be reached by seeing everything once,
+ * nor while one topic is still below `WEAKEST_CAP_BELOW` (pass its strength as `weakest`).
+ */
+export function labelFor(coverage: number, score: number, weakest: number | null = null): ReadinessLabel {
   const byCoverage = coverage < 0.3 ? 0 : coverage < 0.6 ? 1 : coverage < 0.8 ? 2 : 3;
   const byScore = score < 20 ? 0 : score < 45 ? 1 : score < 70 ? 2 : 3;
-  return LABELS[Math.min(byCoverage, byScore)]!;
+  const byWeakest = weakest !== null && weakest < WEAKEST_CAP_BELOW ? 2 : 3;
+  return LABELS[Math.min(byCoverage, byScore, byWeakest)]!;
 }
 
 export function readiness(course: Course, p: Progress, today: Day, weights?: Record<string, number>): Readiness {
@@ -110,7 +124,16 @@ export function readiness(course: Course, p: Progress, today: Day, weights?: Rec
   const coverage = total === 0 ? 0 : seen / total;
   const started = stats.filter((s) => s.seen >= WEAKEST_MIN_SEEN);
   const weakest = started.length ? started.reduce((a, b) => (b.strength < a.strength ? b : a)) : undefined;
-  return { score, coverage, label: labelFor(coverage, score), enough: coverage >= READINESS_MIN_COVERAGE, weakestUnitId: weakest?.unitId ?? null };
+  const weakestStrength = canNameWeakest(stats) && weakest ? weakest.strength : null;
+  const label = labelFor(coverage, score, weakestStrength);
+  return {
+    score,
+    coverage,
+    label,
+    enough: coverage >= READINESS_MIN_COVERAGE,
+    weakestUnitId: weakest?.unitId ?? null,
+    heldBack: label !== labelFor(coverage, score),
+  };
 }
 
 function questionsOf(course: Course, unitId: string): Question[] {

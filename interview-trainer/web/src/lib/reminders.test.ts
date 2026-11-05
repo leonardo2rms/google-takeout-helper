@@ -160,7 +160,7 @@ describe('useReminderCheck', () => {
     await startCheck();
     expect(FakeNotification.instances).toHaveLength(1);
     expect(FakeNotification.instances[0]!.title).toBe('Interview Trainer');
-    expect(FakeNotification.instances[0]!.options.body).toMatch(/1 question is ready to review/);
+    expect(FakeNotification.instances[0]!.options.body).toMatch(/1 question is due for review/);
     expect(saved().prefs.reminders.lastNotified).toBe('2026-06-15');
 
     // Coming back to the tab the same day does not show it again.

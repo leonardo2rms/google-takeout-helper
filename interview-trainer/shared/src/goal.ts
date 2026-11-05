@@ -18,6 +18,28 @@ export interface GoalToday {
   comeback: boolean;
 }
 
+/**
+ * How goal progress is shown everywhere (Home ring, summary, goal sheet): never more than the target, so "8/8"; whatever
+ * was done beyond it is a separate, named bonus ("+11 bonus"). This keeps "8 of 8" and "19 of 8" from ever contradicting.
+ */
+export interface GoalDisplay {
+  /** min(done, target). */
+  shown: number;
+  target: number;
+  /** done - target when the goal is met, else 0. */
+  bonus: number;
+  /** "8/8". */
+  ratio: string;
+  /** "8 of 8 questions today". */
+  sentence: string;
+}
+
+export function goalDisplay(g: Pick<GoalToday, 'done' | 'target'>): GoalDisplay {
+  const shown = Math.min(g.done, g.target);
+  const bonus = Math.max(0, g.done - g.target);
+  return { shown, target: g.target, bonus, ratio: `${shown}/${g.target}`, sentence: `${shown} of ${g.target} questions today` };
+}
+
 /** The target that applies on `today` and whether it is the halved comeback goal. */
 export function targetFor(p: Progress, today: Day): { target: number; comeback: boolean } {
   const log = p.days[today];

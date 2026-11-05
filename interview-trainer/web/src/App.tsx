@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
   ACHIEVEMENTS, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
-  reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
+  reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
@@ -41,7 +41,6 @@ const go = (route: string) => {
 };
 
 const MIX_SIZE = 8;
-const REVIEW_SIZE = 10;
 
 type PracticeKind = Exclude<SessionKind, 'lesson'>;
 
@@ -84,7 +83,7 @@ function Shell() {
       >
         Skip to main content
       </a>
-      <DataSafetyBanners />
+      <DataSafetyBanners route={route} />
       <main id="main" tabIndex={-1}>
         <Screens />
       </main>
@@ -254,7 +253,7 @@ function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string):
   const seed = dayNumber(today) * 131 + progress.stats.sessions;
   switch (kind) {
     case 'review':
-      return reviewQueue(progress, allQuestions(course), today, unitOfFor(course)).all.slice(0, REVIEW_SIZE);
+      return reviewQueue(progress, allQuestions(course), today, unitOfFor(course)).all.slice(0, REVIEW_SESSION_SIZE);
     case 'challenge': {
       const c = challengeQuestion(course, today);
       return c ? [c] : [];

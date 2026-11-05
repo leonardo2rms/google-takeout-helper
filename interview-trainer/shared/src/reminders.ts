@@ -119,7 +119,7 @@ export interface NotifyInput {
   prefs: RemindersPrefs;
   now: Date;
   today: Day;
-  /** Questions ready to review right now. */
+  /** Cards whose due date has arrived (see `dueOverview`). */
   dueCount: number;
   /** The learner already practised today: no reminder needed. */
   practicedToday: boolean;
@@ -148,7 +148,7 @@ export function reminderDecision(i: NotifyInput): NotifyDecision {
   return {
     show: true,
     title: 'Interview Trainer',
-    body: `${n >= 30 ? '30+' : n} ${n === 1 ? 'question is' : 'questions are'} ready to review. A short session takes about five minutes, whenever it suits you.`,
+    body: `${n} ${n === 1 ? 'question is' : 'questions are'} due for review. A short session takes about five minutes, whenever it suits you.`,
   };
 }
 

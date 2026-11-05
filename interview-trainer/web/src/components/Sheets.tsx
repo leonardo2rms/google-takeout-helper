@@ -1,4 +1,4 @@
-import { GOAL_PRESETS, MAX_FREEZES, answeredInLast, goalToday, lastDays, setGoalTarget, streakStatus, type Progress } from '@trainer/shared';
+import { GOAL_PRESETS, MAX_FREEZES, answeredInLast, goalDisplay, goalToday, lastDays, setGoalTarget, streakStatus, type Progress } from '@trainer/shared';
 import { plural } from '../lib/format';
 import { Icon } from './icons';
 import { DayChart } from './DayChart';
@@ -48,13 +48,14 @@ const GOAL_LABELS: [keyof typeof GOAL_PRESETS, string][] = [['light', 'Light'], 
 
 export function GoalSheet({ progress, today, update, onClose }: Props) {
   const g = goalToday(progress, today);
+  const shown = goalDisplay(g);
   const week = answeredInLast(progress, today, 7);
   return (
     <Sheet title="Daily goal" onClose={onClose}>
-      <p className="big-number" data-testid="goal-value">{g.done} of {g.target} questions today</p>
+      <p className="big-number" data-testid="goal-value">{shown.sentence}</p>
       {g.comeback && <p>Easy restart: {g.target} today. Welcome back.</p>}
       {g.done === 0 && !g.comeback && <p className="muted">{GOAL_PRESETS.light} questions is about five minutes.</p>}
-      {g.met && <p>Goal met. Anything more is a bonus.</p>}
+      {g.met && <p>{shown.bonus > 0 ? `Goal met, plus ${plural(shown.bonus, 'bonus question')}.` : 'Goal met. Anything more is a bonus.'}</p>}
       <DayChart bars={lastDays(progress, today, 14)} />
       <dl className="facts">
         <div><dt>Days practised overall</dt><dd>{progress.stats.practiceDays}</dd></div>

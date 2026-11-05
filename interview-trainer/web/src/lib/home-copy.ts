@@ -1,8 +1,8 @@
-import { READINESS_MIN_COVERAGE, READINESS_TEXT, type Progress, type Readiness } from '@trainer/shared';
-import { cappedCount } from './format';
+import { READINESS_MIN_COVERAGE, READINESS_TEXT, REVIEW_SESSION_SIZE, type Progress, type Readiness } from '@trainer/shared';
+import { plural } from './format';
 
 /** How many cards one Review session takes (the rest wait for the next one). */
-export const REVIEW_SIZE = 10;
+export const REVIEW_SIZE = REVIEW_SESSION_SIZE;
 
 /**
  * How much of Home to show. A brand-new learner gets one next step; the practice modes join as they become useful.
@@ -20,16 +20,48 @@ export function homeTier(p: Pick<Progress, 'stats' | 'lessons' | 'cards'>): Home
   return lessons >= FULL_HOME_AFTER_LESSONS ? 2 : 1;
 }
 
-/** The Review card's second line: how many cards are ready, and that one round takes a handful (so "30+" never reads as a debt). */
-export function dueLine(due: number): string {
-  if (due === 0) return 'All caught up';
-  if (due <= REVIEW_SIZE) return `${due} ready to review`;
-  return `${cappedCount(due)} ready · ${REVIEW_SIZE} at a time`;
+/** The one phrase for the one meaning of "due" (a card whose due date has arrived): "5 due". */
+export const dueText = (n: number): string => `${n} due`;
+
+/**
+ * The Review card's second line. `due` is the number of cards whose date has arrived (the same figure as Today and Progress);
+ * `retry` are earlier misses that are not due yet, named separately so they never inflate "due".
+ */
+export function dueLine(due: number, retry = 0): string {
+  if (due === 0 && retry === 0) return 'All caught up';
+  const parts: string[] = [];
+  if (due > 0) parts.push(due > REVIEW_SIZE ? `${dueText(due)} · ${REVIEW_SIZE} per session` : dueText(due));
+  if (retry > 0) parts.push(`${retry} missed to retry`);
+  return parts.join(' · ');
 }
 
 /** "5 due" in Today's card, and "5 of 24 due" when there are more due cards than Today has room for. */
 export function dueInToday(inToday: number, totalDue: number): string {
-  return totalDue > inToday ? `${inToday} of ${totalDue} due` : `${inToday} due`;
+  return totalDue > inToday ? `${inToday} of ${totalDue} due` : dueText(inToday);
+}
+
+/** "3 to reinforce" (never "weak spots": a flawless lesson has none, and it reads as a reproach). */
+export const reinforceText = (n: number): string => `${n} to reinforce`;
+
+export interface GoalMetHero {
+  href: string;
+  title: string;
+  sub: string;
+  cta: string;
+  /** What the single suggestion is. */
+  next: 'review' | 'lesson' | 'more';
+}
+
+/**
+ * Home's hero once today's goal is met: no longer "Today" (that session is done), but a calm "done" with the one best optional
+ * next step: reviewing what is due, else the next lesson, else more practice.
+ */
+export function goalMetHero(i: { done: number; target: number; due: number; nextLesson?: { id: string; title: string } | null }): GoalMetHero {
+  const bonus = Math.max(0, i.done - i.target);
+  const said = bonus > 0 ? `Goal met, plus ${plural(bonus, 'bonus question')}.` : `Goal met: ${plural(i.target, 'question')}.`;
+  if (i.due > 0) return { href: '#/review', title: 'Done for today', sub: `${said} Optional: review ${dueText(i.due)}.`, cta: 'Review', next: 'review' };
+  if (i.nextLesson) return { href: `#/lesson/${i.nextLesson.id}`, title: 'Done for today', sub: `${said} Optional: ${i.nextLesson.title}.`, cta: 'Next lesson', next: 'lesson' };
+  return { href: '#/daily', title: 'Done for today', sub: `${said} Optional: a bonus round.`, cta: 'Keep going', next: 'more' };
 }
 
 /** The Progress card on Home: the score only once there is enough of the course behind it to mean something. */

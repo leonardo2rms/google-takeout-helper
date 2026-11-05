@@ -1,66 +1,127 @@
 import { useEffect, useMemo, useState } from 'react';
 import { backupFileName, dayKey, importProgress, summarizeProgress, type ParkedCopy } from '@trainer/shared';
 import { copyText, saveTextFile } from '../lib/files';
-import { acknowledgeRecovered, exportText, importContext, listParkedCopies, mergeIntoProgress, replaceProgress, useSafetyStatus } from '../lib/store';
+import { formatDay } from '../lib/format';
+import { acknowledgeRecovered, exportText, importContext, listParkedCopies, mergeIntoProgress, replaceProgress, useProgress, useSafetyStatus, type SafetyStatus } from '../lib/store';
 import { useUpdateReady } from '../lib/sw-register';
+import { Icon } from './icons';
+
+/** Routes that run a session (lesson, review, mix, mock ...): nothing sits above a question, so only a small mark is shown there. */
+export const SESSION_ROUTE = /^\/(lesson\/|mix$|review$|daily$|warmup$|topic\/|challenge$|q\/|mock)/;
+
+/** What a notice says: one line, and the details behind a button. */
+export interface RiskCopy {
+  line: string;
+  details: string;
+}
+
+/** The words for "your work is not being kept". Pure so the copy is testable. */
+export function riskCopy(s: Pick<SafetyStatus, 'unreadablePending' | 'persistence'>): RiskCopy {
+  if (s.unreadablePending) {
+    return {
+      line: 'Your saved progress could not be read. Nothing new is saved.',
+      details:
+        'Your old data has not been touched or deleted. Until this is sorted out, what you do now stays in this tab only: if you close it, that work is gone.',
+    };
+  }
+  if (s.persistence === 'memory') {
+    return {
+      line: 'Your progress is not being saved.',
+      details: 'This browser blocks storage here, so what you do is lost when you reload or close the page.',
+    };
+  }
+  return {
+    line: 'Your progress is not being saved.',
+    details: 'The device may be full. Your work is kept in this tab and we keep trying.',
+  };
+}
 
 /**
  * Quiet, non-blocking notices about the safety of the learner's data and the freshness of the app. They sit above the
- * page content, never cover it, and only appear when there is something the learner can act on.
+ * page content, never cover it, only appear when there is something the learner can act on, and show ONE at a time
+ * (the most important first). Inside a lesson nothing is shown here: see `SafetyMark`.
  */
-export function DataSafetyBanners() {
+export function DataSafetyBanners({ route = '/' }: { route?: string }) {
   const status = useSafetyStatus();
   const updateReady = useUpdateReady();
   const [dismissedRisk, setDismissedRisk] = useState(false);
   const [dismissedUpdate, setDismissedUpdate] = useState(false);
+  if (SESSION_ROUTE.test(route)) return null;
   const showRisk = (status.atRisk || status.unreadablePending) && !dismissedRisk;
   const showRecovered = status.recovered.length > 0;
+  const showUpdate = updateReady && !dismissedUpdate;
   return (
     <div className="safety-bars">
-      {updateReady && !dismissedUpdate && (
-        <div className="notice" role="status" data-testid="update-ready">
-          <span>A new version is ready.</span>
-          <span className="safety-actions">
-            <button type="button" className="btn small secondary" onClick={() => window.location.reload()}>Reload</button>
-            <button type="button" className="btn small ghost" onClick={() => setDismissedUpdate(true)}>Later</button>
-          </span>
-        </div>
-      )}
-      {showRisk && (
-        <div className="notice bad" role="status" data-testid="not-saved">
-          <div>
-            <p>
-              <b>{status.unreadablePending ? 'Saved progress could not be read, so nothing new is being saved.' : 'Your progress is not being saved.'}</b>{' '}
-              {status.persistence === 'memory'
-                ? 'This browser blocks storage here, so what you do is lost when you reload or close the page.'
-                : status.unreadablePending
-                  ? 'The old data is left untouched. What you do now is kept in this tab only, and we keep trying to set a copy of the old data aside.'
-                  : 'The device may be full. It is kept in this tab and we keep trying.'}{' '}
-              Download a backup so nothing is lost.
-            </p>
-            <ExportActions onDismiss={() => setDismissedRisk(true)} />
-          </div>
-        </div>
-      )}
-      {showRecovered && (
+      {showRisk ? (
+        <RiskBar status={status} onDismiss={() => setDismissedRisk(true)} />
+      ) : showRecovered ? (
         <div className="notice" role="status" data-testid="recovered-notice">
           <div>
             <p>
-              <b>Some saved data could not be read.</b> It may be damaged or from a newer version of the app. A copy was set aside and nothing was deleted.
-              You can download or restore it under Settings, Recovered data.
+              <b>Some saved data could not be read.</b> A copy was set aside and nothing was deleted. You can download or restore it under
+              Settings, Recovered data.
             </p>
             <span className="safety-actions">
               <button type="button" className="btn small ghost" onClick={acknowledgeRecovered}>Got it</button>
             </span>
           </div>
         </div>
+      ) : (
+        showUpdate && (
+          <div className="notice" role="status" data-testid="update-ready">
+            <span>A new version is ready.</span>
+            <span className="safety-actions">
+              <button type="button" className="btn small secondary" onClick={() => window.location.reload()}>Reload</button>
+              <button type="button" className="btn small ghost" onClick={() => setDismissedUpdate(true)}>Later</button>
+            </span>
+          </div>
+        )
       )}
     </div>
   );
 }
 
+/** The compact bar: one line, "Details" to expand, "Dismiss". A backup is offered only when there is something to save. */
+function RiskBar({ status, onDismiss }: { status: SafetyStatus; onDismiss: () => void }) {
+  const [open, setOpen] = useState(false);
+  const { progress } = useProgress();
+  const copy = riskCopy(status);
+  const hasProgress = progress.xp > 0 || progress.stats.sessions > 0;
+  return (
+    <div className="notice bad compact" role="status" data-testid="not-saved">
+      <div className="safety-main">
+        <p className="safety-line"><Icon name="info" size="1.1em" /><b>{copy.line}</b></p>
+        <span className="safety-actions">
+          <button type="button" className="btn small ghost" aria-expanded={open} aria-controls="safety-details" onClick={() => setOpen((o) => !o)}>
+            Details
+          </button>
+          <button type="button" className="btn small ghost" onClick={onDismiss}>Dismiss</button>
+        </span>
+      </div>
+      {open && (
+        <div id="safety-details" className="safety-details">
+          <p>{copy.details}</p>
+          {hasProgress ? <ExportActions /> : <p className="muted">There is nothing to back up yet.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A small mark in a lesson's header while progress is not being kept, in place of a banner above the question. */
+export function SafetyMark() {
+  const status = useSafetyStatus();
+  if (!(status.atRisk || status.unreadablePending)) return null;
+  const { line } = riskCopy(status);
+  return (
+    <span className="safety-mark" role="img" aria-label={line} title={line} data-testid="safety-mark">
+      <Icon name="info" size="1.2em" />
+    </span>
+  );
+}
+
 /** Download / copy / show-the-text for the current profile; the text is shown when both of the others are blocked. */
-function ExportActions({ onDismiss }: { onDismiss: () => void }) {
+function ExportActions() {
   const [text, setText] = useState('');
   const [note, setNote] = useState('');
   const download = () => {
@@ -84,7 +145,6 @@ function ExportActions({ onDismiss }: { onDismiss: () => void }) {
       <span className="safety-actions">
         <button type="button" className="btn small secondary" onClick={download}>Download backup</button>
         <button type="button" className="btn small ghost" onClick={() => void copy()}>Copy backup text</button>
-        <button type="button" className="btn small ghost" onClick={onDismiss}>Dismiss</button>
       </span>
       {note && <p className="muted" role="status">{note}</p>}
       {text && (
@@ -126,7 +186,7 @@ export function RecoveredData() {
             <li key={c.key} className="notice" data-testid="recovered-item">
               <div>
                 <p>
-                  <b>{kindLabel(c)}</b>{c.day ? `, ${c.day}` : ''}
+                  <b>{kindLabel(c)}</b>{c.day ? `, ${formatDay(c.day)}` : ''}
                 </p>
                 <p className="muted">
                   {sum ? `${sum.xp} XP, ${sum.streak}-day streak, ${sum.lessons} lessons` : 'This version cannot read it, but the text is kept in full.'} ({Math.max(1, Math.round(c.raw.length / 1024))} kB)

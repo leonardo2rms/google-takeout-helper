@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  allQuestions, buildDailySession, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
+  buildDailySession, dueOverview, goalDisplay, goalToday, planFor, rankFor, readiness, streakStatus,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { ChallengeCard } from '../components/ChallengeCard';
@@ -10,7 +10,7 @@ import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
 import { formatCount, plural } from '../lib/format';
-import { dueInToday, dueLine, homeTier, readinessLine } from '../lib/home-copy';
+import { dueInToday, dueLine, goalMetHero, homeTier, readinessLine, reinforceText } from '../lib/home-copy';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
 import { unitStyle } from '../lib/unit-style';
@@ -32,9 +32,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const [sheet, setSheet] = useState<SheetName>(null);
   const [iosTip, setIosTip] = useState(shouldShowIosTip);
 
-  const questions = useMemo(() => allQuestions(course), [course]);
-  const unitOf = useMemo(() => unitOfFor(course), [course]);
-  const queue = useMemo(() => reviewQueue(progress, questions, today, unitOf), [progress, questions, today, unitOf]);
+  const overview = useMemo(() => dueOverview(course, progress, today), [course, progress, today]);
   const daily = useMemo(() => buildDailySession(course, progress, today), [course, progress, today]);
   const ready = useMemo(() => readiness(course, progress, today), [course, progress, today]);
   const plan = useMemo(() => planFor(course, progress, today), [course, progress, today]);
@@ -47,16 +45,22 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const done = Object.keys(progress.lessons).length;
   const nextLesson = course.units.flatMap((u) => u.lessons).find((l) => !progress.lessons[l.id]);
   const firstLesson = course.units[0]?.lessons[0];
-  const dueCount = queue.all.length;
+  const dueCount = overview.due;
+  const reviewable = overview.reviewable;
+  const shownGoal = goalDisplay(goal);
 
   const hero = (() => {
     if (daily.kind === 'first') {
       const lesson = nextLesson ?? firstLesson;
-      return { href: lesson ? `#/lesson/${lesson.id}` : '#/daily', title: 'Start your first lesson', sub: `${lesson?.title ?? 'A short lesson'} · about 5 minutes`, cta: 'Start' };
+      return { href: lesson ? `#/lesson/${lesson.id}` : '#/daily', title: 'Start your first lesson', sub: `${lesson?.title ?? 'A short lesson'} · about 5 minutes`, cta: 'Start', done: false as const };
+    }
+    // Today's goal is met: the "Today" session is done, so Home stops selling it and offers one optional next step.
+    if (goal.met) {
+      return { ...goalMetHero({ done: goal.done, target: goal.target, due: dueCount, nextLesson }), done: true as const };
     }
     const parts = [
       daily.mix.due && dueInToday(daily.mix.due, dueCount),
-      daily.mix.weak && plural(daily.mix.weak, 'weak spot'),
+      daily.mix.weak && reinforceText(daily.mix.weak),
       daily.mix.fresh && `${daily.mix.fresh} new`,
       daily.mix.filler && `${daily.mix.filler} to refresh`,
     ].filter(Boolean);
@@ -65,6 +69,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       title: daily.kind === 'bonus' ? 'Bonus round' : 'Today',
       sub: `${plural(daily.questions.length, 'question')} · about ${daily.minutes} min${parts.length ? ` · ${parts.join(', ')}` : ''}`,
       cta: daily.kind === 'bonus' ? 'Keep going' : 'Start',
+      done: false as const,
     };
   })();
 
@@ -84,13 +89,13 @@ export function Home({ course, progress, health, update, onReset }: Props) {
 
   // The practice modes, shown on the page or tucked under "More ways to practise" depending on how far along the learner is.
   const reviewCard = (
-    <a key="review" className={`card action ${dueCount ? '' : 'disabled'}`} href={dueCount ? '#/review' : undefined} aria-disabled={!dueCount} data-testid="due-card">
+    <a key="review" className={`card action ${reviewable ? '' : 'disabled'}`} href={reviewable ? '#/review' : undefined} aria-disabled={!reviewable} data-testid="due-card">
       <span className="tile-i" aria-hidden="true"><Icon name="rotate-ccw" size={22} /></span>
       <span>
         <b>Review due</b>
-        <small data-testid="due-count" data-count={dueCount}>{dueLine(dueCount)}</small>
+        <small data-testid="due-count" data-count={reviewable}>{dueLine(overview.due, overview.retry)}</small>
       </span>
-      {dueCount > 0 && <Icon name="chevron-right" className="go" />}
+      {reviewable > 0 && <Icon name="chevron-right" className="go" />}
     </a>
   );
   const mixCard = (
@@ -143,6 +148,21 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const inline = all.filter((c) => onPage.includes(c.id));
   const more = all.filter((c) => !onPage.includes(c.id));
 
+  // "Up next" sits right under the hero once a learner has started (not on day 0, where the hero already is the first lesson), and is
+  // left out when the hero already offers that very lesson.
+  const heroIsNextLesson = hero.done && hero.href === `#/lesson/${nextLesson?.id}`;
+  const upNext = nextLesson && tier > 0 && daily.kind !== 'first' && !heroIsNextLesson ? (() => {
+    const ui = course.units.findIndex((u) => u.lessons.some((l) => l.id === nextLesson.id));
+    const li = course.units[ui]!.lessons.findIndex((l) => l.id === nextLesson.id);
+    return (
+      <a className="card up-next" href={`#/lesson/${nextLesson.id}`} data-testid="up-next">
+        <span className="no" aria-hidden="true">{ui + 1}.{li + 1}</span>
+        <span className="hero-text"><b>{nextLesson.title}</b><small>Up next · {plural(nextLesson.questions.length, 'question')}</small></span>
+        <span className="cta" aria-hidden="true">Start</span>
+      </a>
+    );
+  })() : null;
+
   return (
     <div className="home">
       <header className="home-top">
@@ -189,11 +209,12 @@ export function Home({ course, progress, health, update, onReset }: Props) {
           type="button"
           className="goal-ring"
           data-testid="goal-ring"
-          aria-label={`Daily goal ${goal.done}/${goal.target}: ${goal.done} of ${goal.target} questions today. Show details`}
+          aria-label={`Daily goal ${shownGoal.ratio}: ${shownGoal.sentence}${shownGoal.bonus > 0 ? `, plus ${plural(shownGoal.bonus, 'bonus question')}` : ''}. Show details`}
           onClick={() => setSheet('goal')}
         >
           <Ring fraction={goal.fraction} size={40} />
-          <span className="goal-text" data-testid="goal-text">{goal.done}/{goal.target}</span>
+          <span className="goal-text" data-testid="goal-text">{shownGoal.ratio}</span>
+          {shownGoal.bonus > 0 && <span className="goal-bonus" data-testid="goal-bonus">+{shownGoal.bonus}</span>}
         </button>
       </div>
       {note && <p className="stat-note" data-testid="streak-note"><Icon name="snowflake" size="1.1em" />{note}</p>}
@@ -206,11 +227,13 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       {/* Editing the plan from Settings (a learner who has already started) puts the open form first; on first run it is one quiet line under the lesson. */}
       {!progress.profile.onboarded && tier > 0 && <OnboardingCard today={today} progress={progress} update={update} startOpen />}
 
-      <a className={`card hero ${tier === 0 ? 'first' : ''}`} href={hero.href} data-testid="daily-card">
-        <span className="tile-i solid" aria-hidden="true"><Icon name="target" size={22} /></span>
+      <a className={`card hero ${tier === 0 ? 'first' : ''} ${hero.done ? 'done' : ''}`} href={hero.href} data-testid="daily-card" data-state={hero.done ? 'done' : 'open'}>
+        <span className={`tile-i ${hero.done ? '' : 'solid'}`} aria-hidden="true"><Icon name={hero.done ? 'circle-check' : 'target'} size={22} /></span>
         <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
-        <span className="cta" aria-hidden="true">{hero.cta}</span>
+        <span className={`cta ${hero.done ? 'quiet' : ''}`} aria-hidden="true">{hero.cta}</span>
       </a>
+
+      {upNext}
 
       {!progress.profile.onboarded && tier === 0 && <OnboardingCard today={today} progress={progress} update={update} />}
 
@@ -244,18 +267,6 @@ export function Home({ course, progress, health, update, onReset }: Props) {
           <div className="practice">{more.map((c) => c.node)}</div>
         </details>
       )}
-
-      {nextLesson && daily.kind !== 'first' && (() => {
-        const ui = course.units.findIndex((u) => u.lessons.some((l) => l.id === nextLesson.id));
-        const li = course.units[ui]!.lessons.findIndex((l) => l.id === nextLesson.id);
-        return (
-          <a className="card up-next" href={`#/lesson/${nextLesson.id}`} data-testid="up-next">
-            <span className="no" aria-hidden="true">{ui + 1}.{li + 1}</span>
-            <span className="hero-text"><b>{nextLesson.title}</b><small>Up next · {plural(nextLesson.questions.length, 'question')}</small></span>
-            <span className="cta" aria-hidden="true">Start</span>
-          </a>
-        );
-      })()}
 
       <div className="progress-line">
         <div className="row">
@@ -295,7 +306,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
                         <b>{lesson.title}</b>
                         <small>
                           {lesson.questions.length} questions
-                          {isNext && <span className="tag-next">Up next</span>}
+                          {isNext && tier > 0 && <span className="tag-next">Up next</span>}
                           {rec && <span className="sr-only">, completed, mastery {level} of 3</span>}
                         </small>
                       </span>

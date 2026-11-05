@@ -81,7 +81,7 @@ export function useReminderCheck(course: Course): void {
           prefs: p.prefs.reminders,
           now,
           today,
-          dueCount: reviewQueue(p, questions, today, unitOf).all.length,
+          dueCount: reviewQueue(p, questions, today, unitOf).due.length,
           practicedToday: (p.days[today]?.answered ?? 0) > 0,
           restDays: p.profile.restDays,
           permission: notificationPermission(),

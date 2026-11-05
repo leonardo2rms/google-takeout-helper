@@ -1,3 +1,4 @@
+import { SafetyMark } from '../components/DataSafety';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize, xpFor,
@@ -208,6 +209,7 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
         >
           <div className="fill" style={{ width: `${Math.max(sessionProgress(session) * 100, 2)}%` }} />
         </div>
+        <SafetyMark />
         <span className="xp-chip" aria-label={`${session.xp + gain} XP earned`}>
           <span className="label" aria-hidden="true">XP</span> {session.xp + gain}
           {gain > 0 && <span className="xp-gain" aria-hidden="true">+{gain}</span>}
