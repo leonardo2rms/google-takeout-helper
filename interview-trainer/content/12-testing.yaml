@@ -11,7 +11,7 @@ lessons:
         options:
           - { id: a, text: "Many real bugs live in the wiring between components, which mock-heavy unit tests skip" }
           - { id: b, text: "Unit tests are slower than integration tests: mocking frameworks generate classes at runtime" }
-          - { id: c, text: "Integration tests never need test data or cleanup, because they run against the real system" }
+          - { id: c, text: "Integration tests never need test data cleanup, because they run against the real system" }
           - { id: d, text: "Unit tests are impractical for idiomatic Kotlin code that uses coroutines, extension functions and sealed hierarchies" }
         answer: a
         explanation: "The pyramid's logic (many fast, cheap tests; few slow ones) still holds, but with modern tooling such as slices and Testcontainers, integration tests are cheaper than they were, and they check what users depend on. Unit tests are normally the faster ones, integration tests do need data and cleanup, and Kotlin code is unit-testable. Judge a test by the confidence it buys per second and per hour of maintenance, not by its label."

@@ -316,7 +316,7 @@ lessons:
         prompt: "A test written with `runTest` takes a real 10 seconds, although the code under test only calls `delay(10_000)`. What is the most likely cause?"
         options:
           - { id: a, text: "The code runs on a hard-coded dispatcher such as `Dispatchers.IO`, so its `delay` uses real time instead of virtual time" }
-          - { id: b, text: "`runTest` skips delays in the test body itself, but not in code started with `launch` or `async`" }
+          - { id: b, text: "`runTest` skips delays in the test body itself, but not in code started with `launch` and `async`" }
           - { id: c, text: "Virtual time only works for delays shorter than a few seconds, since longer ones fall back to real time" }
           - { id: d, text: "`delay` is only skipped after an explicit `advanceUntilIdle()` call, so without it `runTest` waits in real time" }
         answer: a

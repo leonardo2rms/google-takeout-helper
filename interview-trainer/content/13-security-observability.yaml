@@ -42,7 +42,7 @@ lessons:
           - { id: a, text: "Broken access control, an IDOR, fixed by checking that the caller owns the invoice on each access" }
           - { id: b, text: "SQL injection through the id concatenated into the query, fixed by switching to prepared statements" }
           - { id: c, text: "Cross-site scripting in the unescaped JSON response, fixed by HTML-encoding each field before sending" }
-          - { id: d, text: "A weak or guessable token issued to Alice, fixed by issuing longer random tokens" }
+          - { id: d, text: "A guessable token issued to Alice, fixed by issuing longer random tokens" }
         answer: a
         explanation: "Authentication answered 'who are you?'; authorization must still answer 'may you do this to that record?'. Broken access control tops the OWASP Top 10. The token worked and nothing was injected or reflected into a page: the server simply returned another user's record. Hard-to-guess ids are not a fix, only obscurity. Scope the query by the caller (`WHERE id = ? AND customer_id = ?`) or check the permission centrally."
 

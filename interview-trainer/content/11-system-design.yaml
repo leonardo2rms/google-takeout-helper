@@ -162,7 +162,7 @@ lessons:
         prompt: "What does PACELC add to the CAP theorem?"
         options:
           - { id: a, text: "Without a partition (the Else case), replication trades latency against consistency, like waiting for acks" }
-          - { id: b, text: "Partitions can be avoided with enough redundancy or a dedicated network, so CAP's trade-off disappears" }
+          - { id: b, text: "Partitions can be avoided with enough redundant network links, so CAP's trade-off disappears" }
           - { id: c, text: "Consistency and availability can both be kept during a partition, since synchronous replicas never diverge" }
           - { id: d, text: "A fourth guarantee (durability) that has to be traded off against partition tolerance and latency" }
         answer: a

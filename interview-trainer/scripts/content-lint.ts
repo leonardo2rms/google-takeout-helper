@@ -176,7 +176,7 @@ export const STYLE_LIMITS = {
   liftHigh: 1.6,
   /** expected accuracy of "prefer options with the feature" / "avoid them", random among the rest */
   rule: 0.35,
-  /** the audit's fixed combined rule */
+  /** the audit's fixed combined rule, and the same rule reversed */
   combined: 0.35,
   /** leave-one-question-out bag-of-words classifier */
   bow: 0.4,
@@ -207,6 +207,8 @@ export type StyleStats = {
   multi: FeatureStat[];
   /** expected accuracy of the fixed combined rule on singles */
   combined: number;
+  /** the same rule reversed (pick the lowest score): catches content over-corrected the other way */
+  combinedReverse: number;
   /** expected accuracy of the leave-one-question-out bag-of-words classifier on singles (computed over the whole course) */
   bow: number;
   /** singles whose answer is the strictly shortest option (chance 25%) */
@@ -300,6 +302,7 @@ export function measureStyle(all: Choice[], unit: string, bow: Map<string, numbe
     single: FEATURE_NAMES.map((f) => featureStat(singles, f)),
     multi: FEATURE_NAMES.map((f) => featureStat(multis, f)),
     combined: avg(singles.map((c) => argmaxAccuracy(c, (o) => combinedScore(c, o)))),
+    combinedReverse: avg(singles.map((c) => argmaxAccuracy(c, (o) => -combinedScore(c, o)))),
     bow: avg(singles.map((c) => bow.get(c.id) ?? 0)),
     shortest: singles.filter((c) => uniqueMax(c.options, (o) => -len(o)) === c.options.find((o) => c.correct.has(o.id))).length,
   };
@@ -341,6 +344,7 @@ export function styleViolations(r: { overall: StyleStats }): Violation[] {
     if (s.avoid > L.rule) out.push({ scope: 'single questions', what: `"avoid the option with ${FEATURES[s.feature].label}" scores`, value: s.avoid, limit: L.rule, offenders: [], hint: STYLE_HINT });
   }
   if (o.combined > L.combined) out.push({ scope: 'single questions', what: 'the combined style rule scores', value: o.combined, limit: L.combined, offenders: [], hint: STYLE_HINT });
+  if (o.combinedReverse > L.combined) out.push({ scope: 'single questions', what: 'the combined style rule, reversed, scores', value: o.combinedReverse, limit: L.combined, offenders: [], hint: STYLE_HINT });
   if (o.bow > L.bow) out.push({ scope: 'single questions', what: 'a bag-of-words classifier (leave one question out) scores', value: o.bow, limit: L.bow, offenders: [], hint: STYLE_HINT });
   return out;
 }
@@ -348,12 +352,13 @@ export function styleViolations(r: { overall: StyleStats }): Violation[] {
 export function styleReport(r: { overall: StyleStats; units: StyleStats[] }): string {
   const p = (x: number) => (Number.isFinite(x) ? `${(x * 100).toFixed(0)}%` : '-');
   const lift = (x: number) => (Number.isNaN(x) ? '-' : Number.isFinite(x) ? x.toFixed(2) : 'inf');
-  const head = 'unit'.padEnd(20) + [...FEATURE_NAMES.map((f) => `${f} A/D`), 'combined', 'bow', 'shortest'].map((h) => h.padStart(14)).join('');
+  const head = 'unit'.padEnd(20) + [...FEATURE_NAMES.map((f) => `${f} A/D`), 'combined', 'reversed', 'bow', 'shortest'].map((h) => h.padStart(14)).join('');
   const row = (s: StyleStats) =>
     s.unit.padEnd(20) +
     [
       ...s.single.map((f) => `${f.answers}/${f.distractors}`),
       p(s.combined),
+      p(s.combinedReverse),
       p(s.bow),
       p(s.singles ? s.shortest / s.singles : 0),
     ].map((c) => c.padStart(14)).join('');

@@ -21,7 +21,7 @@ lessons:
           - { id: a, text: "Request threads are queuing for a connection because the pool is saturated" }
           - { id: b, text: "The JIT is recompiling hot methods in a loop and stalls request threads" }
           - { id: c, text: "Garbage collection is thrashing (full GCs back to back), so threads wait for the collector" }
-          - { id: d, text: "The database is under-provisioned and needs more CPU cores or memory to answer queries quicker" }
+          - { id: d, text: "The database is under-provisioned and needs more CPU cores to answer queries quicker" }
         answer: a
         explanation: "Idle CPUs plus rising latency means waiting. JIT recompilation, GC thrashing and a starved database all burn CPU, which is exactly what the stem rules out. Check pool metrics (active/pending/connection-acquire time) before touching anything else. Raising the pool blindly can overload the DB, so find out why connections are held so long first."
 

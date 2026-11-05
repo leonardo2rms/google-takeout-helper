@@ -202,7 +202,7 @@ lessons:
             }
         options:
           - { id: a, text: "Yes, Hibernate detects the change at flush time (at the latest at commit) and issues an UPDATE" }
-          - { id: b, text: "No, Hibernate writes just the entities explicitly passed to `save()` or `persist()`" }
+          - { id: b, text: "No, Hibernate writes just the entities explicitly passed to `save()`" }
           - { id: c, text: "No, it throws an exception because the entity is detached outside a session" }
           - { id: d, text: "Yes, the UPDATE goes to the database on the very line that assigns the name" }
         answer: a

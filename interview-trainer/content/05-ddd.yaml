@@ -47,7 +47,7 @@ lessons:
             }
         options:
           - { id: a, text: "Anemic domain model: the rules live in a service while the domain object is just data" }
-          - { id: b, text: "Primitive obsession: the status should be an enum or value type, and nothing else is wrong" }
+          - { id: b, text: "Primitive obsession: the status should be an enum, and nothing else is wrong" }
           - { id: c, text: "A God Class: `Order` does too much and should be split into smaller classes" }
           - { id: d, text: "Shotgun surgery: one change to the status rules would touch many classes at once" }
         answer: a
@@ -277,7 +277,7 @@ lessons:
         prompt: "In an event-sourced system a bug stored `PriceChanged(sku, 90)` when the price should have been 99. What is the right way to correct the history?"
         options:
           - { id: a, text: "Append a correcting event (say, `PriceCorrected`), since stored events are immutable facts" }
-          - { id: b, text: "Edit or delete the wrong event, so the history shows the right price from the start" }
+          - { id: b, text: "Edit the wrong event in place, so the history shows the right price from the start" }
           - { id: c, text: "Fix the read model and leave the event stream alone: projections are disposable anyway" }
           - { id: d, text: "Drop the event store and rebuild it from the current database tables, which hold the right price" }
         answer: a

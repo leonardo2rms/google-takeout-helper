@@ -216,7 +216,7 @@ lessons:
         options:
           - { id: a, text: "The class was on the compile classpath but is missing from the runtime classpath" }
           - { id: b, text: "The code called `Class.forName` with a misspelled class name, which made the loader give up" }
-          - { id: c, text: "A compile error that the build tool ignored left the class file empty or incomplete" }
+          - { id: c, text: "A compile error that the build tool ignored left an empty class file behind" }
           - { id: d, text: "The class is deprecated, so the JVM refuses to load it unless a flag is set" }
         answer: a
         explanation: "`ClassNotFoundException` is thrown by explicit reflective loading (`Class.forName`); `NoClassDefFoundError` is a linkage error when the JVM can't find or initialise a class it needs. Typical causes: `provided`/`compileOnly` dependency, version conflicts, or an `ExceptionInInitializerError` first."
@@ -302,7 +302,7 @@ lessons:
           - { id: a, text: "With one or two receiver types the JIT inlines the target behind a type check, and beyond that it makes a virtual call" }
           - { id: b, text: "Interface calls are always slower than calls on a concrete class, and the JIT cannot inline them whatever it sees" }
           - { id: c, text: "Each additional implementation adds a new vtable slot; the memory footprint of `Shape` grows each time" }
-          - { id: d, text: "The JIT is disabled for call sites that see two or more classes, which leaves them interpreted" }
+          - { id: d, text: "The JIT is disabled for call sites that see more than one class, which leaves them interpreted" }
         answer: a
         explanation: "HotSpot records which receiver types each call site sees. A monomorphic or bimorphic site is inlined with a guard, and inlining opens the door to further optimisations (escape analysis, constant folding). A site that sees many types (megamorphic) needs a real virtual or interface call. This is why the same code can behave differently in a benchmark with one implementation and in production with many."
 

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { loadCourse } from '../shared/src/load-content';
 import {
-  bagOfWords, combinedScore, describeViolations, has, lint, LIMITS, measure, measureStyle, STYLE_LIMITS, styleViolations, tokens, violations, type Choice,
+  bagOfWords, combinedScore, describeViolations, has, lint, lintStyle, LIMITS, measure, measureStyle, STYLE_LIMITS, styleViolations, tokens, violations, type Choice,
 } from '../scripts/content-lint';
 
 /**
@@ -18,6 +18,11 @@ describe('balanced options: the real course', () => {
 
   it('the correct option is not systematically the longest (per unit, overall, top-2, correlation, multi)', () => {
     const v = violations(result);
+    expect(v.length, `\n${describeViolations(v)}\n`).toBe(0);
+  });
+
+  it('the correct option cannot be found from its style (asides, "or", causal clauses, absolutes, two attackers)', () => {
+    const v = styleViolations(lintStyle(course));
     expect(v.length, `\n${describeViolations(v)}\n`).toBe(0);
   });
 
@@ -176,6 +181,17 @@ describe('style tells: the lint itself', () => {
     expect(whats).toContain('combined style rule');
     expect(whats).toContain('bag-of-words');
     expect(describeViolations(v)).toContain('--offenders');
+  });
+
+  it('also catches content over-corrected the other way (the reversed rule)', () => {
+    // Every answer is the plain, causal option; every distractor has an aside and "or".
+    const reversed = Array.from({ length: 20 }, (_, i) =>
+      q(`r/${i}`, 'u', [`It fails because of locks ${i}`, `Retry (with backoff) or fail ${i}`, `Retry (once) or stop ${i}`, `Wait (a bit) or give up ${i}`], [0]),
+    );
+    const s = style(reversed);
+    expect(s.combined).toBe(0);
+    expect(s.combinedReverse).toBe(1);
+    expect(styleViolations({ overall: s }).map((x) => x.what)).toContain('the combined style rule, reversed, scores');
   });
 
   it('passes a course where every option is written in the same style', () => {

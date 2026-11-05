@@ -193,7 +193,7 @@ lessons:
         prompt: "What is the main purpose of `@JvmInline value class UserId(val raw: Long)`?"
         options:
           - { id: a, text: "Distinct compile-time types like UserId and OrderId, usually stored as a plain `Long`" }
-          - { id: b, text: "It guarantees a `UserId` is never boxed, even inside generic lists or nullable types" }
+          - { id: b, text: "It guarantees a `UserId` is never boxed, even inside generic lists and nullable types" }
           - { id: c, text: "It generates the data-class members: `equals`, `copy` and `componentN`" }
           - { id: d, text: "It makes each access to `raw` atomic, so coroutines can share it without locks" }
         answer: a
