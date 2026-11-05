@@ -182,6 +182,14 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </span>
       </a>
 
+      <a className="card action mock-link" href="#/mock" data-testid="mock-link">
+        <span className="emoji" aria-hidden="true">⏱️</span>
+        <span>
+          <b>Mock interview</b>
+          <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
+        </span>
+      </a>
+
       <a className="card action library-link" href="#/library" data-testid="library-link">
         <span className="emoji" aria-hidden="true">📚</span>
         <span>

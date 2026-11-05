@@ -13,6 +13,7 @@ import { AchievementToasts } from './components/AchievementToasts';
 import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
 import { Library } from './screens/Library';
+import { MockScreen } from './screens/Mock';
 import { LessonScreen } from './screens/Lesson';
 import { ProgressScreen } from './screens/ProgressScreen';
 import { Summary, type Finished } from './screens/Summary';
@@ -146,6 +147,7 @@ function Screens() {
     <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} reviewHint={reviewHint} onFinish={finish} />
   );
   if (route === '/library') return <Library course={course} progress={progress} />;
+  if (route === '/mock') return <MockScreen course={course} progress={progress} grade={grade} />;
   if (route === '/challenge') {
     // Today's featured question. Once it has a result, a replay is plain practice (no XP, no streak).
     const today = dayKey(new Date());

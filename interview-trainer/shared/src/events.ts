@@ -116,7 +116,8 @@ export function applySession(
   const questions = allQuestions(course);
   const outcomes = r.outcomes ?? outcomesOf({ missed: r.missed, recovered: r.recovered, correct: r.cleared ?? [] });
   const answered = r.answered ?? Object.keys(outcomes).length;
-  const firstTry = Object.values(outcomes).filter((o) => o === 'first').length;
+  // `answered` can be lower than the number of outcomes (a mock credits the goal only partly): first tries never exceed it.
+  const firstTry = Math.min(answered, Object.values(outcomes).filter((o) => o === 'first').length);
 
   const beforeRank = rankFor(p.xp);
   const beforeGoal = goalToday(p, today);
