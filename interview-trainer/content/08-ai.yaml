@@ -127,7 +127,7 @@ lessons:
           - { id: c, text: "Ask the model whether the new prompt is better than the old one, and trust its verdict" }
           - { id: d, text: "Ship it to everyone and watch whether the number of support tickets goes down" }
         answer: a
-        explanation: "LLM outputs vary, so anecdotes mislead. Grade with code where possible, otherwise with a model judge calibrated against human labels, and track regressions as you change prompts or models."
+        explanation: "LLM outputs vary, so anecdotes mislead. Grade with code where possible, otherwise with a model judge calibrated against human labels, and track regressions as you change prompts or models. Shipping to everyone and watching support tickets is slow, confounded by other changes and exposes real users; if you test online at all, do it as a staged rollout or A/B test with a defined metric, after offline evals."
 
       - type: single
         hint: "Which part of the request never changes between calls?"
@@ -303,7 +303,7 @@ lessons:
         prompt: "A unit test calls a model with temperature 0 and asserts that the answer is exactly the same string every time. Why is this test fragile?"
         options:
           - { id: a, text: "Providers do not guarantee identical output at temperature 0 (batching, model updates)" }
-          - { id: b, text: "At temperature 0 the model returns an empty string unless a seed is set in the request" }
+          - { id: b, text: "Most providers ignore a temperature of 0 and sample at their default temperature instead" }
           - { id: c, text: "Models randomise the first token of an answer, so the start of the string differs between runs of the same prompt" }
           - { id: d, text: "Strings returned by an API arrive in streamed chunks, so `equals` compares the first chunk" }
         answer: a
