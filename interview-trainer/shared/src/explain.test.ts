@@ -92,6 +92,9 @@ describe('prompt building', () => {
     expect(p.user.match(/<correct_answer>/g)).toHaveLength(1);
     expect(p.user.match(/<\/learner_answer>/g)).toHaveLength(1);
     expect(neutralizeTags('<QUESTION foo>')).toBe('[tag removed]');
+    expect(neutralizeTags('< / conversation >')).toBe('[tag removed]'); // QA S2-4
+    expect(neutralizeTags('\uFF1C/conversation\uFF1E')).toBe('[tag removed]');
+    expect(neutralizeTags('</learner_answer')).toBe('[tag removed]');
   });
   it('the plain prompt (hosted build) is the system prompt followed by the same user text', () => {
     const p = buildExplainPrompt(qs[1]!, 'a', true, [u('hi')]);

@@ -7,6 +7,7 @@
  * "assistant" turns they echo back) is untrusted data: fenced in tags, stripped of our delimiter tags, length-capped.
  */
 import { z } from 'zod';
+import { tagPattern } from './grading-prompt';
 import { openParts } from './interview';
 import { spotLines, type OpenQ, type Question } from './schema';
 
@@ -73,8 +74,8 @@ Rules:
 - Do not praise or scold. No guilt, no hype.`;
 
 /** Removes anything that could close or spoof one of our delimiter tags. */
-const FENCE_TAGS = /<\/?\s*(learner_answer|conversation|learner_message|tutor_message|question|correct_answer|explanation|code_shown)\b[^>]*>/gi;
-export const neutralizeTags = (text: string): string => text.replace(FENCE_TAGS, '[tag removed]');
+const FENCE_TAGS = tagPattern('learner_answer|conversation|learner_message|tutor_message|question|correct_answer|explanation|code_shown');
+export const neutralizeTags = (text: string): string => text.normalize('NFKC').replace(FENCE_TAGS, '[tag removed]');
 
 const numbered = (lines: string[]) => lines.map((l, i) => `${i + 1}. ${l}`).join('\n');
 const fence = (lang: string, source: string) => `\`\`\`${lang}\n${source}\n\`\`\``;

@@ -1,4 +1,4 @@
-import { allQuestions, buildPlainPrompt, openParts, type Course, type GradeResponse, type OpenQ } from '@trainer/shared';
+import { allQuestions, buildPlainPrompt, cleanFeedback, openParts, type Course, type GradeResponse, type OpenQ } from '@trainer/shared';
 import type { GradeFn } from './evaluate';
 
 /**
@@ -15,11 +15,25 @@ interface ClaudeHost {
 
 export const isStandalone = import.meta.env.VITE_STANDALONE === '1';
 
+/** How long a hosted `sample` call may take before the app gives up and falls back to self-assessment. */
+export const SAMPLE_TIMEOUT_MS = 25_000;
+/** How long the host may take to hand over the capability at start-up. */
+export const SAMPLE_LOAD_TIMEOUT_MS = 5_000;
+
+/** Rejects if `work` has not settled within `ms`. A host call that never answers must not leave the learner stuck on "Grading...". */
+export function withTimeout<T>(work: Promise<T>, ms: number = SAMPLE_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+
 export async function loadSample(): Promise<Sample | null> {
   const host = (window as unknown as { claude?: ClaudeHost }).claude;
   if (!host?.use) return null;
   try {
-    return ((await host.use('sample')) as Sample | null) ?? null;
+    return ((await withTimeout(host.use('sample'), SAMPLE_LOAD_TIMEOUT_MS)) as Sample | null) ?? null;
   } catch {
     return null;
   }
@@ -37,14 +51,14 @@ export function createSampleGrader(course: Course, sample: Sample): GradeFn {
   return async (questionId, answer): Promise<GradeResponse> => {
     const q = open.get(questionId);
     if (!q) throw new Error('unknown question');
-    const verdict = await sample.json<Verdict>(buildPlainPrompt(q, answer), { cache: false });
+    const verdict = await withTimeout(sample.json<Verdict>(buildPlainPrompt(q, answer), { cache: false }));
     const points = verdict.points;
     if (!Array.isArray(points) || points.length !== q.keyPoints.length) throw new Error('bad verdict shape');
     const covered = points.map((p) => p?.covered === true);
     return {
       score: covered.filter(Boolean).length / covered.length,
       covered,
-      feedback: typeof verdict.feedback === 'string' ? verdict.feedback.trim() : '',
+      feedback: cleanFeedback(verdict.feedback),
       graded_by: 'ai',
     };
   };
