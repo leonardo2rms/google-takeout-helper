@@ -107,6 +107,21 @@ describe('mergeProgress', () => {
     const b: Progress = { ...base, streak: 6, lastDay: today };
     expect(mergeProgress(a, b, ctx).streak).toBe(6);
   });
+  it('a day answered equally often on both devices keeps one deterministic goal snapshot, whichever side is "local"', () => {
+    // Regression (found by the commutativity property test): a tie on `answered` used to keep the local side's target/comeback.
+    const day = (target: number, comeback?: true) => ({ xp: 10, answered: 4, firstTry: 3, target, ...(comeback && { comeback }) });
+    const a: Progress = { ...base, days: { [today]: day(8) } };
+    const b: Progress = { ...base, days: { [today]: day(1) } };
+    expect(mergeProgress(a, b, ctx).days[today]).toEqual(mergeProgress(b, a, ctx).days[today]);
+    expect(mergeProgress(a, b, ctx).days[today]!.target).toBe(8);
+    const halved: Progress = { ...base, days: { [today]: day(4, true) } };
+    const full: Progress = { ...base, days: { [today]: day(4) } };
+    expect(mergeProgress(halved, full, ctx).days).toEqual(mergeProgress(full, halved, ctx).days);
+    // the busier side still supplies the snapshot, even with a smaller target
+    const busy: Progress = { ...base, days: { [today]: { ...day(2), answered: 9 } } };
+    expect(mergeProgress(a, busy, ctx).days[today]).toMatchObject({ target: 2, answered: 9 });
+    expect(mergeProgress(busy, a, ctx).days[today]).toMatchObject({ target: 2, answered: 9 });
+  });
 });
 
 function memory(initial: Record<string, string> = {}): StorageLike & { data: Record<string, string> } {

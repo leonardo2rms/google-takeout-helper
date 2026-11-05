@@ -91,7 +91,10 @@ export function mergeProgress(local: Progress, incoming: Progress, ctx: Migratio
     missed: [...new Set([...local.missed, ...incoming.missed])],
     cards: maxRecord<Card>(local.cards, incoming.cards, (x, y) => (y.last > x.last || (y.last === x.last && y.seen > x.seen) ? y : x)),
     days: maxRecord<DayLog>(local.days, incoming.days, (x, y) => {
-      const big = y.answered > x.answered ? y : x;
+      // The side with the busier day supplies the goal snapshot. A tie on `answered` is broken on the snapshot itself
+      // (larger target, then "comeback"), never on argument order, so merging A into B and B into A agree.
+      const cmp = (p: DayLog, q: DayLog) => p.answered - q.answered || p.target - q.target || Number(!!p.comeback) - Number(!!q.comeback);
+      const big = cmp(y, x) > 0 ? y : x;
       return { ...big, xp: Math.max(x.xp, y.xp), answered: Math.max(x.answered, y.answered), firstTry: Math.max(x.firstTry, y.firstTry) };
     }),
     profile: {
