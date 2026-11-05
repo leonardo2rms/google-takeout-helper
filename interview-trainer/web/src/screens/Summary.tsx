@@ -11,6 +11,8 @@ import { forecastText, plural, prefersReducedMotion } from '../lib/format';
 export interface Finished {
   title: string;
   summary: SessionSummary;
+  /** XP actually credited for the session (the engine's figure includes bonuses a one-question session does not get). */
+  xpEarned: number;
   streak: number;
   nextLessonId?: string;
   events: SessionEvent[];
@@ -120,7 +122,7 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       )}
 
       <div className="tiles">
-        <div className="tile xp"><small>XP earned</small><b>+{summary.xp}</b></div>
+        <div className="tile xp"><small>XP earned</small><b>+{finished.xpEarned}</b></div>
         <div className="tile acc"><small>Accuracy</small><b>{pct}%</b></div>
         <div className="tile fire"><small>Streak</small><b><Icon name="flame" size="1em" /> {streak} d</b></div>
         {outstanding > 0 && <div className="tile todo"><small>To revisit</small><b>{outstanding}</b></div>}

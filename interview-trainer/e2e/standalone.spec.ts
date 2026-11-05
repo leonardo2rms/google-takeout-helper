@@ -14,8 +14,9 @@ const open = questions.find((q) => q.type === 'open')!;
 
 test.describe.configure({ mode: 'serial' });
 test.beforeAll(() => {
+  test.setTimeout(120_000);
   execFileSync('node', ['scripts/build-standalone.mjs'], { cwd: root, stdio: 'ignore' });
-}, 120_000);
+});
 
 test.describe('opened from disk', () => {
   test('is a complete standards-mode UTF-8 document with a phone viewport', async ({ page }) => {

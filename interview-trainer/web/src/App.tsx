@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
+  XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
@@ -113,8 +113,10 @@ function Screens() {
     });
   }, []);
 
-  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => {
+  // `servedOn` is the day the session was opened: the daily challenge is recorded against it, even when the answer comes after midnight.
+  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge', servedOn?: string) => {
     const today = dayKey(new Date());
+    const challengeDay = servedOn ?? today;
     const outcomes = outcomesOf(summary);
     let before: Progress = getProgress();
     let events: SessionEvent[] = [];
@@ -124,14 +126,15 @@ function Screens() {
     let challengeBonus = 0;
     updateProgress((p) => {
       before = p;
-      challengeBonus = kind === 'challenge' && pass && !p.challenge[today] ? CHALLENGE_XP : 0;
+      const settled = kind === 'challenge' ? settleChallenge(p, challengeDay, pass) : null;
+      challengeBonus = settled?.bonus ?? 0;
       const res = applySession(
         p,
         { lessonId, kind: kind ? 'single' : undefined, accuracy: summary.accuracy, xp: baseXp + challengeBonus, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes, hinted: summary.hinted, confidence: summary.confidence },
         { today, course },
       );
       events = res.events;
-      return kind === 'challenge' ? recordChallenge(res.progress, today, pass) : res.progress;
+      return kind === 'challenge' ? settleChallenge(res.progress, challengeDay, pass).progress : res.progress;
     });
     const after = getProgress();
     if (before.stats.sessions === 0) requestPersistence(); // ask the browser to keep our storage once there is something worth keeping
@@ -142,6 +145,7 @@ function Screens() {
     setFinished({
       title,
       summary,
+      xpEarned: baseXp + challengeBonus, // what was really credited (a one-question session earns no perfect-lesson bonus)
       streak: streakStatus(after, today).streak,
       nextLessonId: nextLesson?.id,
       events,
@@ -268,9 +272,10 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
   grade?: GradeFn;
   explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
-  onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => void;
+  onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge', servedOn?: string) => void;
 }) {
   const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
+  const [servedOn] = useState(() => dayKey(new Date())); // same moment the questions were picked
 
   if (questions.length === 0) {
     return (
@@ -291,7 +296,7 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}
-      onFinish={(s) => onFinish(title, s, undefined, kind === 'one' ? 'single' : kind === 'challenge' ? 'challenge' : undefined)}
+      onFinish={(s) => onFinish(title, s, undefined, kind === 'one' ? 'single' : kind === 'challenge' ? 'challenge' : undefined, servedOn)}
     />
   );
 }
