@@ -118,7 +118,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
           type="button"
           className="goal-ring"
           data-testid="goal-ring"
-          aria-label={`Daily goal: ${goal.done} of ${goal.target} questions today. Show details`}
+          aria-label={`Daily goal ${goal.done}/${goal.target}: ${goal.done} of ${goal.target} questions today. Show details`}
           onClick={() => setSheet('goal')}
         >
           <Ring fraction={goal.fraction} size={44} />
@@ -198,7 +198,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
                 const rec = progress.lessons[lesson.id];
                 return (
                   <li key={lesson.id} className={`node-row ${i % 2 ? 'right' : 'left'}`}>
-                    <a className={`node ${rec ? 'done' : ''}`} href={`#/lesson/${lesson.id}`} aria-label={`${lesson.title}${rec ? `, completed with ${stars(rec.bestAccuracy)} stars` : ''}`}>
+                    <a className={`node ${rec ? 'done' : ''}`} href={`#/lesson/${lesson.id}`} aria-label={`${i + 1}. ${lesson.title}${rec ? `, completed with ${stars(rec.bestAccuracy)} stars` : ''}`}>
                       <span aria-hidden="true">{rec ? '★' : i + 1}</span>
                     </a>
                     <div className="node-label">

@@ -119,6 +119,7 @@ cards{questionId -> h, ease, interval, due, reps, lapses, seen, firstTry, last} 
 days{YYYY-MM-DD -> xp, answered, firstTry, target}                                    per-day log, last 400 days
 goal{target}, profile{onboarded, role, interviewDate, restDays[], practiceTime}
 settings{haptics, sound, confetti, tips, confidence}, stats{sessions, answered, firstTry, perfect, practiceDays}
+prefs{reminders{time,notify,lastNotified}, reading{textSize,dyslexiaFont}}               device preferences, namespaced; kept local on import/merge
 milestones{key -> day}        dedupes celebrations ("rank:3", "streak:7", "unit:ddd:80", "goal:first", ...)
 ```
 
@@ -157,6 +158,13 @@ no dates, role, interview date or question content, and nothing is uploaded. The
 (or text only when files cannot be shared), otherwise a download link, plus **Copy text** and a selectable text version. The hosted single-file build cannot download from its frame,
 so the download button is hidden there; a sheet with no working option says how to save the picture.
 
+### Accessibility and reading settings
+
+Behaviour, rules and the tracked colour-contrast exception are in [`docs/accessibility.md`](docs/accessibility.md). In short: axe-core runs over every screen and state
+(`e2e/a11y.spec.ts`, fails on serious/critical issues), plus behaviour tests for what axe cannot see (`e2e/a11y-behaviour.spec.ts`): a skip link and a single `main`
+landmark, focus moved to the prompt on a new question and to the verdict after Check, results readable without colour, keyboard-only match / order / spot, a focus ring on every Tab stop,
+and reduced motion. **Settings -> Reading** sets text size (S / M / L / XL) and an easier-to-read system font, stored in `progress.prefs.reading`.
+
 ## End-to-end tests
 
 ```bash
@@ -167,6 +175,9 @@ npm run e2e        # builds the app, serves it with AI grading off, drives it in
 day (the page clock is moved with `page.clock`), freezes and rest days, Daily Practice, onboarding, export/import (including garbage and tampered files),
 two tabs staying in sync, celebrations with and without reduced motion, the readiness page, and 390px layout / tap-target / keyboard checks. Storage is
 seeded with `localStorage` blobs so each test starts from an exact state.
+
+`e2e/ask-why.spec.ts`, `e2e/reminders.spec.ts`, `e2e/share-card.spec.ts`, `e2e/a11y.spec.ts` and `e2e/a11y-behaviour.spec.ts` cover the tutor chat (the AI endpoint is faked in the browser), reminders (a recording
+`Notification` stand-in, the downloaded `.ics`), the share card (a real PNG, `navigator.share` stubs) and accessibility. Run several agents or shards side by side with `E2E_PORT=4182 npx playwright test --workers=2`.
 
 `e2e/question-types.spec.ts` plays **every question type through the real UI** (reading the correct answers from the
 YAML, so it stays in sync with the content), and asserts the feedback, the XP awarded and that the page never
@@ -181,10 +192,10 @@ First time on a machine: `npx playwright install chromium`.
 interview-trainer/
   content/          the course: one YAML file per unit (edit these to add questions)
   shared/           schema (zod), grading, lesson-session engine, streak/progress logic. Pure TS, fully tested
-  server/           Express API: /api/health, /api/grade (+ serves web/dist in production)
+  server/           Express API: /api/health, /api/grade, /api/explain (+ serves web/dist in production)
   web/              React + Vite PWA
   e2e/              Playwright tests + screenshots
-  docs/             design notes (engagement.md: the habit loop and its ethics rules)
+  docs/             design notes (engagement.md: the habit loop and its ethics rules; accessibility.md)
   scripts/          content:check, build-standalone
 ```
 
@@ -328,6 +339,6 @@ generated, so it works offline and is deterministic; the AI only grades.
 
 - **Architecture board** (drag & connect components, validate against a reference topology): the question schema is a
   discriminated union (`shared/src/schema.ts`), so it is one new type plus one component. Deliberately left out for now.
-- Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, user-chosen reminders (a calendar `.ics` first), a weekly recap card.
-- Later: timed "mock interview" mode, teach-back prompts, a shareable progress card, a transfer code / QR for moving between devices.
+- Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, a weekly recap card. (Reminders, the share card, the Ask why tutor and the accessibility pass are done.)
+- Later: timed "mock interview" mode, teach-back prompts, a transfer code / QR for moving between devices.
 - Real code execution for coding challenges (sandboxed Kotlin runner) instead of AI grading.

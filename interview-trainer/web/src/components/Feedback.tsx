@@ -40,8 +40,8 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
   const answerLine = q.type === 'estimate' ? estimateLine(q) : null;
 
   return (
-    <div className={`feedback ${tone}`} role="status" aria-live="polite">
-      <h2>{title}</h2>
+    <section className={`feedback ${tone}`} aria-labelledby="feedback-title">
+      <h2 id="feedback-title" tabIndex={-1}>{title}</h2>
 
       {open && oq && (
         <>
@@ -141,7 +141,7 @@ export function Feedback({ q, outcome, overall, onCoveredChange, actions }: Prop
       )}
 
       {actions}
-    </div>
+    </section>
   );
 }
 

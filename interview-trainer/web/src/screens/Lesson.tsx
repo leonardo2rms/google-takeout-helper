@@ -17,6 +17,7 @@ import { OrderQuestion } from '../components/OrderQuestion';
 import { SpotQuestion } from '../components/SpotQuestion';
 import type { ExplainFn } from '../lib/explain';
 import { describeLearnerAnswer } from '../lib/explain';
+import { scrollIntoViewGently } from '../lib/a11y';
 import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 import { runCodeInWorker } from '../lib/run-code';
 
@@ -123,7 +124,18 @@ export function LessonScreen({ title, color, questions, grade, explain, reviewHi
 
   // Bring the feedback into view above the fixed bottom bar; on phones it starts below the fold.
   useEffect(() => {
-    if (phase === 'feedback') feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (phase === 'feedback') scrollIntoViewGently(feedbackRef.current);
+  }, [phase]);
+
+  // Focus follows the flow, so keyboard and screen-reader users never get lost: a new question puts focus on its
+  // prompt; checking an answer moves it to the verdict heading (Tab then reaches the explanation and "Continue").
+  const promptRef = useRef<HTMLHeadingElement>(null);
+  const viewKey = view ? `${view.id}#${attempt}` : '';
+  useEffect(() => {
+    promptRef.current?.focus({ preventScroll: true });
+  }, [viewKey]);
+  useEffect(() => {
+    if (phase === 'feedback') feedbackRef.current?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
   }, [phase]);
 
   useEffect(() => {
@@ -165,12 +177,12 @@ export function LessonScreen({ title, color, questions, grade, explain, reviewHi
         <span className="xp-chip" aria-label={`${session.xp} XP earned`}>⚡ {session.xp}</span>
       </header>
 
-      <main className="lesson-body">
+      <div className="lesson-body">
         <p className="kicker">
           {attempt > 0 ? '↻ Try again · ' : ''}
           {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
         </p>
-        <h1 className="prompt"><Inline text={view.prompt} /></h1>
+        <h1 className="prompt" ref={promptRef} tabIndex={-1}><Inline text={view.prompt} /></h1>
         {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
 
         <div key={key} className="answer-area">
@@ -208,11 +220,14 @@ export function LessonScreen({ title, color, questions, grade, explain, reviewHi
             })()}
           </div>
         )}
-      </main>
+      </div>
+
+      {/* Announces the wait for AI grading / test runs; the verdict itself is announced by moving focus to it. */}
+      <p className="sr-only" role="status" aria-live="polite">{phase === 'grading' ? (view.type === 'code' ? 'Running your code' : 'Checking your answer') : ''}</p>
 
       <footer className={`lesson-bar ${phase === 'feedback' && !pending ? (passed ? 'good' : 'bad') : ''}`}>
         {phase === 'feedback' ? (
-          <button type="button" className="btn primary wide" onClick={next} autoFocus>Continue</button>
+          <button type="button" className="btn primary wide" onClick={next}>Continue</button>
         ) : (
           <>
             <button type="button" className="btn ghost" onClick={skip} disabled={phase === 'grading'}>I don't know</button>

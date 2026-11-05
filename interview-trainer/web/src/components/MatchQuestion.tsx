@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { seededShuffle, type MatchQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
 import { Inline } from './Inline';
+import { ResultCue, type ResultState } from './ResultCue';
 
 interface Props {
   q: MatchQ;
@@ -49,6 +50,9 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
   return (
     <>
       <p className="hint">Tap an item, then the one it belongs with</p>
+      <p className="sr-only" role="status" aria-live="polite">
+        {checked ? '' : active !== null ? `Selected: ${q.pairs[active]!.left}. Now choose its match.` : `${chosen.filter((c) => c !== null).length} of ${q.pairs.length} paired`}
+      </p>
       <div className="match">
         <div className="match-col" role="group" aria-label="Items">
           {q.pairs.map((p, i) => {
@@ -65,6 +69,8 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 onClick={() => pickLeft(i)}
               >
                 <Inline text={p.left} />
+                {chosen[i] !== null && <span className="sr-only">, paired with {chosen[i]}</span>}
+                <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} />
               </button>
             );
           })}
@@ -84,6 +90,8 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 onClick={() => pickRight(r)}
               >
                 <Inline text={r} />
+                {owner !== -1 && <span className="sr-only">, paired with {q.pairs[owner]!.left}</span>}
+                <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} />
               </button>
             );
           })}

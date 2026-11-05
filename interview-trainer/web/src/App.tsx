@@ -5,6 +5,7 @@ import {
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
+import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
 import { fetchHealth, gradeOpen } from './lib/api';
 import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
@@ -37,7 +38,42 @@ const REVIEW_SIZE = 10;
 
 type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic';
 
+/** Screens that put focus on their own question/prompt, so the route announcer must not steal it. */
+const OWNS_FOCUS = /^\/(lesson\/|mix$|review$|daily$|warmup$|topic\/)/;
+
+function titleFor(route: string): string {
+  if (route === '/progress') return 'Progress';
+  if (route === '/done') return 'Session complete';
+  if (OWNS_FOCUS.test(route)) return 'Practice';
+  return 'Interview Trainer';
+}
+
+/** Page chrome shared by every screen: skip link, the single <main> landmark, route announcements, reading preferences. */
 export function App() {
+  const route = useHashRoute();
+  const { progress } = useProgress();
+  useReadingPrefs(progress.prefs.reading);
+  useRouteAnnouncer(titleFor(route), OWNS_FOCUS.test(route));
+  return (
+    <>
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault(); // the hash is our router: move focus instead of navigating
+          document.getElementById('main')?.focus();
+        }}
+      >
+        Skip to main content
+      </a>
+      <main id="main" tabIndex={-1}>
+        <Screens />
+      </main>
+    </>
+  );
+}
+
+function Screens() {
   const route = useHashRoute();
   const { progress, update, reset } = useProgress();
   const [health, setHealth] = useState<HealthResponse | null>(null);
