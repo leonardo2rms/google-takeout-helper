@@ -1,114 +1,124 @@
 /*
- * features-a: hints, confidence, library, daily challenge, achievements, mock interview.
- * Structure and spacing only, using the existing tokens; colours and type are restyled in a later pass.
- * Kept in its own file so merging with styles.css changes is trivial.
+ * Learning features: hints, confidence, Library, daily challenge, badges, mock interview.
+ * Same tokens and rules as styles.css (see docs/design-system.md): 1px edges, 6px radii, verdicts = icon + word + border style.
  */
 
 /* ---------- hints ---------- */
-.btn.hint-btn { min-height: 44px; margin: 4px 0 12px; width: fit-content; align-self: flex-start; justify-self: start; gap: 6px; padding: 0 18px; }
-.hint-box { margin: 4px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--amber-bg); color: var(--amber-text); overflow-wrap: anywhere; }
+.btn.hint-btn { min-height: 44px; margin: 4px 0 12px; width: fit-content; align-self: flex-start; justify-self: start; gap: 8px; padding: 0 16px; }
+.hint-box { display: flex; gap: 10px; align-items: flex-start; margin: 4px 0 12px; padding: 10px 14px; border-radius: var(--r2); background: var(--ochre-tint); color: var(--ink); border-left: 4px solid var(--ochre); overflow-wrap: anywhere; }
+.hint-box > .i { color: var(--ochre); margin-top: 2px; }
+.hint-box b { font: 600 var(--fs-12) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ochre); margin-right: 6px; }
 
 /* ---------- confidence ---------- */
 .confidence { display: grid; gap: 8px; margin: 14px 0 4px; }
-.confidence-label small { color: var(--muted); font-weight: 600; margin-left: 6px; }
+.confidence-label { font-weight: 600; }
+.confidence-label small { color: var(--graphite); font-weight: 400; margin-left: 6px; }
 .confidence-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.confidence-chip { min-height: 44px; min-width: 88px; cursor: pointer; color: var(--text); font-weight: 700; }
-.confidence-chip.on { border-color: var(--blue); background: var(--blue-bg); color: var(--blue-dark); }
-.confidence-note { margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: var(--amber-bg); color: var(--amber-text); font-weight: 700; }
-.calibration { margin-bottom: 14px; }
-.calib-rows { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
-.calib-rows li { display: flex; justify-content: space-between; gap: 12px; }
+.confidence-chip { min-height: 44px; min-width: 88px; cursor: pointer; color: var(--ink); font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.confidence-chip.on { border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); background: var(--cobalt-tint); }
 
-/* ---------- question tools (star + note) and the Library ---------- */
+/* ---------- question tools (save + note) and the Library ---------- */
 .q-tools { display: grid; gap: 8px; margin-top: 12px; }
 .q-tools-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.btn.tool-btn { min-height: 44px; padding: 0 14px; color: var(--text); }
-.btn.tool-btn.on { border-color: var(--amber-text); background: var(--amber-bg); color: var(--amber-text); }
-.q-note { margin: 0; padding: 8px 12px; border-radius: 12px; background: var(--surface); color: var(--text); overflow-wrap: anywhere; white-space: pre-wrap; }
+.btn.tool-btn { min-height: 44px; padding: 0 14px; color: var(--ink); }
+.btn.tool-btn.on { border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); background: var(--cobalt-tint); }
+.btn.tool-btn.on .i { fill: currentColor; }
+.q-note { margin: 0; padding: 8px 12px; border-radius: var(--r2); background: var(--sheet); border: 1px solid var(--hairline); color: var(--ink); overflow-wrap: anywhere; white-space: pre-wrap; }
 .q-note-editor { display: grid; gap: 8px; }
 .q-note-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .q-note-actions .hint { margin-right: auto; }
-.lib-input, .lib-select { width: 100%; min-height: 48px; padding: 8px 12px; font: inherit; color: var(--text); background: var(--surface); border: 2px solid var(--border); border-radius: 12px; }
+.lib-input, .lib-select { width: 100%; min-height: 48px; padding: 8px 12px; font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--edge); border-radius: var(--r2); }
+.lib-input:focus-visible, .lib-select:focus-visible { border-color: var(--cobalt); }
 .lib-selects { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .lib-selects label { min-width: 0; }
 .lib-filters { display: grid; gap: 10px; margin: 10px 0; }
 .lib-toggles { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip.lib-chip { min-height: 44px; cursor: pointer; color: var(--text); font-weight: 700; }
-.chip.lib-chip.on { border-color: var(--blue); background: var(--blue-bg); color: var(--blue-dark); }
-.lib-count { color: var(--muted); margin: 6px 0; }
+.chip.lib-chip { min-height: 44px; cursor: pointer; color: var(--ink); font-weight: 600; }
+.chip.lib-chip.on { border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); background: var(--cobalt-tint); }
+.lib-count { color: var(--graphite); margin: 6px 0; font: 500 var(--fs-13) var(--mono); }
 .link.inline { padding: 8px 4px; min-height: 44px; }
-.lib-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 12px; }
-.lib-item { padding: 12px 14px; border: 2px solid var(--border); border-radius: var(--radius); display: grid; gap: 8px; min-width: 0; }
-.lib-prompt { margin: 0; font-weight: 700; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.lib-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: 13px; align-items: center; }
+.lib-list { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 8px; }
+.lib-item { padding: 12px 14px; border: 1px solid var(--edge); border-radius: var(--r2); background: var(--sheet); display: grid; gap: 8px; min-width: 0; }
+.lib-prompt { margin: 0; font-weight: 600; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.lib-meta { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--graphite); font-size: var(--fs-13); align-items: center; }
+.lib-meta .unit-tag { display: inline-flex; gap: 6px; align-items: center; color: var(--graphite); }
+.lib-meta .unit-tag .i { color: var(--pen, var(--graphite)); }
 .lib-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .lib-actions .btn { min-height: 44px; }
-.pill.status-due { background: var(--amber-bg); color: var(--amber-text); }
-.pill.status-mastered { background: var(--green-bg); color: var(--green-text); }
 .lib-empty { padding: 16px 0; }
 .lib-search { padding-top: 6px; }
 
 /* ---------- daily challenge ---------- */
-.card.challenge { margin: 0 0 12px; }
+.card.challenge { margin: 0 0 var(--s2); }
 .card.challenge.done { border-style: dashed; }
 .card.challenge .btn { flex: none; min-height: 44px; }
 
 /* ---------- achievements ---------- */
 .badge-toast-region { position: fixed; z-index: 70; left: 0; right: 0; top: calc(env(safe-area-inset-top, 0px) + 8px); display: grid; justify-items: center; padding: 0 16px; pointer-events: none; }
-.badge-toast { pointer-events: none; display: flex; align-items: center; gap: 8px; max-width: 460px; width: 100%; padding: 8px 14px 8px 4px; border-radius: var(--radius); border: 2px solid var(--amber-text); background: var(--amber-bg); color: var(--amber-text); box-shadow: 0 4px 16px rgba(0, 0, 0, .18); animation: badge-in .25s ease-out; }
-.badge-toast .icon-btn { pointer-events: auto; flex: none; color: inherit; }
-.badge-toast-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
-.badge-toast-text small { font-size: 13px; }
-.badge-emoji { font-size: 28px; flex: none; }
-@keyframes badge-in { from { transform: translateY(-12px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .badge-toast { animation: none; } }
+.badge-toast {
+  pointer-events: none; display: flex; align-items: center; gap: 10px; max-width: 460px; width: 100%; padding: 8px 8px 8px 14px; border-radius: var(--r2);
+  border: 1px solid var(--edge); border-left: 4px solid var(--ochre); background: var(--sheet); color: var(--ink); animation: rise .16s var(--ease);
+}
+.badge-toast .icon-btn { pointer-events: auto; flex: none; color: var(--graphite); }
+.badge-toast-text { display: grid; min-width: 0; overflow-wrap: anywhere; flex: 1; }
+.badge-toast-text small { font-size: var(--fs-13); color: var(--graphite); }
+.badge-icon { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 1.5px solid var(--ochre); border-radius: var(--r2); color: var(--ochre); }
 .trophies { margin: 8px 0 18px; display: grid; gap: 10px; }
-.trophy-group h3 { font-size: 15px; color: var(--muted); margin: 8px 0; }
+.trophy-group h3 { font: 500 var(--fs-12) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); margin: 12px 0 8px; }
 .badge-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.badge { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border: 2px solid var(--border); border-radius: var(--radius); min-width: 0; }
-.badge.got { border-color: var(--amber-text); background: var(--amber-bg); color: var(--amber-text); }
-.badge.locked { opacity: .6; }
-.badge.locked .badge-emoji { filter: grayscale(1); }
+.badge { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px dashed var(--edge); border-radius: var(--r2); min-width: 0; background: none; }
+.badge.got { border-style: solid; border-color: var(--edge); border-left: 4px solid var(--ochre); background: var(--sheet); }
+.badge.locked .badge-icon { border-style: dashed; border-color: var(--edge); color: var(--graphite); }
 .badge-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
-.badge-text small { font-size: 13px; color: inherit; opacity: .85; }
+.badge-text small { font-size: var(--fs-13); color: var(--graphite); }
+.badge-text .badge-state { font: 600 var(--fs-11) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); margin-top: 2px; }
+.badge.locked .badge-state { color: var(--graphite); }
 
 /* ---------- mock interview ---------- */
 .mock-top { justify-content: space-between; }
-.mock-count { font-weight: 800; font-variant-numeric: tabular-nums; }
-.mock-timer { font-weight: 800; font-variant-numeric: tabular-nums; padding: 8px 12px; border-radius: 999px; background: var(--surface); min-height: 44px; display: inline-flex; align-items: center; }
-.mock-timer.low { background: var(--amber-bg); color: var(--amber-text); }
+.mock-count { font: 600 var(--fs-15) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.mock-timer { display: inline-flex; gap: 6px; align-items: center; font: 600 var(--fs-15) var(--mono); font-variant-numeric: tabular-nums slashed-zero; padding: 0 12px; border-radius: var(--r2); border: 1px solid var(--edge); background: var(--sheet); min-height: 44px; }
+.mock-timer.low { border: 1px dashed var(--ochre); background: var(--ochre-tint); color: var(--ink); }
+.mock-timer.low .i { color: var(--ochre); }
 .mock-palette { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.mock-dot { min-width: 44px; min-height: 44px; border-radius: 12px; border: 2px solid var(--border); background: var(--bg); color: var(--text); font-weight: 800; display: inline-flex; gap: 2px; align-items: center; justify-content: center; }
-.mock-dot.answered { background: var(--blue-bg); border-color: var(--blue); color: var(--blue-dark); }
-.mock-dot.flagged { border-color: var(--amber-text); }
-.mock-dot.current { outline: 3px solid var(--text); outline-offset: 2px; }
+.mock-dot { position: relative; min-width: 44px; min-height: 44px; padding: 0 6px; border-radius: var(--r2); border: 1px solid var(--edge); background: var(--sheet); color: var(--ink); font: 600 var(--fs-14) var(--mono); display: inline-flex; gap: 3px; align-items: center; justify-content: center; font-variant-numeric: tabular-nums slashed-zero; }
+.mock-dot.answered { background: var(--cobalt-tint); border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); }
+.mock-dot.flagged { border-style: dashed; border-color: var(--ochre); }
+.mock-dot.current { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mock-dot .i { width: 12px; height: 12px; color: var(--ochre); }
 .mock-legend { margin: 0; }
 .mock-bar { gap: 8px; }
 .mock-bar .btn { padding: 0 14px; min-width: 0; }
 .mock-bar .btn.primary:not(.wide) { min-width: 96px; }
-.mock-flag.on { color: var(--amber-text); border-color: var(--amber-text); background: var(--amber-bg); }
-.mock-confirm { border: 2px solid var(--amber-text); border-radius: var(--radius); padding: 14px; display: grid; gap: 10px; background: var(--amber-bg); color: var(--amber-text); }
+.mock-flag.on { color: var(--ink); border: 1px dashed var(--ochre); background: var(--ochre-tint); }
+.mock-flag.on .i { color: var(--ochre); }
+.mock-confirm { border: 1px solid var(--edge); border-left: 4px dashed var(--ochre); border-radius: var(--r2); padding: 14px; display: grid; gap: 10px; background: var(--sheet); color: var(--ink); }
 .mock-confirm-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.mock-setup { display: grid; gap: 14px; padding-bottom: 32px; }
+.mock-setup { display: grid; gap: 14px; padding-bottom: 32px; align-content: start; }
 .mock-choices { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip.mock-choice { min-height: 48px; cursor: pointer; color: var(--text); font-weight: 700; }
-.chip.mock-choice.on { border-color: var(--blue); background: var(--blue-bg); color: var(--blue-dark); }
-.mock-rules { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); font-size: 14px; }
-.mock-history ol { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
-.mock-history li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
-.mock-history-day { font-variant-numeric: tabular-nums; }
-.mock-results { padding-bottom: 120px; display: grid; gap: 14px; }
+.chip.mock-choice { min-height: 48px; cursor: pointer; color: var(--ink); font-weight: 600; }
+.chip.mock-choice.on { border-color: var(--cobalt); box-shadow: inset 0 0 0 1px var(--cobalt); background: var(--cobalt-tint); }
+.mock-rules { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--graphite); font-size: var(--fs-14); }
+.mock-history ol { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--ink); }
+.mock-history li { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--hairline); }
+.mock-history li b { font-family: var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.mock-history-day { font: 500 var(--fs-13) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--graphite); }
+.mock-results { padding-bottom: 120px; display: grid; gap: 14px; align-content: start; }
 .mock-score { display: grid; gap: 6px; }
+.mock-score .big-number { font-size: var(--fs-72); line-height: 1; letter-spacing: -.04em; font-weight: 500; }
 .mock-qlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.mock-q { border: 2px solid var(--border); border-radius: var(--radius); padding: 4px 12px; min-width: 0; }
-.mock-q.good { border-color: var(--green); }
-.mock-q.bad { border-color: var(--red); }
-.mock-q.meh { border-color: var(--amber-text); }
+.mock-q { border: 1px solid var(--edge); border-left-width: 4px; border-radius: var(--r2); padding: 0 12px; min-width: 0; background: var(--sheet); }
+.mock-q.good { border-left-color: var(--teal); }
+.mock-q.bad { border-left-color: var(--vermilion); }
+.mock-q.meh { border-left-style: dashed; border-left-color: var(--ochre); }
 .mock-q summary { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; align-items: start; padding: 8px 0; min-height: 44px; }
-.mock-q-num { font-weight: 800; }
-.mock-q-text { overflow-wrap: anywhere; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.mock-q-state { grid-column: 2; color: var(--muted); font-size: 13px; }
+.mock-q-num { font: 600 var(--fs-14) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+.mock-q-text { overflow-wrap: anywhere; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mock-q-state { grid-column: 2; display: flex; gap: 6px; align-items: center; color: var(--graphite); font: 600 var(--fs-12) var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.mock-q.good .mock-q-state { color: var(--teal); }
+.mock-q.bad .mock-q-state { color: var(--vermilion); }
+.mock-q.meh .mock-q-state { color: var(--ochre); }
 .mock-q .feedback { margin: 4px 0 10px; }
-.mock-saved { border: 2px solid var(--green); border-radius: var(--radius); padding: 14px; display: grid; gap: 8px; background: var(--green-bg); color: var(--green-text); }
+.mock-saved { border: 1px solid var(--edge); border-left: 4px solid var(--teal); border-radius: var(--r2); padding: 14px; display: grid; gap: 8px; background: var(--sheet); color: var(--ink); }
 .mock-results-bar { justify-content: space-between; }
 .answer-area[hidden] { display: none; }

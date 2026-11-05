@@ -1,6 +1,6 @@
 // Minimal offline support: the whole course ships inside the JS bundle, so caching the app shell
 // is enough to practise with no network. API calls are never cached (grading falls back to self-check).
-const CACHE = 'interview-trainer-v2';
+const CACHE = 'interview-trainer-v3';
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/manifest.webmanifest', '/icon.svg'])));
