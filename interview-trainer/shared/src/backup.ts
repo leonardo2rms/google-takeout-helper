@@ -65,7 +65,7 @@ export function importProgress(text: string, ctx: MigrationContext): ImportResul
 const later = (a: string | null, b: string | null): string | null => (a === null ? b : b === null ? a : a >= b ? a : b);
 const maxRecord = <T>(a: Record<string, T>, b: Record<string, T>, pick: (x: T, y: T) => T): Record<string, T> => {
   const out: Record<string, T> = { ...a };
-  for (const [k, v] of Object.entries(b)) out[k] = k in out ? pick(out[k]!, v) : v;
+  for (const [k, v] of Object.entries(b)) out[k] = Object.hasOwn(out, k) ? pick(out[k]!, v) : v;
   return out;
 };
 

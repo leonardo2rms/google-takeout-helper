@@ -1,5 +1,4 @@
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import {
   ExplainRequest, GradeRequest, allQuestions, explainableQuestions, openParts,
@@ -100,7 +99,8 @@ export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute
 
   if (staticDir && existsSync(staticDir)) {
     app.use(express.static(staticDir));
-    app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile(join(staticDir, 'index.html')));
+    // `root` (not a joined absolute path): sendFile refuses paths with a dot-directory in them (e.g. /srv/.apps/trainer/...).
+    app.get(/^(?!\/api\/).*/, (_req, res) => res.sendFile('index.html', { root: staticDir }));
   }
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

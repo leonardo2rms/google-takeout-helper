@@ -75,6 +75,8 @@ export const emptyExtras = (): ProgressExtras => ({
 });
 
 type Obj = Record<string, unknown>;
+/** Keys that must never be copied into a plain object: assigning `__proto__` would swap the object's prototype. */
+export const safeKey = (k: string): boolean => k !== '__proto__';
 const isObj = (x: unknown): x is Obj => typeof x === 'object' && x !== null && !Array.isArray(x);
 const nat = (x: unknown, max = Number.MAX_SAFE_INTEGER): number => (typeof x === 'number' && Number.isFinite(x) ? Math.min(max, Math.max(0, Math.floor(x))) : 0);
 const triple = (x: unknown): [number, number, number] => {
@@ -90,7 +92,7 @@ function normalizeMock(raw: unknown): MockRecord | null {
   const byUnit: MockRecord['byUnit'] = {};
   if (isObj(raw.byUnit)) {
     for (const [id, v] of Object.entries(raw.byUnit)) {
-      if (id.length > KEY_MAX || !isObj(v)) continue;
+      if (id.length > KEY_MAX || !safeKey(id) || !isObj(v)) continue;
       const n = nat(v.n, 200);
       const score = typeof v.score === 'number' && Number.isFinite(v.score) ? Math.min(n, Math.max(0, v.score)) : 0;
       if (n > 0) byUnit[id] = { n, score: Math.round(score * 100) / 100 };
@@ -117,7 +119,7 @@ export function normalizeExtras(p: Obj, today: Day): ProgressExtras {
   const bookmarks: ProgressExtras['bookmarks'] = {};
   if (isObj(p.bookmarks)) {
     for (const [id, b] of Object.entries(p.bookmarks)) {
-      if (id.length > KEY_MAX || !isObj(b) || typeof b.h !== 'string' || b.h === '') continue;
+      if (id.length > KEY_MAX || !safeKey(id) || !isObj(b) || typeof b.h !== 'string' || b.h === '') continue;
       if (Object.keys(bookmarks).length >= MAX_BOOKMARKS) break;
       bookmarks[id] = { h: b.h, day: isDay(b.day) ? b.day : today };
     }
@@ -126,7 +128,7 @@ export function normalizeExtras(p: Obj, today: Day): ProgressExtras {
   const notes: ProgressExtras['notes'] = {};
   if (isObj(p.notes)) {
     for (const [id, v] of Object.entries(p.notes)) {
-      if (id.length > KEY_MAX || !isObj(v) || typeof v.h !== 'string' || v.h === '' || typeof v.text !== 'string') continue;
+      if (id.length > KEY_MAX || !safeKey(id) || !isObj(v) || typeof v.h !== 'string' || v.h === '' || typeof v.text !== 'string') continue;
       const text = v.text.trim().slice(0, MAX_NOTE_CHARS);
       if (text === '') continue;
       if (Object.keys(notes).length >= MAX_NOTES) break;
@@ -143,7 +145,7 @@ export function normalizeExtras(p: Obj, today: Day): ProgressExtras {
 
   const achievements: ProgressExtras['achievements'] = {};
   if (isObj(p.achievements)) {
-    for (const [id, d] of Object.entries(p.achievements)) if (id.length <= KEY_MAX && id !== '') achievements[id] = isDay(d) ? d : today;
+    for (const [id, d] of Object.entries(p.achievements)) if (id.length <= KEY_MAX && id !== '' && safeKey(id)) achievements[id] = isDay(d) ? d : today;
   }
 
   const mocks = (Array.isArray(p.mocks) ? p.mocks : [])
@@ -152,14 +154,14 @@ export function normalizeExtras(p: Obj, today: Day): ProgressExtras {
     .slice(0, MAX_MOCKS);
 
   const passedByType: ProgressExtras['passedByType'] = {};
-  if (isObj(p.passedByType)) for (const [t, v] of Object.entries(p.passedByType)) if (t.length <= 20 && nat(v) > 0) passedByType[t] = nat(v);
+  if (isObj(p.passedByType)) for (const [t, v] of Object.entries(p.passedByType)) if (t.length <= 20 && safeKey(t) && nat(v) > 0) passedByType[t] = nat(v);
 
   return { calibration: { n, right }, bookmarks, notes, challenge, achievements, mocks, passedByType };
 }
 
 const maxRec = (a: Record<string, number>, b: Record<string, number>): Record<string, number> => {
   const out = { ...a };
-  for (const [k, v] of Object.entries(b)) out[k] = Math.max(out[k] ?? 0, v);
+  for (const [k, v] of Object.entries(b)) out[k] = Math.max(Object.hasOwn(out, k) ? out[k]! : 0, v);
   return out;
 };
 
@@ -179,7 +181,7 @@ export function mergeExtras(local: ProgressExtras, incoming: ProgressExtras): Pr
   for (const [day, r] of Object.entries(incoming.challenge)) challenge[day] = challenge[day] === 'pass' || r === 'pass' ? 'pass' : 'fail';
 
   const achievements = { ...local.achievements };
-  for (const [id, d] of Object.entries(incoming.achievements)) achievements[id] = id in achievements && achievements[id]! <= d ? achievements[id]! : d;
+  for (const [id, d] of Object.entries(incoming.achievements)) achievements[id] = Object.hasOwn(achievements, id) && achievements[id]! <= d ? achievements[id]! : d;
 
   const seen = new Set<string>();
   const mocks = [...local.mocks, ...incoming.mocks]

@@ -5,7 +5,7 @@ import {
   DAYS_KEPT, DEFAULT_GOAL, MAX_FREEZES, MAX_INTERVAL, MAX_REST_DAYS, ROLE_IDS, emptyProgress,
   type Card, type DayLog, type LessonRecord, type Progress,
 } from './progress';
-import { normalizeExtras } from './extras';
+import { normalizeExtras, safeKey } from './extras';
 import { normalizePrefs } from './prefs';
 import { rankFor } from './rank';
 import type { Question } from './schema';
@@ -51,7 +51,7 @@ function normalizeCards(raw: unknown, today: Day): Progress['cards'] {
   const out: Progress['cards'] = {};
   if (!isObj(raw)) return out;
   for (const [id, c] of Object.entries(raw)) {
-    if (!isObj(c) || typeof c.h !== 'string' || c.h === '' || !isDay(c.due)) continue;
+    if (!safeKey(id) || !isObj(c) || typeof c.h !== 'string' || c.h === '' || !isDay(c.due)) continue;
     // A due date far in the future can only come from clock skew: pull it back inside the interval cap.
     const due = daysBetween(today, c.due) > MAX_INTERVAL ? addDays(today, MAX_INTERVAL) : c.due;
     const card: Card = {
@@ -92,7 +92,7 @@ function normalizeLessons(raw: unknown, today: Day): Progress['lessons'] {
   const out: Progress['lessons'] = {};
   if (!isObj(raw)) return out;
   for (const [id, r] of Object.entries(raw)) {
-    if (!isObj(r)) continue;
+    if (!safeKey(id) || !isObj(r)) continue;
     const rec: LessonRecord = {
       bestAccuracy: typeof r.bestAccuracy === 'number' && Number.isFinite(r.bestAccuracy) ? Math.min(1, Math.max(0, r.bestAccuracy)) : 0,
       completions: int(r.completions, 0, BIG, 0),
@@ -118,7 +118,7 @@ export function normalizeProgress(input: unknown, ctx: MigrationContext): Progre
   const streak = int(p.streak, 0, BIG, 0);
   const rest = Array.isArray(profile.restDays) ? [...new Set(profile.restDays.filter((x): x is number => Number.isInteger(x) && x >= 0 && x <= 6))].sort() : [];
   const milestones: Progress['milestones'] = {};
-  if (isObj(p.milestones)) for (const [k, v] of Object.entries(p.milestones)) if (k.length > 0 && k.length <= 80) milestones[k] = isDay(v) ? v : ctx.today;
+  if (isObj(p.milestones)) for (const [k, v] of Object.entries(p.milestones)) if (k.length > 0 && k.length <= 80 && safeKey(k)) milestones[k] = isDay(v) ? v : ctx.today;
 
   return {
     version: 2,

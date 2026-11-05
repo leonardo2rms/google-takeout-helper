@@ -61,3 +61,19 @@ describe('mockResults', () => {
     ]);
   });
 });
+
+describe('markMock: a failing runner or grader never loses the mock', () => {
+  it('regression: a code runner that throws marks that question as failed and the rest are still marked', async () => {
+    const run = async () => { throw new Error('worker exploded'); };
+    const out = await markMock(questions, { ...ans({ type: 'single', selected: 'a' }, single.id), ...ans({ type: 'code', source: 'function f() { return 1 }' }, code.id) }, undefined, run);
+    expect(out[single.id]!.correct).toBe(true);
+    expect(out[code.id]).toEqual({ correct: false });
+    expect(out[open.id]!.skipped).toBe(true);
+  });
+
+  it('a grader that throws synchronously falls back to the keyword checklist', async () => {
+    const grade: GradeFn = () => { throw new Error('sync boom'); };
+    const out = await markMock(questions, ans({ type: 'open', text: 'backoff and jitter' }, open.id), grade, undefined);
+    expect(out[open.id]!.open).toMatchObject({ gradedBy: 'self', covered: [true, true] });
+  });
+});

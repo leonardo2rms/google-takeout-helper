@@ -1,5 +1,34 @@
-import { describe, expect, it } from 'vitest';
-import { cappedCount, forecastText, inDays, plural } from './format';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { WEEKDAYS, cappedCount, forecastText, inDays, plural, prefersReducedMotion } from './format';
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe('format edge cases', () => {
+  it('inDays treats negative values as tomorrow and larger ones as a plural', () => {
+    expect(inDays(-4)).toBe('tomorrow');
+    expect(inDays(2)).toBe('in 2 days');
+  });
+  it('cappedCount honours a custom cap and the exact boundary', () => {
+    expect(cappedCount(10, 10)).toBe('10');
+    expect(cappedCount(11, 10)).toBe('10+');
+    expect(cappedCount(0)).toBe('0');
+  });
+  it('prefersReducedMotion reads the media query and is false when matchMedia is missing or throws', () => {
+    vi.stubGlobal('window', { matchMedia: (q: string) => ({ matches: q.includes('reduce') }) });
+    expect(prefersReducedMotion()).toBe(true);
+    vi.stubGlobal('window', { matchMedia: () => ({ matches: false }) });
+    expect(prefersReducedMotion()).toBe(false);
+    vi.stubGlobal('window', {});
+    expect(prefersReducedMotion()).toBe(false);
+    vi.unstubAllGlobals();
+    expect(prefersReducedMotion()).toBe(false);
+  });
+  it('WEEKDAYS is indexed like Date#getDay (Sunday first)', () => {
+    expect(WEEKDAYS).toHaveLength(7);
+    expect(WEEKDAYS[new Date(2026, 5, 14).getDay()]).toBe('Sunday');
+    expect(WEEKDAYS[new Date(2026, 5, 15).getDay()]).toBe('Monday');
+  });
+});
 
 describe('format helpers', () => {
   it('inDays', () => {
