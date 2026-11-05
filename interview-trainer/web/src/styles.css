@@ -292,8 +292,8 @@ button.card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
   background:
     linear-gradient(to right, var(--code) 30%, transparent) left center / 28px 100% no-repeat local,
     linear-gradient(to left, var(--code) 30%, transparent) right center / 28px 100% no-repeat local,
-    linear-gradient(to right, var(--edge), transparent) left center / 12px 100% no-repeat scroll,
-    linear-gradient(to left, var(--edge), transparent) right center / 12px 100% no-repeat scroll,
+    linear-gradient(to right, var(--edge), transparent) left center / 8px 100% no-repeat scroll,
+    linear-gradient(to left, var(--edge), transparent) right center / 8px 100% no-repeat scroll,
     var(--code);
 }
 .code[data-lang]::before {

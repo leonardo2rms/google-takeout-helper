@@ -82,6 +82,13 @@ describe('drawShareCard', () => {
     expect(texts.some((t) => /weakest|course seen/i.test(t))).toBe(false);
   });
 
+  it('leaves out lessons and days practised while they are still zero', () => {
+    const { texts } = draw({ ...card, lessonsDone: 0, daysPracticed: 0 });
+    expect(texts).not.toContain('LESSONS');
+    expect(texts).not.toContain('DAYS PRACTISED');
+    expect(texts).toContain('RANK');
+  });
+
   it('says "day" for a streak of one and "days" otherwise', () => {
     const one = draw({ ...card, streak: 1 }).texts;
     expect(one).toContain('day');

@@ -115,9 +115,9 @@ export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void 
   // ruled readout: rank, lessons, days practised, and readiness once it means something
   const rows: [string, string][] = [
     ['Rank', card.rank],
-    ['Lessons', `${card.lessonsDone} of ${card.lessonsTotal}`],
-    ['Days practised', String(card.daysPracticed)],
   ];
+  if (card.lessonsDone > 0) rows.push(['Lessons', `${card.lessonsDone} of ${card.lessonsTotal}`]);
+  if (card.daysPracticed > 0) rows.push(['Days practised', String(card.daysPracticed)]);
   if (card.readiness) rows.push(['Readiness', `${card.readiness.score}  ${card.readiness.label}`]);
   let y = 560;
   ctx.fillStyle = C.ink;
