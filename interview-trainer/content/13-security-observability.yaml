@@ -39,10 +39,10 @@ lessons:
             HTTP/1.1 200 OK
             {"id": 1042, "customer": "bob", "total": 920.00}
         options:
-          - { id: a, text: "Broken access control (IDOR): Alice is authenticated but never authorised for this invoice; check ownership on each access" }
-          - { id: b, text: "SQL injection: the id is concatenated into a query, so the fix is to switch to prepared statements" }
-          - { id: c, text: "Cross-site scripting: the JSON response is returned unescaped, so HTML-encode each field before sending it" }
-          - { id: d, text: "Weak token generation: Alice's token is guessable, so issue longer random tokens" }
+          - { id: a, text: "Broken access control, an IDOR, fixed by checking that the caller owns the invoice on each access" }
+          - { id: b, text: "SQL injection through the id concatenated into the query, fixed by switching to prepared statements" }
+          - { id: c, text: "Cross-site scripting in the unescaped JSON response, fixed by HTML-encoding each field before sending" }
+          - { id: d, text: "A weak or guessable token issued to Alice, fixed by issuing longer random tokens" }
         answer: a
         explanation: "Authentication answered 'who are you?'; authorization must still answer 'may you do this to that record?'. Broken access control tops the OWASP Top 10. The token worked and nothing was injected or reflected into a page: the server simply returned another user's record. Hard-to-guess ids are not a fix, only obscurity. Scope the query by the caller (`WHERE id = ? AND customer_id = ?`) or check the permission centrally."
 
@@ -59,10 +59,10 @@ lessons:
       - type: single
         prompt: "Which practice best reduces the supply-chain risk of third-party dependencies?"
         options:
-          - { id: a, text: "Pin exact versions with a lockfile or checksums, scan automatically, and upgrade through reviewed changes" }
-          - { id: b, text: "Declare dynamic version ranges such as `latest.release` so that fixes arrive without delay and without manual review" }
+          - { id: a, text: "Pin exact versions in a lockfile, scan continuously, and upgrade through reviewed changes" }
+          - { id: b, text: "Declare dynamic version ranges such as `latest.release`, letting fixes arrive without delay or manual review" }
           - { id: c, text: "Trust any library with many downloads, and skip reviewing its updates because the community already did" }
-          - { id: d, text: "Scan the dependencies once at project start and then freeze the list, since they do not change afterwards" }
+          - { id: d, text: "Scan the dependencies once at project start, then freeze the list and treat it as safe from then on" }
         answer: a
         explanation: "Dependencies are code you run with your privileges. Floating versions let an unreviewed (possibly malicious) release in, and new vulnerabilities are published against old versions all the time, so scanning must be continuous. An SBOM and signed or verified artifacts help you answer 'are we affected?' quickly."
 
@@ -80,10 +80,10 @@ lessons:
       - type: single
         prompt: "Which is the best way to store user passwords?"
         options:
-          - { id: a, text: "Hash them with a slow, salted, adaptive algorithm such as bcrypt or Argon2 and store only the hash" }
-          - { id: b, text: "Store SHA-256(password) with no salt, so that lookups by hash are fast and simple" }
-          - { id: c, text: "Encrypt them with AES and keep the key in the application config, so support can recover forgotten passwords" }
-          - { id: d, text: "Store SHA-256(salt + password): a per-user salt makes any fast hash safe against offline guessing" }
+          - { id: a, text: "Hash them with a slow, salted, adaptive algorithm such as Argon2id and store only the hash" }
+          - { id: b, text: "Store an unsalted SHA-256 hash of each password, keeping lookups by hash fast and simple" }
+          - { id: c, text: "Encrypt them with AES (key in the application config) so support can recover forgotten passwords" }
+          - { id: d, text: "Store a salted SHA-256 hash, as a per-user salt makes any fast hash safe against offline guessing" }
         answer: a
         explanation: "Attackers who steal a hash table try billions of guesses per second against fast hashes; a deliberately slow, memory- or CPU-hard function with a per-user salt makes that expensive and defeats precomputed tables. Reversible encryption means one leaked key exposes every password, and nobody needs to recover a password, only to reset it."
 
@@ -222,10 +222,10 @@ lessons:
       - type: single
         prompt: "Which of these is the best page-worthy alert for a checkout API with a 99.9% availability SLO?"
         options:
-          - { id: a, text: "The error budget is burning far faster than allowed (high burn rate over a long and a short window)" }
-          - { id: b, text: "CPU on a host exceeds 70% for one minute, because saturation precedes an outage and users feel it later" }
-          - { id: c, text: "A single HTTP 500 response, because a server error is a failed customer request" }
-          - { id: d, text: "A garbage-collection pause longer than 50 ms occurs, because pauses add to checkout latency" }
+          - { id: a, text: "The error budget is burning much faster than allowed (high burn rate over a long and a short window)" }
+          - { id: b, text: "CPU on a host stays above 70% for one minute: saturation comes before an outage that users feel later" }
+          - { id: c, text: "A single HTTP 500 response: every server error is a failed customer request" }
+          - { id: d, text: "A garbage-collection pause longer than 50 ms, which adds directly to checkout latency" }
         answer: a
         explanation: "Page on symptoms users feel and that need a human now, tied to the SLO. Causes such as CPU or GC are for dashboards and tickets: they fire without user impact and miss problems that have other causes. The short window makes the alert reset quickly once the problem stops."
 
@@ -242,9 +242,9 @@ lessons:
                  `- fx-service  GET  /rate    TIMEOUT 1050 ms
         options:
           - { id: a, text: "The call from pricing-service to fx-service, which took about 1050 ms and timed out" }
-          - { id: b, text: "auth-service (35 ms), because authentication runs first and each later call has to wait for it" }
-          - { id: c, text: "The database query in pricing-service (20 ms), since SQL is the usual cause of slow requests" }
-          - { id: d, text: "cart-service (60 ms), since it is the middle call and carts are usually the slowest part" }
+          - { id: b, text: "auth-service (35 ms): authentication runs first and each later call has to wait for it" }
+          - { id: c, text: "The database query in pricing-service, since SQL is the usual cause of slow requests" }
+          - { id: d, text: "cart-service, the middle call at 60 ms, as carts are usually the slowest part of checkout" }
         answer: a
         explanation: "Read a trace by finding the span that accounts for most of the time: the fx-service call is nearly the whole 1105 ms of pricing. Next questions: why does it time out (the dependency, the network, a missing deadline?), and should pricing cache rates or fall back to the last known value rather than wait?"
 
