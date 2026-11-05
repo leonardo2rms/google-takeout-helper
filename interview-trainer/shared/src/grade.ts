@@ -32,7 +32,7 @@ export function gradeSpot(q: SpotQ, selected: readonly number[]): boolean {
 }
 
 /**
- * Parses what a person types as a number: "50", "1,234.5", "1 234", "18,2", "18.2%", "5k".
+ * Parses what a person types as a number: "50", "1,234.5", "1.234,5", "1 234", "18,2", "18.2%", "5k".
  * A lone comma followed by exactly three digits groups ("1,234" = 1234); any other lone comma is a decimal.
  */
 export function parseNumber(raw: string): number | null {
@@ -43,8 +43,10 @@ export function parseNumber(raw: string): number | null {
     mult = 1000;
     s = s.slice(0, -1);
   }
-  if (s.includes(',') && s.includes('.')) s = s.replace(/,/g, '');
-  else if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
+  if (s.includes(',') && s.includes('.')) {
+    // Both separators: the one that comes last is the decimal point ("1,234.5" and "1.234,5" are both 1234.5).
+    s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  } else if (/^\d{1,3}(,\d{3})+$/.test(s)) s = s.replace(/,/g, '');
   else s = s.replace(',', '.');
   if (!/^[-+]?(\d+\.?\d*|\.\d+)$/.test(s)) return null;
   const n = Number(s) * mult;
