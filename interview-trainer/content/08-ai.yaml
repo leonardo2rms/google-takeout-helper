@@ -20,12 +20,12 @@ lessons:
         prompt: Select all habits that improve the quality of AI-assisted coding.
         options:
           - { id: a, text: "Provide relevant context: conventions, constraints and the files involved" }
-          - { id: b, text: "Work in small steps, each with its own tests and a clear acceptance check" }
+          - { id: b, text: "Ask for the whole feature in one large prompt so the design stays consistent" }
           - { id: c, text: "Accept large multi-file diffs without reading them; passing tests are enough" }
           - { id: d, text: "Feed failing tests and compiler errors back to the assistant" }
           - { id: e, text: "Turn off static analysis so the assistant isn't distracted by warnings" }
-        answers: [a, b, d]
-        explanation: "Tight feedback loops (compile, test, lint) are what let an assistant correct itself, and small diffs are reviewable. Passing tests only prove what the tests cover."
+        answers: [a, d]
+        explanation: "Tight feedback loops (compile, test, lint) are what let an assistant correct itself. Small steps, each with its own tests, keep every diff reviewable; one prompt for a whole feature produces a large diff that nobody reads properly. Passing tests only prove what the tests cover."
 
       - type: single
         prompt: "The assistant suggests `list.chunkedBy(3)`, which doesn't exist in the Kotlin stdlib (`chunked(3)` does). What's the best general defence against this kind of hallucination?"
@@ -288,9 +288,9 @@ lessons:
           - { id: b, text: "In pairwise comparisons, run each pair in both orders to control position bias" }
           - { id: c, text: "Give it a rubric with specific criteria, which is more consistent than a vague 1-10 quality score" }
           - { id: d, text: "Use the same model that wrote the answers as the only judge, because it understands its own output best" }
-          - { id: e, text: "Treat a higher judge score for longer answers as proof that the change is an improvement" }
-        answers: [a, b, c]
-        explanation: "LLM judges are useful but biased: they tend to prefer the first (or last) option, longer answers, and output from their own model family. Counter this with swapped orders, specific rubrics, a different or stronger judge model, and regular spot checks against human labels. Where a deterministic check exists (a schema, a unit test, an exact match) use that instead."
+          - { id: e, text: "Prefer a deterministic check, such as a schema or an exact match, where one is available" }
+        answers: [a, b, c, e]
+        explanation: "LLM judges are useful but biased: they tend to prefer the first (or last) option, longer answers, and output from their own model family. Counter this with swapped orders, specific rubrics, a different or stronger judge model, and regular spot checks against human labels. Where a deterministic check exists (a schema, a unit test, an exact match), use that instead: it is cheaper and does not drift."
 
       - type: estimate
         prompt: "Made-up prices: $1 per million input tokens and $5 per million output tokens. A feature handles 1,000,000 requests per day, each with 3,000 input tokens and 500 output tokens. A response cache answers 30% of the requests without calling the model (ignore the cost of the cache). What is the daily model cost, in dollars?"

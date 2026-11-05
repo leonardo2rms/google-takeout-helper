@@ -238,11 +238,11 @@ lessons:
         options:
           - { id: a, text: "In cache-aside, the app reads the cache first; on a miss it loads from the database and fills the cache" }
           - { id: b, text: "A cache stampede happens when many requests miss on the same expired hot key and all hit the database" }
-          - { id: c, text: "Write-through updates the cache and the database in the same write, which makes stale reads of recent writes rare" }
+          - { id: c, text: "Write-through keeps the cache and the database consistent even if one of the two writes fails" }
           - { id: d, text: "Write-behind (write-back) is the safest strategy against data loss, as the cache buffers every write" }
           - { id: e, text: "Setting a TTL guarantees that clients never see stale data, as each entry expires on time and is reloaded" }
-        answers: [a, b, c]
-        explanation: "Write-behind acknowledges before the database has the data, so a cache crash loses recent writes: it buys speed, not safety. A TTL only bounds how long data can be stale. Stampedes are tamed with request coalescing (one loader per key), jittered TTLs or early refresh."
+        answers: [a, b]
+        explanation: "Write-through updates the cache and the database on the same write path, which makes stale reads of recent writes rare, but the two writes are not atomic: if one fails, they disagree until the entry is rewritten or expires. Write-behind acknowledges before the database has the data, so a cache crash loses recent writes: it buys speed, not safety. A TTL only bounds how long data can be stale. Stampedes are tamed with request coalescing (one loader per key), jittered TTLs or early refresh."
 
       - type: spot
         prompt: "A crash in the middle of processing silently loses messages. Tap the line responsible."

@@ -31,10 +31,10 @@ lessons:
           - { id: a, text: "Cache frequently-read, rarely-changed data" }
           - { id: b, text: "Route read-only queries to read replicas" }
           - { id: c, text: "Return projections and paginate instead of loading full entities" }
-          - { id: d, text: "Raise the connection pool size to 1,000" }
+          - { id: d, text: "Index the columns that frequent slow queries filter and sort on" }
           - { id: e, text: "Retry timed-out queries at once and without a limit" }
-        answers: [a, b, c]
-        explanation: "Raising the pool to 1,000 makes the database spend more time context-switching, and retrying timed-out queries immediately and indefinitely is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
+        answers: [a, b, c, d]
+        explanation: "Caching, replicas, lean projections and the right indexes each cut the work per read or move it elsewhere. Replicas need you to tolerate replication lag on those reads. Retrying timed-out queries immediately and indefinitely is a retry storm that turns a slowdown into an outage."
 
       - type: single
         hint: "Many callers reload the same value at once. How could one caller do the work for all of them?"

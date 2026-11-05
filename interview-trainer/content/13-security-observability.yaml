@@ -23,10 +23,10 @@ lessons:
           - { id: a, text: "Parameterized queries (prepared statements) with bound values" }
           - { id: b, text: "Allowlisting dynamic identifiers, such as a sort column, instead of concatenating user text" }
           - { id: c, text: "Connecting with a database account that has only the privileges the application needs" }
-          - { id: d, text: "Removing single quotes from the input with a `replace` call" }
-          - { id: e, text: "Blocklisting words like DROP and UNION in the input" }
-        answers: [a, b, c]
-        explanation: "Bound parameters are the real fix. Identifiers cannot be bound, so they need an allowlist. A least-privilege account limits the damage if something slips through. Escaping and blocklists are fragile: attackers use other encodings, other quote styles and other keywords."
+          - { id: d, text: "Validating typed input strictly, such as parsing an id parameter as a number" }
+          - { id: e, text: "Blocklisting keywords such as DROP and UNION in the input before it reaches the query" }
+        answers: [a, b, c, d]
+        explanation: "Bound parameters are the real fix. Identifiers cannot be bound, so they need an allowlist, and strict validation of typed input (an id must parse as a number) is a cheap extra layer. A least-privilege account limits the damage if something slips through. Blocklists are fragile: attackers use other encodings, other quote styles and other keywords."
 
       - type: single
         prompt: "Alice is logged in and can read Bob's invoice just by changing the id in the URL. What is the flaw and the right fix?"
@@ -71,11 +71,11 @@ lessons:
         options:
           - { id: a, text: "The payload of a signed JWT is only Base64URL-encoded, so anyone holding the token can read the claims" }
           - { id: b, text: "The verifier should pin the algorithms it accepts instead of trusting the token's own `alg` header" }
-          - { id: c, text: "A self-contained access token is hard to revoke before it expires, so keep its lifetime short" }
-          - { id: d, text: "Signing a JWT also encrypts its contents, so sensitive data can safely be stored in the claims" }
+          - { id: c, text: "A self-contained access token is revoked at once when the user's session on the server is deleted" }
+          - { id: d, text: "Signing a JWT also encrypts its contents, so sensitive data can safely be stored in the token's claims" }
           - { id: e, text: "A valid signature is enough: the expiry (`exp`) and audience (`aud`) checks are optional extras" }
-        answers: [a, b, c]
-        explanation: "A signature gives integrity and authenticity, not secrecy (that needs JWE or simply not putting secrets in claims). Accepting whatever `alg` the token declares, including `none`, has caused real forgeries. Always validate signature, `exp`, issuer and audience."
+        answers: [a, b]
+        explanation: "A signature gives integrity and authenticity, not secrecy (that needs JWE or simply not putting secrets in claims). Accepting whatever `alg` the token declares, including `none`, has caused real forgeries. A self-contained token is checked by its signature alone, so deleting a server-side session does not stop it: it stays valid until `exp` unless you add a denylist or introspection, which is why access tokens are kept short-lived. Always validate signature, `exp`, issuer and audience."
 
       - type: single
         prompt: "Which is the best way to store user passwords?"

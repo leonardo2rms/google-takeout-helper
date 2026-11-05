@@ -252,12 +252,12 @@ lessons:
         prompt: Select all operations that run in O(log n).
         options:
           - { id: a, text: "TreeMap.get" }
-          - { id: b, text: "PriorityQueue.offer" }
+          - { id: b, text: "PriorityQueue.peek" }
           - { id: c, text: "Collections.binarySearch on a sorted ArrayList" }
           - { id: d, text: "HashMap.get (expected)" }
           - { id: e, text: "ArrayDeque.addFirst" }
-        answers: [a, b, c]
-        explanation: "TreeMap is a red-black tree, PriorityQueue is a binary heap (offer/poll are O(log n); peek is O(1)), and binary search halves the range. HashMap.get and ArrayDeque.addFirst are O(1)."
+        answers: [a, c]
+        explanation: "TreeMap is a red-black tree and binary search halves the range, so both are O(log n). PriorityQueue is a binary heap: offer and poll are O(log n), but peek only reads the root, which is O(1). HashMap.get (expected) and ArrayDeque.addFirst (amortised) are O(1) as well."
 
       - type: single
         prompt: "What is the complexity of this loop on an `ArrayList`, and what is a better data structure?"
