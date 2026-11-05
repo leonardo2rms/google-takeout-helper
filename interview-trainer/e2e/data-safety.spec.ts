@@ -83,6 +83,7 @@ test.describe('storage that is blocked outright (a sandboxed host)', () => {
     await practiceOne(page, 0);
     const banner = page.getByTestId('not-saved');
     await expect(banner).toContainText('Your progress is not being saved');
+    await banner.getByRole('button', { name: 'Details' }).click(); // one line first; the explanation and the backup are behind Details
     await expect(banner).toContainText('blocks storage');
 
     const [download] = await Promise.all([page.waitForEvent('download'), banner.getByRole('button', { name: 'Download backup' }).click()]);
@@ -108,6 +109,7 @@ test.describe('storage that is blocked outright (a sandboxed host)', () => {
     await page.goto('/');
     await practiceOne(page, 0);
     const banner = page.getByTestId('not-saved');
+    await banner.getByRole('button', { name: 'Details' }).click();
     await banner.getByRole('button', { name: 'Copy backup text' }).click();
     await expect(banner.getByRole('textbox', { name: 'Backup text' })).toHaveValue(/"xp": 10/);
     await expect(banner).toContainText('Copying is blocked here');

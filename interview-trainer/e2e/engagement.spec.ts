@@ -45,7 +45,7 @@ test.describe('upgrading from v1', () => {
     // the welcome gift is announced once, in the next summary, without a retroactive rank-up
     await playLesson(page, LESSON);
     await expect(page.getByTestId('summary-notes')).toContainText('welcome gift');
-    await expect(page.getByTestId('celebration')).not.toContainText('New rank');
+    await expect(page.getByTestId('celebration').filter({ hasText: 'New rank' })).toHaveCount(0);
   });
 
   test('unreadable or newer storage never crashes, is not overwritten on load, and is backed up before the first save', async ({ page }) => {
@@ -171,8 +171,8 @@ test.describe('review queue', () => {
     await expect(page.locator('.summary')).toContainText('1 question to revisit');
     await homeAfterSummary(page);
 
-    // same day: only the missed question is waiting
-    await expect(dueCount(page)).toHaveText('1 due');
+    // same day: only the missed question is waiting (its card is not due until tomorrow, so it is a retry, not a "due")
+    await expect(dueCount(page)).toHaveText('1 missed to retry');
     await page.screenshot({ path: `${SHOTS}/home-review-due.png` });
     await page.getByTestId('due-card').click();
     await expect(page.locator('.prompt')).toBeVisible();
@@ -468,7 +468,9 @@ test.describe('export and import', () => {
     await expect(goalText(page)).toHaveText('7/8');
     const after = await stored(page);
     expect(after!.cards).toEqual(before!.cards);
-    expect(after).toEqual(before);
+    // the one-time "make tomorrow easy" flag is a device preference: a reset clears it, an import never restores it
+    const local = (p: typeof before) => ({ ...p!, prefs: { ...p!.prefs, reminders: { ...p!.prefs.reminders, nudged: undefined } } });
+    expect(local(after)).toEqual(local(before));
 
     // restored state survives a reload
     await page.reload();
@@ -543,7 +545,7 @@ test.describe('celebrations', () => {
       await page.locator('.prompt').waitFor();
       for (const q of LESSON_Q) await solveAndContinue(page, q);
       await expect(page.locator('.summary h1')).toHaveText('Clean run');
-      await expect(page.getByTestId('celebration')).toBeVisible();
+      await expect(page.getByTestId('celebration')).toHaveCount(0); // the heading already says it: no second "Perfect lesson" card
       await expect(page.getByTestId('confetti')).toBeAttached();
       await expect(page.getByTestId('confetti')).toHaveAttribute('aria-hidden', 'true');
       await expect(page.getByTestId('confetti')).toHaveCount(0, { timeout: 5000 }); // it removes itself
@@ -554,7 +556,7 @@ test.describe('celebrations', () => {
       await page.goto(`/#/lesson/${LESSON}`);
       await page.locator('.prompt').waitFor();
       for (const q of LESSON_Q) await solveAndContinue(page, q);
-      await expect(page.getByTestId('celebration')).toBeVisible();
+      await expect(page.locator('.summary h1')).toHaveText('Clean run');
       await page.waitForTimeout(300);
       await expect(page.getByTestId('confetti')).toHaveCount(0);
     });
@@ -564,8 +566,7 @@ test.describe('celebrations', () => {
     await page.goto(`/#/lesson/${LESSON}`);
     await page.locator('.prompt').waitFor();
     for (const q of LESSON_Q) await solveAndContinue(page, q);
-    await expect(page.locator('.summary h1')).toHaveText('Clean run');
-    await expect(page.getByTestId('celebration')).toBeVisible();
+    await expect(page.locator('.summary h1')).toHaveText('Clean run'); // the milestone is still told, by the heading
     await page.waitForTimeout(300);
     await expect(page.locator('canvas')).toHaveCount(0);
   });
