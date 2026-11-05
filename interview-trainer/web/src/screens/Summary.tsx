@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  READINESS_TEXT, isLargeCelebration, pickCelebration, type ForecastBucket, type GoalToday, type SessionEvent, type SessionSummary, type Settings,
+  ICS_FILE_NAME, RANKS, READINESS_TEXT, buildReminderIcs, goalDisplay, isLargeCelebration, pickCelebration, type ForecastBucket, type GoalToday, type SessionEvent, type SessionSummary, type Settings,
 } from '@trainer/shared';
 import { Confetti } from '../components/Confetti';
 import { Icon, type IconName } from '../components/icons';
 import { Inline } from '../components/Inline';
 import { AnimatedRing } from '../components/Ring';
-import { forecastText, listNames, plural, prefersReducedMotion } from '../lib/format';
-import { endingLine, failedCount, resultHeading, type SessionKind } from '../lib/summary-copy';
+import { listNames, plural, prefersReducedMotion } from '../lib/format';
+import { canDownloadFiles, saveTextFile } from '../lib/reminders';
+import { getProgress, updateProgress } from '../lib/store';
+import { dueTomorrow, endingLine, failedCount, nextReviewLine, resultHeading, shouldOfferBridge, type SessionKind } from '../lib/summary-copy';
 
 export interface Finished {
   title: string;
@@ -84,11 +86,64 @@ function note(e: SessionEvent, headlineType: string | undefined): Note | null {
 /** Only one big burst per couple of minutes, however fast sessions are finished. */
 let lastBurst = -Infinity;
 
+/**
+ * A gentle, one-time offer after the first sessions: tomorrow's reviews are already scheduled, and a calendar event is the one
+ * channel that works while the app is closed. Shown once (it is marked as shown the moment it appears), never repeated, dismissible,
+ * and it states nothing about streaks or loss.
+ */
+function TomorrowOffer({ forecast }: { forecast: readonly ForecastBucket[] }) {
+  const [offer] = useState(() => {
+    const p = getProgress();
+    return shouldOfferBridge({
+      sessions: p.stats.sessions,
+      nudged: p.prefs.reminders.nudged === true,
+      hasReminder: p.prefs.reminders.time !== null,
+      scheduled: forecast.length > 0,
+      canDownload: canDownloadFiles(),
+    });
+  });
+  const [time, setTime] = useState(() => getProgress().profile.practiceTime ?? new Date().toTimeString().slice(0, 5));
+  const [state, setState] = useState<'open' | 'added' | 'closed'>('open');
+  useEffect(() => {
+    if (offer) updateProgress((p) => (p.prefs.reminders.nudged ? p : { ...p, prefs: { ...p.prefs, reminders: { ...p.prefs.reminders, nudged: true } } }));
+  }, [offer]);
+  if (!offer || state === 'closed') return null;
+  const n = dueTomorrow(forecast);
+  const add = () => {
+    const p = getProgress();
+    saveTextFile(ICS_FILE_NAME, buildReminderIcs({ time, now: new Date(), restDays: p.profile.restDays }), 'text/calendar');
+    updateProgress((cur) => ({ ...cur, prefs: { ...cur.prefs, reminders: { ...cur.prefs.reminders, time } } }));
+    setState('added');
+  };
+  return (
+    <section className="tomorrow" data-testid="tomorrow-offer" aria-label="Tomorrow">
+      {state === 'added' ? (
+        <>
+          <p role="status">Calendar file saved. Open it to add a daily event at {time}. You can change or turn it off in Settings, Reminders.</p>
+          <div className="tomorrow-offer"><button type="button" className="btn small ghost" onClick={() => setState('closed')}>Done</button></div>
+        </>
+      ) : (
+        <>
+          <p><b>{n > 0 ? 'Tomorrow is ready.' : 'Your next review is scheduled.'}</b> A calendar event can remind you at a time you pick. It works while the app is closed.</p>
+          <div className="tomorrow-offer">
+            <label htmlFor="tomorrow-time" className="muted">Time</label>
+            <input id="tomorrow-time" className="time-input" type="time" value={time} onChange={(e) => setTime(e.target.value)} data-testid="tomorrow-time" />
+            <button type="button" className="btn small secondary" onClick={add} disabled={!time} data-testid="tomorrow-add">Add to calendar (.ics)</button>
+            <button type="button" className="btn small ghost" onClick={() => setState('closed')} data-testid="tomorrow-dismiss">No thanks</button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export function Summary({ finished, settings, onHome }: { finished: Finished; settings: Settings; onHome: () => void }) {
   const { summary, streak, events } = finished;
   const pct = Math.round(summary.accuracy * 100);
   const outstanding = failedCount(summary);
-  const celebration = pickCelebration(events);
+  // The first promotion (Associate to Engineer) comes after a lesson or two: it is noted quietly, not celebrated.
+  const picked = pickCelebration(events);
+  const celebration = picked?.type === 'rank-up' && picked.title === RANKS[1]?.title ? null : picked;
   const big = isLargeCelebration(celebration);
   const [burst, setBurst] = useState(false);
   const fired = useRef(false);
@@ -112,8 +167,14 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
   const isLesson = finished.kind === 'lesson';
   const hasNext = Boolean(finished.nextLessonId);
   const warn = heading === 'Another pass needed';
-  const goalDone = Math.min(g.done, g.target);
-  const bonus = Math.max(0, g.done - g.target);
+  const shown = goalDisplay(g);
+  // "Goal met" is said once: by the milestone card when it is the headline, otherwise here by the ring.
+  const goalSaidAbove = top?.title === 'Daily goal met';
+  // A clean run says so in its heading (and in the stats below): the "Perfect lesson" card would only repeat it.
+  const topCard = celebration?.type === 'perfect' && heading === 'Clean run' ? null : top;
+  const goalLine = g.met
+    ? shown.bonus > 0 ? `Goal met, plus ${plural(shown.bonus, 'bonus question')}.` : goalSaidAbove ? '' : 'Goal met.'
+    : `${plural(g.target - g.done, 'more question')} to reach today's goal.`;
 
   return (
     <div className={`summary ${warn ? 'warn' : ''}`}>
@@ -124,10 +185,10 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       <p className="result-cap" aria-hidden="true">first-try accuracy</p>
       {ending && <p className="muted ending-line" data-testid="ending-line">{ending}</p>}
 
-      {top && (
+      {topCard && (
         <section className="milestone" data-testid="celebration" data-kind={celebration!.type} aria-label="Milestone">
-          <b>{top.title}</b>
-          <span>{top.body}</span>
+          <b>{topCard.title}</b>
+          <span>{topCard.body}</span>
         </section>
       )}
 
@@ -149,10 +210,10 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       </div>
 
       <div className="summary-goal" data-testid="summary-goal">
-        <AnimatedRing from={finished.goalBefore.fraction} to={g.fraction} size={56}>{goalDone}/{g.target}</AnimatedRing>
+        <AnimatedRing from={finished.goalBefore.fraction} to={g.fraction} size={56}>{shown.ratio}</AnimatedRing>
         <span>
-          <b>{goalDone} of {g.target} questions today</b>
-          <small className="muted">{g.met ? (bonus > 0 ? `Goal met, plus ${plural(bonus, 'bonus question')}.` : 'Goal met.') : `${plural(g.target - g.done, 'more question')} to reach today's goal.`}</small>
+          <b>{shown.sentence}</b>
+          {goalLine && <small className="muted">{goalLine}</small>}
         </span>
       </div>
 
@@ -170,8 +231,10 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
       )}
 
       {finished.forecast.length > 0 && (
-        <p className="muted" data-testid="next-review">Next review: {forecastText(finished.forecast)}</p>
+        <p className="muted" data-testid="next-review">{nextReviewLine(finished.forecast)}</p>
       )}
+
+      <TomorrowOffer forecast={finished.forecast} />
 
       {outstanding > 0 && (
         <p className="muted">

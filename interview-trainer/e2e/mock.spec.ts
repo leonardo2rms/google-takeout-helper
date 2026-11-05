@@ -253,7 +253,7 @@ test.describe('mock interview: results', () => {
     await expect(page.getByTestId('mock-history-item')).toHaveCount(1);
     await expect(page.getByTestId('mock-history-item').first()).toContainText(`${score}%`);
     await page.goto('/');
-    await expect(page.getByTestId('due-count')).toContainText('ready to review');
+    await expect(page.getByTestId('due-count')).toContainText('due');
     await expect(page.getByTestId('goal-text')).not.toHaveText('8/8');
   });
 

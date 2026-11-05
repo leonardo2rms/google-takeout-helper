@@ -89,6 +89,9 @@ test.describe('reminders: calendar file', () => {
   });
 });
 
+/** The notification choice sits in a disclosure ("Also notify me when I open the app"); open it (idempotent). */
+const openNotify = (page: Page) => page.getByTestId('notify-more').evaluate((d) => ((d as HTMLDetailsElement).open = true));
+
 test.describe('reminders: notification when the app is opened', () => {
   test('opting in asks for permission from the toggle, and explains the limits honestly', async ({ page }) => {
     await fakeNotifications(page, 'default');
@@ -96,6 +99,7 @@ test.describe('reminders: notification when the app is opened', () => {
     await seed(page, { [KEY_V2]: v2({ prefs: { ...defaultPrefs(), reminders: { time: '09:00', notify: false, lastNotified: null } } }) });
     await page.goto('/');
     await openReminders(page);
+    await openNotify(page);
     const toggle = page.getByTestId('reminder-notify');
     await expect(page.getByRole('dialog')).toContainText('Browsers usually cannot wake this app while it is closed');
     await toggle.check();
@@ -109,6 +113,7 @@ test.describe('reminders: notification when the app is opened', () => {
     await seed(page, { [KEY_V2]: v2({ prefs: { ...defaultPrefs(), reminders: { time: '09:00', notify: false, lastNotified: null } } }) });
     await page.goto('/');
     await openReminders(page);
+    await openNotify(page);
     await page.getByTestId('reminder-notify').click();
     await expect(page.getByTestId('reminder-message')).toContainText('blocked');
     await expect(page.getByTestId('reminder-notify')).not.toBeChecked();

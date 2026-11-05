@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { endingLine, failedCount, resultHeading } from './summary-copy';
+import { BRIDGE_SESSIONS, dueTomorrow, endingLine, failedCount, nextReviewLine, resultHeading, shouldOfferBridge } from './summary-copy';
+
+describe('tomorrow bridge', () => {
+  it('says what is next and when, with a rough duration for tomorrow', () => {
+    expect(nextReviewLine([{ inDays: 1, count: 7 }])).toBe('Next review: 7 questions tomorrow · about 4 min');
+    expect(nextReviewLine([{ inDays: 1, count: 7 }, { inDays: 3, count: 2 }])).toBe('Next review: 7 questions tomorrow, 2 in 3 days · about 4 min');
+    expect(nextReviewLine([{ inDays: 3, count: 5 }])).toBe('Next review: 5 questions in 3 days');
+    expect(dueTomorrow([{ inDays: 3, count: 5 }])).toBe(0);
+  });
+  const base = { sessions: 1, nudged: false, hasReminder: false, scheduled: true, canDownload: true };
+  it('offers the calendar entry once, in the first sessions only', () => {
+    expect(shouldOfferBridge(base)).toBe(true);
+    expect(shouldOfferBridge({ ...base, sessions: BRIDGE_SESSIONS })).toBe(true);
+    expect(shouldOfferBridge({ ...base, sessions: BRIDGE_SESSIONS + 1 })).toBe(false);
+    expect(shouldOfferBridge({ ...base, sessions: 0 })).toBe(false);
+  });
+  it('never nags: not after it was shown, not with a reminder, nothing scheduled, or no way to hand over a file', () => {
+    expect(shouldOfferBridge({ ...base, nudged: true })).toBe(false);
+    expect(shouldOfferBridge({ ...base, hasReminder: true })).toBe(false);
+    expect(shouldOfferBridge({ ...base, scheduled: false })).toBe(false);
+    expect(shouldOfferBridge({ ...base, canDownload: false })).toBe(false);
+  });
+});
 
 const ids = (n: number, from = 0) => Array.from({ length: n }, (_, i) => `q${from + i}`);
 /** `firstTry` right first time, `recovered` missed then right, `failed` never right. */

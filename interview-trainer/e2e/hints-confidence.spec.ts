@@ -127,7 +127,7 @@ test.describe('confidence ratings', () => {
     expect(p!.cards[Q1.id].ease).toBeCloseTo(1.95);
     expect(p!.calibration).toEqual({ n: [0, 0, 1], right: [0, 0, 0] });
     await page.goto('/#/');
-    await expect(dueCount(page)).toContainText('ready to review');
+    await expect(dueCount(page)).toContainText('due');
   });
 
   test('right but a guess: kept short (hard) and noted', async ({ page }) => {
