@@ -354,7 +354,7 @@ lessons:
       - type: multi
         prompt: "The JPA entity `Account` has a `@Version` field, and `AccountService.debit` is `@Transactional`. Under load some debits fail with `ObjectOptimisticLockingFailureException`. Select all true statements."
         options:
-          - { id: a, text: "Retry by calling `debit` again from a caller outside the transaction, so each attempt reloads the account" }
+          - { id: a, text: "A retry works if a caller outside the transaction calls `debit` again, so each attempt reloads the account" }
           - { id: b, text: "The conflict can surface at commit, after the method body has returned, where a `try`/`catch` in `debit` cannot see it" }
           - { id: c, text: "The version is checked and bumped for a dirty-checked change too, so the code needs no explicit `save()` call" }
           - { id: d, text: "Catch the exception inside `debit` and call `save()` again, so the second attempt overwrites the row with the new balance" }

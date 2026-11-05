@@ -98,7 +98,7 @@ Blanks are `[[1]]`, `[[2]]`, ... each used exactly once; `answers[i]` fills blan
   explanation: "After enough failures the breaker opens; after a cool-down it lets trial calls through (half-open); if they succeed it closes again, otherwise it re-opens."
 ```
 
-3 to 10 lines. `kind: code` (the default) renders monospace lines where **indentation is part of the line**; `kind: steps` renders plain sentences. All lines must be unique, including indentation, otherwise the order would be ambiguous. The canonical order is the order you write them.
+3 to 10 lines. `kind: code` (the default) renders monospace lines where **indentation is part of the line**; `kind: steps` renders plain sentences. The pool shows lines without their indentation (a placed line shows it again), so all lines must be unique once trimmed, otherwise the order would be ambiguous; label a closing brace that would repeat (`} // while`). The canonical order is the order you write them.
 
 ### `spot` - tap the buggy line
 

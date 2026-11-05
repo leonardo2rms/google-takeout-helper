@@ -207,7 +207,7 @@ lessons:
         explanation: "Flow has context preservation: emitting from another dispatcher inside `flow {}` violates the flow invariant and throws an `IllegalStateException`. Use `flowOn` (or `channelFlow`) to change the producer's context. `buffer()` decouples producer and collector with a channel between them. Cold flows can be collected any number of times; each collection runs the producer again."
 
       - type: order
-        prompt: Arrange the lines of a Flow that emits a counter every second, forever.
+        prompt: Arrange the lines of a Flow that emits 0 at once and then the next number every second, forever.
         lines:
           - "fun ticker(): Flow<Int> = flow {"
           - "    var i = 0"

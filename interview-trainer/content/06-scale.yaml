@@ -204,7 +204,7 @@ lessons:
 
       - type: order
         hint: "Which attempt must be allowed to throw to the caller, and where does that call sit relative to the loop?"
-        prompt: Arrange the lines to build a retry helper with exponential backoff.
+        prompt: "Arrange the lines to build a retry helper with exponential backoff: it waits 100 ms after the first failure and doubles the wait after each further one."
         lines:
           - "suspend fun <T> retry(times: Int, block: suspend () -> T): T {"
           - "    var delayMs = 100L"
