@@ -1,8 +1,8 @@
 # Interview Trainer
 
-Duolingo-style practice for **senior engineer interviews**: Kotlin, Spring, the JVM, DDD, scaling/resilience
-and working with AI. Short lessons, instant feedback, XP and streaks, and a "review mistakes" loop, built to be
-comfortable on a phone.
+Short, phone-friendly practice for **senior engineer interviews**: Kotlin, Spring, the JVM, DDD, data, messaging, system design,
+scaling/resilience, testing, security and working with AI. Short lessons, instant feedback, spaced review and an honest readiness estimate.
+The interface is a calm "drafting sheet" (ink on paper, hairline rules, mono labels) with a "blueprint" dark theme; see [Design](#design).
 
 > Lives in its own folder so it can be lifted into a dedicated repo later:
 > `git subtree split -P interview-trainer -b trainer-only`, or just copy the directory. Nothing outside it is touched.
@@ -80,7 +80,7 @@ On the feedback card, **Ask why** opens a short chat about *that* question ("why
 ### Single-file build (no server, no install)
 
 ```bash
-npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, ~570 kB)
+npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, @@SIZE@@ kB)
 ```
 
 Everything (course, logic, styles) is inlined, with no service worker and no API server. Hosts that provide
@@ -163,7 +163,7 @@ so the download button is hidden there; a sheet with no working option says how 
 
 ### Accessibility and reading settings
 
-Behaviour, rules and the tracked colour-contrast exception are in [`docs/accessibility.md`](docs/accessibility.md). In short: axe-core runs over every screen and state
+Behaviour and rules are in [`docs/accessibility.md`](docs/accessibility.md); colour contrast is enforced by axe on every screen in both themes, and by a token check (see [Design](#design)). In short: axe-core runs over every screen and state
 (`e2e/a11y.spec.ts`, fails on serious/critical issues), plus behaviour tests for what axe cannot see (`e2e/a11y-behaviour.spec.ts`): a skip link and a single `main`
 landmark, focus moved to the prompt on a new question and to the verdict after Check, results readable without colour, keyboard-only match / order / spot, a focus ring on every Tab stop,
 and reduced motion. **Settings -> Reading** sets text size (S / M / L / XL) and an easier-to-read system font, stored in `progress.prefs.reading`.
@@ -199,8 +199,8 @@ interview-trainer/
   server/           Express API: /api/health, /api/grade, /api/explain (+ serves web/dist in production)
   web/              React + Vite PWA
   e2e/              Playwright tests + screenshots
-  docs/             design notes (engagement.md: the habit loop and its ethics rules; accessibility.md)
-  scripts/          content:check, build-standalone
+  docs/             design notes (engagement.md: the habit loop and its ethics rules; accessibility.md; design-system.md: tokens, type, icons)
+  scripts/          content:check, build-standalone, contrast.mjs (token contrast check), subset-font.sh
 ```
 
 Content is plain YAML on purpose: it is the most portable part of this project (any backend, a Kotlin/Spring
@@ -212,6 +212,17 @@ build time; the server loads the same files to look up rubrics.
 Drop a question into any lesson in `content/*.yaml`, or add a new `NN-name.yaml` for a new unit (files are ordered
 by name). Question ids are derived automatically (`<lesson-id>/<n>`). `npm run content:check` and `npm test`
 validate the structure and cross-field rules (answers exist, blanks match, rubric sanity).
+
+A unit file starts with its header. `icon` is the name of an icon in `web/src/components/icons.tsx` (the unit tests fail on an unknown name); a unit also gets a pen colour from
+`--pen-<id>` in `styles.css`, or cobalt if it has none. `emoji` and `color` are optional, ignored by the UI and only kept so older course files still validate.
+
+```yaml
+id: data
+title: Data & Persistence
+icon: database
+description: Indexes and query plans, isolation levels, locking, pagination, migrations and caching.
+lessons: [...]
+```
 
 ```yaml
 # single / multi
@@ -328,6 +339,22 @@ An `open` question can list `followUps`. After the main answer, the app picks on
 `missed` follow-up probing a gap, otherwise a `covered` one pushing deeper. The follow-up is graded like any open
 question (AI or self-check), and the question passes on the average of both answers. The selection is authored, not
 generated, so it works offline and is deterministic; the AI only grades.
+
+## Design
+
+The look is documented in [`docs/design-system.md`](docs/design-system.md). In short:
+
+- **Tokens**: eight base colours (`paper`, `ink`, `graphite`, `edge`, `cobalt`, `teal`, `vermilion`, `ochre`) plus derived surfaces and tints, as CSS custom properties at the top of `web/src/styles.css`.
+  Light is `:root`; dark is `:root[data-theme="dark"]` and the same values under `@media (prefers-color-scheme: dark)` with `:root:not([data-theme="light"])`. Cobalt means selected or interactive, teal correct,
+  vermilion incorrect, ochre partial. Verdicts are always icon + word + border or underline style, never colour alone.
+- **Type**: IBM Plex Sans (variable, self-hosted: a Latin subset of `@fontsource-variable/ibm-plex-sans`, about 23 kB, embedded in the build, nothing is fetched at run time) and the system mono for code, labels and numbers.
+  Font sizes are `--fs-*` tokens so the Reading text size (S/M/L/XL) keeps working.
+- **Icons**: an inline SVG set in `web/src/components/icons.tsx` (decorative by default, `title` for meaning). There are no emoji in the UI. Units name an icon in YAML (`icon: braces`); `emoji` and `color` are still accepted but no longer rendered.
+- **Check the contrast**: `node scripts/contrast.mjs` (also part of `npm test`) computes the WCAG ratio of 228 text and UI pairings from the tokens in both themes and fails below AA (4.5:1 text, 3:1 UI);
+  `e2e/a11y.spec.ts` runs axe's `color-contrast` rule on every screen with no exception.
+- **Credits and licences**: [Lucide](https://lucide.dev) icons (ISC; Feather-derived icons MIT), texts in [`web/src/components/LUCIDE-LICENSE.txt`](web/src/components/LUCIDE-LICENSE.txt);
+  IBM Plex Sans (SIL Open Font License 1.1), text in [`web/src/fonts/OFL.txt`](web/src/fonts/OFL.txt).
+- To regenerate the font subset: `pip install fonttools brotli && ./scripts/subset-font.sh`. The output is committed, so a normal build needs no Python.
 
 ## Design notes
 

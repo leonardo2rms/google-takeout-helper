@@ -11,7 +11,7 @@ test.describe('achievements', () => {
     await seed(page, { [KEY_V2]: v2() });
     await page.goto('/');
     await playLesson(page, LESSON);
-    await expect(page.locator('.summary h1')).toHaveText('Perfect lesson!');
+    await expect(page.locator('.summary h1')).toHaveText('Clean run');
     await expect(toast(page)).toBeVisible();
     await expect(toast(page)).toContainText('3 badges unlocked');
     await expect(toast(page)).toContainText('First lesson');

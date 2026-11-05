@@ -71,7 +71,7 @@ test.describe('mock interview: running', () => {
     await seed(page, { [KEY_V2]: v2() });
     const qs = planned();
     await startMock(page);
-    await expect(timer(page)).toHaveText('⏱ 15:00');
+    await expect(timer(page)).toHaveText('15:00');
     await expect(page.getByTestId('mock-count')).toHaveText('1 / 10');
     await expect(page.locator('.prompt')).toBeVisible();
 
@@ -155,7 +155,7 @@ test.describe('mock interview: running', () => {
     await page.clock.fastForward('05:00'); // five minutes pass while hidden
     await setHidden(false);
     await page.clock.fastForward(1500);
-    await expect(timer(page)).toHaveText(/⏱ 1[45]:\d\d/); // still about fifteen minutes left, not ten
+    await expect(timer(page)).toHaveText(/1[45]:\d\d/); // still about fifteen minutes left, not ten
     await expect(page.getByTestId('mock-run')).toBeVisible();
   });
 
@@ -177,7 +177,7 @@ test.describe('mock interview: running', () => {
     await seed(page, { [KEY_V2]: v2() });
     const qs = planned();
     await startMock(page, { minutes: 10 });
-    await expect(timer(page)).toHaveText('⏱ 10:00');
+    await expect(timer(page)).toHaveText('10:00');
     await answer(page, qs[0]!, 'right');
     await page.getByTestId('mock-next').click();
     await page.clock.fastForward('10:30');

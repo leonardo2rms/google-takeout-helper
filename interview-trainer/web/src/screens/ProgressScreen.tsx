@@ -31,10 +31,11 @@ export function ProgressScreen({ course, progress }: Props) {
 
       <section className="readiness" aria-labelledby="ready-title">
         <h2 id="ready-title" className="sr-only">Readiness</h2>
+        <p className="label" aria-hidden="true">Readiness · 0 to 100</p>
         <p className="big-number" data-testid="readiness-score">{ready.score}</p>
         <p><b data-testid="readiness-label">{READINESS_TEXT[ready.label]}</b> · {pct(ready.coverage)}% of the course seen</p>
         <p className="muted">
-          An estimate of how much of <i>this course</i> you would recall today. It is not a prediction of any interview result.
+          An estimate of how much of <b>this course</b> you would recall today. It is not a prediction of any interview result.
           Questions you have not seen yet count as zero, so it only rises as you really learn the material.
         </p>
       </section>

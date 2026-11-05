@@ -245,7 +245,6 @@ export function Home({ course, progress, health, update, onReset }: Props) {
                     <a
                       className={`lesson-row ${isNext ? 'next' : ''} ${rec ? 'done' : ''}`}
                       href={`#/lesson/${lesson.id}`}
-                      aria-label={`${i + 1}. ${lesson.title}${rec ? `, completed, mastery ${level} of 3` : ''}${isNext ? ', up next' : ''}`}
                     >
                       <span className="no" aria-hidden="true">{ui + 1}.{i + 1}</span>
                       <span>
@@ -253,6 +252,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
                         <small>
                           {lesson.questions.length} questions
                           {isNext && <span className="tag-next">Up next</span>}
+                          {rec && <span className="sr-only">, completed, mastery {level} of 3</span>}
                         </small>
                       </span>
                       <span className="status" aria-hidden="true">

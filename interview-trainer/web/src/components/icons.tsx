@@ -1,9 +1,9 @@
 /*
  * Icons are copied from Lucide (https://lucide.dev), version 1.68.0, licensed under the ISC licence.
- * Copyright (c) 2026 Lucide Icons and Contributors. Portions are Copyright (c) 2013-2022 Cole Bemis (Feather), MIT.
+ * Copyright (c) 2026 Lucide Icons and Contributors. Icons derived from Feather are MIT licensed, Copyright (c) 2013-present Cole Bemis.
  * Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted,
  * provided that the above copyright notice and this permission notice appear in all copies.
- * The licence text is reproduced in docs/design-system.md.
+ * Both licence texts are in LUCIDE-LICENSE.txt next to this file (and summarised in docs/design-system.md).
  *
  * 24x24 grid, drawn with stroke="currentColor", round caps and joins, no fills. Only the shapes live here; <Icon> adds the frame.
  * The markup is trusted static data written in this file, never user input.

@@ -212,7 +212,8 @@ test.describe('keyboard operation', () => {
     await answerCorrectly(page, q);
     await check(page);
     await expect(page.locator('.option.correct')).toContainText('your answer, correct');
-    await expect(page.locator('.option.correct .marker')).toHaveText('✓');
+    await expect(page.locator('.option.correct .marker svg')).toBeVisible(); // a check mark, not a letter
+    await expect(page.locator('.option.correct .tagtxt')).toHaveText('Correct'); // and the word
   });
 });
 
@@ -252,11 +253,11 @@ test.describe('reading settings', () => {
     await seed(page, { [KEY_V2]: v2({ xp: 120, streak: 3, lastDay: TODAY, stats: { sessions: 3, answered: 30, firstTry: 20, perfect: 0, practiceDays: 3 }, ...dueCards(8) }) });
     await page.goto('/');
     await page.locator('.home').waitFor();
-    expect(await fontPx(page)).toBeCloseTo(17, 1);
+    expect(await fontPx(page)).toBeCloseTo(16, 1);
     await settings(page);
     await page.screenshot({ path: `${SHOTS}/reading-settings.png` });
 
-    const sizes: Record<string, number> = { S: 15.3, M: 17, L: 20.4, XL: 23.8 };
+    const sizes: Record<string, number> = { S: 14.4, M: 16, L: 19.2, XL: 22.4 };
     for (const [size, px] of Object.entries(sizes)) {
       await page.getByTestId(`text-size-${size}`).check();
       expect(await fontPx(page)).toBeCloseTo(px, 1);
@@ -271,7 +272,7 @@ test.describe('reading settings', () => {
     // persists across a reload and holds on the other screens, at the largest size
     await page.reload();
     await page.locator('.home').waitFor();
-    expect(await fontPx(page)).toBeCloseTo(23.8, 1);
+    expect(await fontPx(page)).toBeCloseTo(22.4, 1);
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/reading-xl-home.png` });
     await page.goto('/#/progress');

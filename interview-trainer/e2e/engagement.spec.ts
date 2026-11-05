@@ -26,10 +26,10 @@ test.describe('upgrading from v1', () => {
     await page.goto('/');
 
     await expect(chip(page)).toContainText('4');
-    await expect(chip(page)).toContainText('🧊 1'); // one-time welcome freeze
+    await expect(chip(page).locator('.freeze')).toContainText('1'); // one-time welcome freeze
     await expect(page.locator('.stat[aria-label="320 XP"]')).toBeVisible();
     await expect(page.getByTestId('rank')).toContainText('Engineer');
-    await expect(page.locator('.overall')).toContainText(`3/${lessons.length} lessons completed`);
+    await expect(page.locator('.progress-line')).toContainText(`3 / ${lessons.length} lessons`);
     // the v1 questions that were missed are due straight away; the rest are spread over the week
     await expect(dueCount(page)).toContainText('ready to review');
     await expectNoOverflow(page);
@@ -77,7 +77,7 @@ test.describe('daily goal ring', () => {
     await solveAndContinueWithHint(page);
     for (const q of LESSON_Q.slice(1)) await solveAndContinue(page, q);
 
-    await expect(page.locator('.summary h1')).toHaveText('Perfect lesson!');
+    await expect(page.locator('.summary h1')).toHaveText('Clean run');
     await expect(page.getByTestId('summary-goal')).toContainText('7 of 8 questions today');
     await expect(page.getByTestId('next-review')).toContainText('tomorrow (7)');
     await expectNoOverflow(page);
@@ -167,7 +167,7 @@ test.describe('review queue', () => {
       await check(page);
       await next(page);
     }
-    await expect(page.locator('.summary h1')).toHaveText('Lesson complete!');
+    await expect(page.locator('.summary h1')).toHaveText('Lesson complete');
     await expect(page.locator('.summary')).toContainText('1 question to revisit');
     await homeAfterSummary(page);
 
@@ -203,7 +203,7 @@ test.describe('review queue', () => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     await page.goto('/#/review');
-    await expect(page.locator('h1')).toHaveText('All clear!');
+    await expect(page.locator('h1')).toHaveText('Nothing to review');
   });
 });
 
@@ -213,8 +213,8 @@ test.describe('forgiving streak', () => {
     await seed(page, { [KEY_V2]: v2({ streak: 6, longestStreak: 6, lastDay: day(-2), freezes: 1, milestones: { 'rank:0': day(-9) } }) });
     await page.goto('/');
     await expect(chip(page)).toContainText('6');
-    await expect(chip(page)).toContainText('🧊 1');
-    await expect(page.getByTestId('streak-note')).toHaveText('🧊 covered yesterday');
+    await expect(chip(page).locator('.freeze')).toContainText('1');
+    await expect(page.getByTestId('streak-note')).toHaveText('covered yesterday');
     // reloading does not spend it
     await page.reload();
     expect((await stored(page)) ?? {}).toMatchObject({ freezes: 1, streak: 6 });
@@ -232,7 +232,7 @@ test.describe('forgiving streak', () => {
     await expect(page.getByTestId('celebration')).toContainText('7-day streak');
     await homeAfterSummary(page);
     await expect(chip(page)).toContainText('7');
-    await expect(chip(page)).toContainText('🧊 1');
+    await expect(chip(page).locator('.freeze')).toContainText('1');
     await expect(page.getByTestId('streak-note')).toHaveCount(0);
   });
 
@@ -249,7 +249,7 @@ test.describe('forgiving streak', () => {
     await playLesson(page, LESSON);
     await homeAfterSummary(page);
     await expect(chip(page)).toContainText('1');
-    await expect(chip(page)).toContainText('🧊 1');
+    await expect(chip(page).locator('.freeze')).toContainText('1');
     const saved = await stored(page);
     expect(saved).toMatchObject({ streak: 1, longestStreak: 23, freezes: 1 });
     expect(saved!.stats.practiceDays).toBe(42);
@@ -535,7 +535,7 @@ test.describe('celebrations', () => {
       await page.goto(`/#/lesson/${LESSON}`);
       await page.locator('.prompt').waitFor();
       for (const q of LESSON_Q) await solveAndContinue(page, q);
-      await expect(page.locator('.summary h1')).toHaveText('Perfect lesson!');
+      await expect(page.locator('.summary h1')).toHaveText('Clean run');
       await expect(page.getByTestId('celebration')).toBeVisible();
       await expect(page.getByTestId('confetti')).toBeAttached();
       await expect(page.getByTestId('confetti')).toHaveAttribute('aria-hidden', 'true');
@@ -557,7 +557,7 @@ test.describe('celebrations', () => {
     await page.goto(`/#/lesson/${LESSON}`);
     await page.locator('.prompt').waitFor();
     for (const q of LESSON_Q) await solveAndContinue(page, q);
-    await expect(page.locator('.summary h1')).toHaveText('Perfect lesson!');
+    await expect(page.locator('.summary h1')).toHaveText('Clean run');
     await expect(page.getByTestId('celebration')).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.locator('canvas')).toHaveCount(0);

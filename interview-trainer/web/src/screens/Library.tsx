@@ -130,7 +130,7 @@ export function Library({ course, progress }: Props) {
                 <span className={`pill status-${e.status}`} data-testid="lib-status">{STATUS_LABEL[e.status]}</span>
               </p>
               <div className="lib-actions">
-                <a className="btn small secondary" href={`#/q/${e.q.id}`} aria-label={`Practise this question: ${plain(e.q.prompt)}`} data-testid="lib-practise">Practise this one</a>
+                <a className="btn small secondary" href={`#/q/${e.q.id}`} aria-label={`Practise this one: ${plain(e.q.prompt)}`} data-testid="lib-practise">Practise this one</a>
                 {!e.note && !e.bookmarked && (
                   <button type="button" className="btn small ghost" onClick={() => setEditing(editing === e.q.id ? null : e.q.id)} aria-expanded={editing === e.q.id}>
                     {editing === e.q.id ? 'Hide' : 'Save or note'}

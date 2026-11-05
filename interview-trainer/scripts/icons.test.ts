@@ -2,12 +2,12 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ACHIEVEMENTS } from '../../../shared/src';
-import { loadCourse } from '../../../shared/src/load-content';
-import { unitStyle, FALLBACK_UNIT_ICON } from '../lib/unit-style';
-import { ICONS, isIconName } from './icons';
+import { ACHIEVEMENTS } from '../shared/src';
+import { loadCourse } from '../shared/src/load-content';
+import { unitStyle, FALLBACK_UNIT_ICON } from '../web/src/lib/unit-style';
+import { ICONS, isIconName } from '../web/src/components/icons';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const course = loadCourse(join(root, 'content'));
 
 describe('icons', () => {

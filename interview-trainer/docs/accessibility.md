@@ -1,7 +1,7 @@
 # Accessibility
 
 The goal is WCAG 2.2 AA behaviour for a phone-first, keyboard-operable, screen-reader-usable app, checked by tests rather than by promises.
-Visual design (palette, typography, icons) is deliberately out of scope here: a redesign is coming, so **colour contrast is a tracked exception** (below).
+Colour contrast is enforced like every other rule: axe's `color-contrast` runs on every screen in the light and the dark theme, and `scripts/contrast.mjs` checks every token pairing (see [`design-system.md`](design-system.md)).
 
 ## How it is checked
 
@@ -13,11 +13,13 @@ Visual design (palette, typography, icons) is deliberately out of scope here: a 
 
 Run: `E2E_PORT=4182 npx playwright test e2e/a11y.spec.ts e2e/a11y-behaviour.spec.ts`.
 
-### Tracked exception: colour contrast
+### Colour contrast (no exceptions)
 
-`KNOWN_EXCEPTIONS = ['color-contrast']` in `e2e/a11y.spec.ts` is the **only** rule excluded, in one constant, with a `TODO(redesign)`.
-The current palette (bright green buttons with white text, muted grey captions, tinted feedback cards) fails AA contrast in places and fixing it on a palette that is about to be replaced would be thrown away.
-When the redesign lands: delete the constant, run the spec, fix what it finds. Everything else in the checklist below is already enforced.
+`e2e/a11y.spec.ts` excludes no rule. Every screen and state is scanned twice, with the OS colour scheme set to light and to dark (`test.use({ colorScheme })`): Home, the sheets, Progress and its badges, Library, the mock interview
+(setup, running, confirmation, results, saved), hints and the confidence row, every question type (answered, right, wrong), summary, and Settings at XL text with the easier-to-read font.
+
+Underneath, `node scripts/contrast.mjs` (also run by `npm test`) reads the colour tokens from `styles.css` and fails below WCAG AA for 228 text and UI pairings (4.5:1 text, 3:1 boundaries and icons) in both themes.
+Verdicts never rely on hue alone: each has an icon, a word and a border or underline style (table in `design-system.md`).
 
 ## What the app does
 
@@ -32,19 +34,19 @@ a document title per screen, labelled regions (`section aria-labelledby`) for fe
 There are no countdown timers in the practice flow; the code runner has a time budget but reports it as a test result, which is already announced.
 
 **Operable by keyboard.** Every interaction is a real `<button>`/input: options are `radio`/`checkbox` roles, *spot* lines, *match* items, *order* lines and *fill* tokens are buttons (Space/Enter), placed lines say "Position n" and "tap to remove", filled blanks say what they hold.
-After checking, each item states its result in text for screen readers ("your answer, correct", "a correct answer you did not select"), and the choice markers use check/cross glyphs, so colour is never the only signal (WCAG 1.4.1).
+After checking, each item states its result in text for screen readers ("your answer, correct", "a correct answer you did not select"), and the choice markers use check and cross icons plus a visible word (Correct, Incorrect, Answer), so colour is never the only signal (WCAG 1.4.1).
 
 **No keyboard traps.** The code editor indents on Tab, so a keyboard user could never leave it. Escape releases the key (Escape, then Tab moves on), Shift+Tab always leaves, and the textarea is described by a hint that says so (`aria-describedby`). The behaviour test covers it, and the Tab-order scan uses the same Escape.
 
-**Focus rings.** One global `:focus-visible` outline (3px, blue, offset 2px). No control removes it: text areas used to swap it for a border colour and now keep the ring. The Tab-order test fails if any stop has none.
+**Focus rings.** One global `:focus-visible` outline (2px, cobalt, offset 2px; at least 6.8:1 on every surface in both themes). No control removes it: text areas used to swap it for a border colour and now keep the ring. The Tab-order test fails if any stop has none.
 
 **Reduced motion.** `@media (prefers-reduced-motion: reduce)` disables every CSS animation and transition (including the progress ring and the sheet slide-in); JS-driven motion is gated too: smooth scrolling uses `behavior: 'auto'` (`scrollIntoViewGently`), and confetti is never mounted.
 The test asserts `document.getAnimations().length === 0` on Home, the settings sheet and a feedback card, that every `scrollIntoView` is instant, and (with the preference off) that the same screens *do* animate, so the check is not vacuous.
 
 **Reading settings** (Settings -> Reading, stored in `progress.prefs.reading`, local to the device):
 
-- *Text size* S / M / L / XL scales every font size by 0.9 / 1 / 1.2 / 1.4. Implementation: every `font-size: Npx` in `styles.css` is `calc(Npx * var(--text-scale, 1))` and `<html data-text-size>` sets `--text-scale`, so text grows while layout (tap targets, paddings) stays put and phone layouts keep fitting (tested at 390px, XL, on Home, Progress, Settings and each question type).
-  New CSS should write font sizes the same way.
+- *Text size* S / M / L / XL scales every font size by 0.9 / 1 / 1.2 / 1.4. Implementation: every font size in `styles.css` is a `--fs-N` token, `calc(Npx * var(--text-scale, 1))` and `<html data-text-size>` sets `--text-scale`, so text grows while layout (tap targets, paddings) stays put and phone layouts keep fitting (tested at 390px, XL, on Home, Progress, Settings and each question type).
+  New CSS should use the `--fs-*` tokens the same way.
 - *Easier-to-read font* sets `<html data-font="dyslexia">`: a system stack (`OpenDyslexic`, `Atkinson Hyperlegible` if installed, then Verdana, Trebuchet MS, Tahoma, Segoe UI, system-ui), wider letter and word spacing and taller lines. No web font is downloaded (the app is offline-first), and code keeps its monospace font and normal spacing.
   This is a convenience, not a medical claim: evidence for dyslexia-specific fonts is mixed; spacing and size matter more, which is why both are adjustable.
 
@@ -54,6 +56,6 @@ The test asserts `document.getAnimations().length === 0` on Home, the settings s
 2. Never remove an outline; style `:focus-visible` instead.
 3. Result states need a text or glyph cue besides colour.
 4. Anything that appears after an action either takes focus (new content the learner must read, a sheet) or is announced by a persistent polite live region; not both.
-5. Font sizes via `calc(Npx * var(--text-scale, 1))`; tap targets at least 44px; no horizontal overflow at 390px at the XL size.
+5. Font sizes via the `--fs-*` tokens (`calc(Npx * var(--text-scale, 1))`); tap targets at least 44px; no horizontal overflow at 390px (or 320px) at the XL size. New colour pairings go into `scripts/contrast.mjs`.
 6. Motion: put it in CSS (the global reduced-motion rule covers it) or check `prefersReducedMotion()`.
 7. Add the new screen/state to `e2e/a11y.spec.ts`.
