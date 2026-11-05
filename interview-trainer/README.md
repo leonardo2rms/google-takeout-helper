@@ -61,6 +61,22 @@ How the grader is built (`server/src/grader.ts`):
   trainer.)
 - Rate-limited (30/min/IP by default), 32 kB body limit, and upstream errors are never leaked to the client.
 
+### Ask why (AI tutor)
+
+On the feedback card, **Ask why** opens a short chat about *that* question ("why is B wrong?", "give me an example"). With no AI available
+(offline, no key) the button is shown disabled with a one-line reason; nothing else changes.
+
+- `POST /api/explain` (`server/src/app.ts`, `server/src/tutor.ts`): body `{ questionId, answer, correct, messages[] }`, zod-validated
+  (`shared/src/explain.ts`): at most 6 learner messages of 500 characters each, strictly alternating turns, answer text up to 600 characters.
+  Rate-limited separately from grading (20/min/IP by default). Same Anthropic client setup as the grader; `EXPLAIN_MODEL` overrides `GRADER_MODEL` for the tutor only.
+- **The question, correct answer and explanation are looked up server-side by `questionId`** (follow-up ids such as `lesson/3~f1` work too). The client only
+  supplies the learner's own answer text and chat, and all of that is untrusted: fenced in `<learner_answer>` / `<conversation>` tags, with any attempt to close or
+  spoof a tag stripped (forged "assistant" turns are flattened into the fenced transcript, so they cannot act as instructions). The system prompt tells the model to
+  stay on the question and to politely decline anything else.
+- Plain-text reply, capped at about 150 words; upstream errors are never leaked (the client shows "could not answer just now").
+- The hosted single-file build uses the `sample` capability with the same prompt builder (`buildExplainPlainPrompt`), exactly like grading does.
+- The UI says plainly that an AI answers and can be wrong, and that the card's explanation is the reference.
+
 ### Single-file build (no server, no install)
 
 ```bash
@@ -104,6 +120,7 @@ cards{questionId -> h, ease, interval, due, reps, lapses, seen, firstTry, last} 
 days{YYYY-MM-DD -> xp, answered, firstTry, target}                                    per-day log, last 400 days
 goal{target}, profile{onboarded, role, interviewDate, restDays[], practiceTime}
 settings{haptics, sound, confetti, tips, confidence}, stats{sessions, answered, firstTry, perfect, practiceDays}
+prefs{reminders{time,notify,lastNotified}, reading{textSize,dyslexiaFont}}               device preferences, namespaced; kept local on import/merge
 milestones{key -> day}        dedupes celebrations ("rank:3", "streak:7", "unit:ddd:80", "goal:first", ...)
 ```
 
@@ -122,6 +139,35 @@ Settings -> **Your data**:
 - **Import backup file** validates everything first (bad JSON, wrong app, damaged or edited file by checksum, a newer format, wrong field types are all rejected with a plain message and **nothing changes**). A good file shows what is inside and asks: **Merge** (keep the best of both: larger XP and counters, the streak from whichever side practised most recently, each card from the side that saw it last, union of mistakes and milestones; settings stay as they are on this device) or **Replace my progress**.
 - Older (v1) backups and a bare progress blob are accepted too. **Reset progress** asks for confirmation and suggests downloading a backup first.
 
+### Reminders (optional)
+
+Settings -> **Reminders**: pick a daily time, then either or both of:
+
+- **Add to my calendar (.ics)**: a recurring iCalendar event (`shared/src/reminders.ts`, RFC 5545: CRLF line ends, 75-octet folding that never splits a UTF-8 character,
+  escaped text, a stable `UID` so re-importing updates the same event, a display alarm at the start). The time is a *floating* local time ("19:30 wherever you are"), which
+  needs no VTIMEZONE rules and follows you when you travel. Rest days become `RRULE:FREQ=WEEKLY;BYDAY=...`. This is the reliable option: it works while the app is closed.
+- **Notify me when I open the app**: asks for the Notification permission from the toggle (never on load), and then shows **one** local notification when the app is opened
+  after that time with something due. At most one per day (`prefs.reminders.lastNotified`), never on a rest day, never after you practised, never when nothing is due, and the copy is
+  plain ("5 questions are ready to review"). There is no push server, so browsers generally cannot fire it while the app is closed, and the UI says so.
+
+"Turn reminders off" clears the time and the choice. The hosted single-file build cannot download files from its frame, so it replaces the calendar button with a note.
+Stored under `progress.prefs.reminders` (`{ time, notify, lastNotified }`); like other settings it stays local on import/merge.
+
+### Share card
+
+Progress -> **Share my progress** (shown once you have answered something) draws a 1080x1350 PNG on a canvas (`web/src/lib/share-image.ts`) from `buildShareCard`
+(`shared/src/share.ts`): streak, rank, readiness with the share of the course seen, and your strongest and weakest started topic. It contains only what the Progress screen already shows:
+no dates, role, interview date or question content, and nothing is uploaded. The image has real alt text. Delivery uses what the browser has: `navigator.share` with the PNG
+(or text only when files cannot be shared), otherwise a download link, plus **Copy text** and a selectable text version. The hosted single-file build cannot download from its frame,
+so the download button is hidden there; a sheet with no working option says how to save the picture.
+
+### Accessibility and reading settings
+
+Behaviour, rules and the tracked colour-contrast exception are in [`docs/accessibility.md`](docs/accessibility.md). In short: axe-core runs over every screen and state
+(`e2e/a11y.spec.ts`, fails on serious/critical issues), plus behaviour tests for what axe cannot see (`e2e/a11y-behaviour.spec.ts`): a skip link and a single `main`
+landmark, focus moved to the prompt on a new question and to the verdict after Check, results readable without colour, keyboard-only match / order / spot, a focus ring on every Tab stop,
+and reduced motion. **Settings -> Reading** sets text size (S / M / L / XL) and an easier-to-read system font, stored in `progress.prefs.reading`.
+
 ## End-to-end tests
 
 ```bash
@@ -134,6 +180,8 @@ two tabs staying in sync, celebrations with and without reduced motion, the read
 seeded with `localStorage` blobs so each test starts from an exact state.
 
 `e2e/hints-confidence.spec.ts`, `library.spec.ts`, `challenge.spec.ts`, `achievements.spec.ts` and `mock.spec.ts` cover the learning features (hints and XP, ratings and hypercorrection, notes and the Library, the deterministic daily challenge across days, silent backfill and toasts, the mock run, time-up with the page clock, scorecard, capped rewards). Run several suites side by side with `E2E_PORT=4181 npx playwright test --workers=2`.
+`e2e/ask-why.spec.ts`, `e2e/reminders.spec.ts`, `e2e/share-card.spec.ts`, `e2e/a11y.spec.ts` and `e2e/a11y-behaviour.spec.ts` cover the tutor chat (the AI endpoint is faked in the browser), reminders (a recording
+`Notification` stand-in, the downloaded `.ics`), the share card (a real PNG, `navigator.share` stubs) and accessibility. Run several agents or shards side by side with `E2E_PORT=4182 npx playwright test --workers=2`.
 
 `e2e/question-types.spec.ts` plays **every question type through the real UI** (reading the correct answers from the
 YAML, so it stays in sync with the content), and asserts the feedback, the XP awarded and that the page never
@@ -148,10 +196,10 @@ First time on a machine: `npx playwright install chromium`.
 interview-trainer/
   content/          the course: one YAML file per unit (edit these to add questions)
   shared/           schema (zod), grading, lesson-session engine, streak/progress logic. Pure TS, fully tested
-  server/           Express API: /api/health, /api/grade (+ serves web/dist in production)
+  server/           Express API: /api/health, /api/grade, /api/explain (+ serves web/dist in production)
   web/              React + Vite PWA
   e2e/              Playwright tests + screenshots
-  docs/             design notes (engagement.md: the habit loop and its ethics rules)
+  docs/             design notes (engagement.md: the habit loop and its ethics rules; accessibility.md)
   scripts/          content:check, build-standalone
 ```
 
@@ -297,4 +345,6 @@ generated, so it works offline and is deterministic; the AI only grades.
 - **Architecture board** (drag & connect components, validate against a reference topology): the question schema is a
   discriminated union (`shared/src/schema.ts`), so it is one new type plus one component. Deliberately left out for now.
 - Specified, not built here: user-chosen reminders (a calendar `.ics` first), a weekly recap card, teach-back prompts, a shareable progress card, a transfer code / QR for moving between devices. (Hints, confidence, bookmarks and notes, the Library, the daily challenge, achievements and mock interviews are built: see [docs/learning-features.md](docs/learning-features.md).)
+- Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, a weekly recap card. (Reminders, the share card, the Ask why tutor and the accessibility pass are done.)
+- Later: timed "mock interview" mode, teach-back prompts, a transfer code / QR for moving between devices.
 - Real code execution for coding challenges (sandboxed Kotlin runner) instead of AI grading.

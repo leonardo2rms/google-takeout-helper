@@ -6,6 +6,7 @@ import {
   type Card, type DayLog, type LessonRecord, type Progress,
 } from './progress';
 import { normalizeExtras } from './extras';
+import { normalizePrefs } from './prefs';
 import { rankFor } from './rank';
 import type { Question } from './schema';
 import { lessonIdOf, MAX_EASE, MIN_EASE, NEW_EASE } from './srs';
@@ -154,6 +155,7 @@ export function normalizeProgress(input: unknown, ctx: MigrationContext): Progre
     },
     milestones,
     ...normalizeExtras(p, ctx.today),
+    prefs: normalizePrefs(p.prefs),
   };
 }
 

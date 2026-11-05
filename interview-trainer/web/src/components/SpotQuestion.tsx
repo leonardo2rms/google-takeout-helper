@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { spotLines, type SpotQ } from '@trainer/shared';
 import { highlight } from '../lib/highlight';
 import type { Answer } from '../lib/evaluate';
+import { ResultCue, type ResultState } from './ResultCue';
 
 interface Props {
   q: SpotQ;
@@ -27,7 +28,7 @@ export function SpotQuestion({ q, checked, onAnswer }: Props) {
       <p className="hint">
         {q.answers.length === 1 ? 'Tap the line with the problem' : `Tap the ${q.answers.length} lines with the problem`}
       </p>
-      <div className="spot code" role="group" aria-label="Code lines">
+      <div className="spot code" role="group" aria-label="Code lines" tabIndex={checked ? 0 : undefined}>
         {lines.map((line, i) => {
           const n = i + 1;
           const isSel = selected.includes(n);
@@ -43,12 +44,13 @@ export function SpotQuestion({ q, checked, onAnswer }: Props) {
               data-line={n}
               className={`src-line ${isSel ? 'selected' : ''} ${state}`}
               aria-pressed={isSel}
-              aria-label={`Line ${n}`}
               disabled={checked || line.trim() === ''}
               onClick={() => toggle(n)}
             >
               <span className="ln" aria-hidden="true">{n}</span>
+              <span className="sr-only">Line {n}: </span>
               <span className="src">{line === '' ? ' ' : highlight(line)}</span>
+              <ResultCue state={state as ResultState} />
             </button>
           );
         })}

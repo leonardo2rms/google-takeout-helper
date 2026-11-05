@@ -45,7 +45,7 @@ describe('API', () => {
   beforeAll(() => new Promise((r) => setTimeout(r, 20)));
 
   it('reports whether AI grading is available', async () => {
-    expect(await (await fetch(`${on.base}/api/health`)).json()).toEqual({ ok: true, ai: true, model: 'fake' });
+    expect(await (await fetch(`${on.base}/api/health`)).json()).toEqual({ ok: true, ai: true, model: 'fake', explain: false });
     expect(((await (await fetch(`${off.base}/api/health`)).json()) as { ai: boolean }).ai).toBe(false);
   });
   it('grades a known open question', async () => {

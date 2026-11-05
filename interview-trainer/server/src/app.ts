@@ -1,21 +1,29 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import { GradeRequest, allQuestions, openParts, type Course, type HealthResponse, type OpenQ } from '@trainer/shared';
+import {
+  ExplainRequest, GradeRequest, allQuestions, explainableQuestions, openParts,
+  type Course, type ExplainResponse, type HealthResponse, type OpenQ, type Question,
+} from '@trainer/shared';
 import type { Grader } from './grader';
+import type { Tutor } from './tutor';
 
 export interface AppOptions {
   course: Course;
   /** Undefined when no API credentials are configured; /api/grade then answers 503. */
   grader?: Grader;
+  /** Undefined when no API credentials are configured; /api/explain then answers 503. */
+  tutor?: Tutor;
   /** Built web app to serve in production. */
   staticDir?: string;
   /** Max grading calls per client per minute. */
   rateLimitPerMinute?: number;
+  /** Max "Ask why" calls per client per minute. */
+  explainRateLimitPerMinute?: number;
 }
 
 /** Tiny fixed-window limiter; enough to stop a runaway client burning API credits. */
-function rateLimiter(limit: number) {
+function rateLimiter(limit: number, message = 'Too many grading requests, slow down a little.') {
   const hits = new Map<string, { count: number; resetAt: number }>();
   return (req: Request, res: Response, next: NextFunction) => {
     const now = Date.now();
@@ -27,23 +35,25 @@ function rateLimiter(limit: number) {
     }
     if (++entry.count > limit) {
       res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
-      return res.status(429).json({ error: 'Too many grading requests, slow down a little.' });
+      return res.status(429).json({ error: message });
     }
     next();
   };
 }
 
-export function createApp({ course, grader, staticDir, rateLimitPerMinute = 30 }: AppOptions) {
+export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute = 30, explainRateLimitPerMinute = 20 }: AppOptions) {
   const openQuestions = new Map<string, OpenQ>();
   // Follow-ups are graded like standalone open questions, under their own ids (`<id>~f1`, ...).
   for (const q of allQuestions(course)) if (q.type === 'open') for (const part of openParts(q)) openQuestions.set(part.id, part);
+
+  const explainable: Map<string, Question> = explainableQuestions(allQuestions(course));
 
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '32kb' }));
 
   app.get('/api/health', (_req, res) => {
-    const body: HealthResponse = { ok: true, ai: Boolean(grader), model: grader?.model };
+    const body: HealthResponse = { ok: true, ai: Boolean(grader), model: grader?.model, explain: Boolean(tutor) };
     res.json(body);
   });
 
@@ -65,6 +75,26 @@ export function createApp({ course, grader, staticDir, rateLimitPerMinute = 30 }
       console.error('[grade] failed:', err instanceof Error ? err.message : err);
       // The client falls back to self-assessment on any non-2xx, so keep the detail server-side.
       res.status(502).json({ error: 'AI grading failed.' });
+    }
+  });
+
+  app.post('/api/explain', rateLimiter(explainRateLimitPerMinute, 'Too many questions, give it a minute.'), async (req, res) => {
+    if (!tutor) return res.status(503).json({ error: 'The AI tutor is not configured on this server.' });
+
+    const parsed = ExplainRequest.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid request body.' });
+    const { questionId, answer, correct, messages } = parsed.data;
+
+    // The question, the correct answer and the explanation come from the course, never from the client.
+    const question = explainable.get(questionId);
+    if (!question) return res.status(404).json({ error: 'Unknown question.' });
+
+    try {
+      const body: ExplainResponse = { reply: await tutor.explain(question, answer, correct, messages) };
+      res.json(body);
+    } catch (err) {
+      console.error('[explain] failed:', err instanceof Error ? err.message : err);
+      res.status(502).json({ error: 'The AI tutor failed.' });
     }
   });
 

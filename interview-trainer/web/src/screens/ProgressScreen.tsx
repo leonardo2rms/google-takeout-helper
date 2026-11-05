@@ -3,6 +3,7 @@ import { READINESS_TEXT, readiness, topicStats, type Course, type Progress } fro
 import { Calibration } from '../components/Calibration';
 import { MockHistory } from '../components/MockHistory';
 import { TrophyCase } from '../components/TrophyCase';
+import { ShareCardButton } from '../components/ShareCardButton';
 import { useToday } from '../lib/today';
 
 interface Props {
@@ -76,6 +77,7 @@ export function ProgressScreen({ course, progress }: Props) {
       <MockHistory mocks={progress.mocks} />
 
       <TrophyCase progress={progress} />
+      <ShareCardButton course={course} progress={progress} today={today} />
     </div>
   );
 }

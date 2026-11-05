@@ -1,5 +1,6 @@
 import type { Day } from './day';
 import { emptyExtras, type ProgressExtras } from './extras';
+import { defaultPrefs, type Prefs } from './prefs';
 
 export type QuestionId = string; // '<lessonId>/<n>'
 /** guess | think so | certain. Reserved for the confidence-rating feature; accepted (and ignored) by the scheduler today. */
@@ -95,6 +96,8 @@ export interface Progress extends ProgressExtras {
   stats: Stats;
   /** Dedupes celebrations: 'rank:3', 'streak:7', 'unit:ddd:80', 'goal:first', 'gift:freeze'. */
   milestones: Record<string, Day>;
+  /** Device preferences (reminders, reading). Namespaced here so other features' fields never collide. Kept local on import/merge. */
+  prefs: Prefs;
 }
 
 export const MAX_FREEZES = 2;
@@ -124,4 +127,5 @@ export const emptyProgress = (): Progress => ({
   stats: { sessions: 0, answered: 0, firstTry: 0, perfect: 0, practiceDays: 0 },
   milestones: {},
   ...emptyExtras(),
+  prefs: defaultPrefs(),
 });

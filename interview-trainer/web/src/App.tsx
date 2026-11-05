@@ -5,11 +5,14 @@ import {
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
+import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
 import { fetchHealth, gradeOpen } from './lib/api';
+import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { AchievementToasts } from './components/AchievementToasts';
+import { useReminderCheck } from './lib/reminders';
 import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
 import { Library } from './screens/Library';
@@ -38,12 +41,48 @@ const REVIEW_SIZE = 10;
 
 type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic' | 'one' | 'challenge';
 
+/** Screens that put focus on their own question/prompt, so the route announcer must not steal it. */
+const OWNS_FOCUS = /^\/(lesson\/|mix$|review$|daily$|warmup$|topic\/)/;
+
+function titleFor(route: string): string {
+  if (route === '/progress') return 'Progress';
+  if (route === '/done') return 'Session complete';
+  if (OWNS_FOCUS.test(route)) return 'Practice';
+  return 'Interview Trainer';
+}
+
+/** Page chrome shared by every screen: skip link, the single <main> landmark, route announcements, reading preferences. */
 export function App() {
   useEffect(() => backfillBadges(), []);
   return (
     <>
-      <Screens />
+      <Shell />
       <AchievementToasts />
+    </>
+  );
+}
+
+/** Landmarks, skip link, reading preferences and route announcements around the screens. */
+function Shell() {
+  const route = useHashRoute();
+  const { progress } = useProgress();
+  useReadingPrefs(progress.prefs.reading);
+  useRouteAnnouncer(titleFor(route), OWNS_FOCUS.test(route));
+  return (
+    <>
+      <a
+        className="skip-link"
+        href="#main"
+        onClick={(e) => {
+          e.preventDefault(); // the hash is our router: move focus instead of navigating
+          document.getElementById('main')?.focus();
+        }}
+      >
+        Skip to main content
+      </a>
+      <main id="main" tabIndex={-1}>
+        <Screens />
+      </main>
     </>
   );
 }
@@ -53,8 +92,10 @@ function Screens() {
   const { progress, update, reset } = useProgress();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
+  useReminderCheck(course);
 
   const [sampleGrade, setSampleGrade] = useState<GradeFn | undefined>();
+  const [sampleExplain, setSampleExplain] = useState<ExplainFn | undefined>();
 
   useEffect(() => {
     if (!isStandalone) {
@@ -65,6 +106,7 @@ function Screens() {
     void loadSample().then((sample) => {
       if (!sample) return;
       setSampleGrade(() => createSampleGrader(course, sample));
+      setSampleExplain(() => createSampleExplainer(course, sample));
       setHealth({ ok: true, ai: true, model: 'your Claude account' });
     });
   }, []);
@@ -115,6 +157,8 @@ function Screens() {
 
   const grade = useMemo<GradeFn | undefined>(() => (isStandalone ? sampleGrade : health?.ai ? gradeOpen : undefined), [sampleGrade, health]);
 
+  const explain = useMemo<ExplainFn | undefined>(() => (isStandalone ? sampleExplain : health?.explain ? explainOnline : undefined), [sampleExplain, health]);
+
   // "You'll see this again tomorrow": computed from the progress as it was when the lesson started.
   const reviewHint = useCallback(
     (q: Question, outcome: 'first' | 'retry' | 'failed') => {
@@ -135,6 +179,7 @@ function Screens() {
         color={found.unit.color}
         questions={found.lesson.questions}
         grade={grade}
+        explain={explain}
         reviewHint={reviewHint}
         haptics={progress.settings.haptics}
         onExit={() => go('/')}
@@ -144,7 +189,7 @@ function Screens() {
   }
 
   const practice = (kind: PracticeKind, title: string, unitId?: string) => (
-    <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} reviewHint={reviewHint} onFinish={finish} />
+    <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} explain={explain} reviewHint={reviewHint} onFinish={finish} />
   );
   if (route === '/library') return <Library course={course} progress={progress} />;
   if (route === '/mock') return <MockScreen course={course} progress={progress} grade={grade} />;
@@ -216,12 +261,13 @@ function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string):
   }
 }
 
-function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }: {
+function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, onFinish }: {
   kind: PracticeKind;
   title: string;
   unitId?: string;
   progress: Progress;
   grade?: GradeFn;
+  explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => void;
 }) {
@@ -243,6 +289,7 @@ function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }
       color={COLORS[kind]}
       questions={questions}
       grade={grade}
+      explain={explain}
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}

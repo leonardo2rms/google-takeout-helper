@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { seededShuffle, type MultiQ, type SingleQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
 import { Inline } from './Inline';
+import { ResultCue, type ResultState } from './ResultCue';
 
 interface Props {
   q: SingleQ | MultiQ;
@@ -45,8 +46,8 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
             disabled={checked}
             onClick={() => toggle(o.id)}
           >
-            <span className="marker" aria-hidden="true">{isSel ? (multi ? '✓' : '●') : ''}</span>
-            <span className="option-text"><Inline text={o.text} /></span>
+            <span className="marker" aria-hidden="true">{state === 'wrong' ? '✗' : state === 'correct' || state === 'missed' ? '✓' : isSel ? (multi ? '✓' : '●') : ''}</span>
+            <span className="option-text"><Inline text={o.text} /><ResultCue state={state as ResultState} /></span>
           </button>
         );
       })}

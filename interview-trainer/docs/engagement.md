@@ -52,4 +52,17 @@ All of it is pure: `today` is always passed in, there is no `Date.now()` in `sha
 
 Reminders (`.ics` first), weekly recap, teach-back, share card, transfer code/QR. (Achievements, confidence ratings, the daily challenge
 and mock interviews are built: see [`learning-features.md`](learning-features.md).) The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
+Achievements, confidence ratings, daily challenge, weekly recap, mock interviews, teach-back,
+transfer code/QR. The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
 defaults in `normalizeProgress`, so they need no migration.
+
+## Reminders
+
+A reminder is a cue the learner chose, not a lever we pull. Rules: opt-in only (nothing is requested until the toggle is used), the time is theirs, at most one local notification a day,
+nothing on rest days or after practising or when nothing is due, copy that states a fact ("5 questions are ready to review"), no streak talk, one tap to turn it all off, and honesty about the limits
+(no push server: the calendar event is the reliable channel). The `.ics` generator and the notification rule are pure functions in `shared/src/reminders.ts` with an injected clock.
+
+## Share card
+
+Share only what the learner already sees, never anything inferred or personal (no interview date, role, practice time or question content), and make it optional and local: the image is drawn in the browser
+and handed to the system share sheet or saved; nothing is uploaded and there is no referral tracking. The copy never claims a result ("readiness is an estimate of recall").

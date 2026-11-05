@@ -3,6 +3,7 @@ import {
   PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize,
   type Confidence, type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
+import { AskWhy } from '../components/AskWhy';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
 import { CodeQuestion } from '../components/CodeQuestion';
@@ -17,6 +18,9 @@ import { MatchQuestion } from '../components/MatchQuestion';
 import { OpenQuestion } from '../components/OpenQuestion';
 import { OrderQuestion } from '../components/OrderQuestion';
 import { SpotQuestion } from '../components/SpotQuestion';
+import type { ExplainFn } from '../lib/explain';
+import { describeLearnerAnswer } from '../lib/explain';
+import { scrollIntoViewGently } from '../lib/a11y';
 import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
 import { runCodeInWorker } from '../lib/run-code';
 import { useProgress } from '../lib/store';
@@ -27,6 +31,8 @@ interface Props {
   questions: Question[];
   /** Grades open answers with AI; undefined means offline (self-assessment). */
   grade?: GradeFn;
+  /** "Ask why" tutor chat; undefined means unavailable (the button is shown disabled). */
+  explain?: ExplainFn;
   /** Optional: when a question will come back ("tomorrow", "in 3 days"), shown under the feedback. */
   reviewHint?: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   /** Short vibration on a correct answer (where supported). */
@@ -61,7 +67,7 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, color, questions, grade, reviewHint, haptics, onExit, onFinish }: Props) {
+export function LessonScreen({ title, color, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
   const [session, setSession] = useState(() => createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
@@ -128,13 +134,25 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
 
   // Bring the feedback into view above the fixed bottom bar; on phones it starts below the fold.
   useEffect(() => {
-    if (phase === 'feedback') feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (phase === 'feedback') scrollIntoViewGently(feedbackRef.current);
+  }, [phase]);
+
+  // Focus follows the flow, so keyboard and screen-reader users never get lost: a new question puts focus on its
+  // prompt; checking an answer moves it to the verdict heading (Tab then reaches the explanation and "Continue").
+  const promptRef = useRef<HTMLHeadingElement>(null);
+  const viewKey = view ? `${view.id}#${attempt}` : '';
+  useEffect(() => {
+    promptRef.current?.focus({ preventScroll: true });
+  }, [viewKey]);
+  useEffect(() => {
+    if (phase === 'feedback') feedbackRef.current?.querySelector<HTMLElement>('h2')?.focus({ preventScroll: true });
   }, [phase]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat) return;
       if (e.target instanceof Element && e.target.closest('[data-no-lesson-keys]')) return; // the note editor keeps its own Enter
+      if (e.target instanceof Element && e.target.closest('[role="dialog"]')) return; // a sheet (Ask why) owns its keys
       const inText = e.target instanceof HTMLTextAreaElement;
       if (inText && !(e.ctrlKey || e.metaKey)) return;
       if (e.target instanceof HTMLButtonElement) return; // keep native activation
@@ -170,12 +188,12 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
         <span className="xp-chip" aria-label={`${session.xp} XP earned`}>⚡ {session.xp}</span>
       </header>
 
-      <main className="lesson-body">
+      <div className="lesson-body">
         <p className="kicker">
           {attempt > 0 ? '↻ Try again · ' : ''}
           {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
         </p>
-        <h1 className="prompt"><Inline text={view.prompt} /></h1>
+        <h1 className="prompt" ref={promptRef} tabIndex={-1}><Inline text={view.prompt} /></h1>
         {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
         {!followUp && view.hint && (
           <Hint
@@ -208,6 +226,15 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
               outcome={outcome}
               overall={overallScore === null ? undefined : { score: overallScore, pass: passed }}
               onCoveredChange={(covered) => setOutcome({ ...outcome, open: outcome.open && { ...outcome.open, covered } })}
+              actions={
+                <AskWhy
+                  key={`${view.id}#${attempt}`}
+                  questionId={view.id}
+                  answer={describeLearnerAnswer(view, answer, Boolean(outcome.skipped))}
+                  correct={passed}
+                  explain={explain}
+                />
+              }
             />
             <QuestionTools q={q} />
             {sure !== null && !followUp && (passed ? sure === 1 : sure === 3) && (
@@ -222,11 +249,14 @@ export function LessonScreen({ title, color, questions, grade, reviewHint, hapti
             })()}
           </div>
         )}
-      </main>
+      </div>
+
+      {/* Announces the wait for AI grading / test runs; the verdict itself is announced by moving focus to it. */}
+      <p className="sr-only" role="status" aria-live="polite">{phase === 'grading' ? (view.type === 'code' ? 'Running your code' : 'Checking your answer') : ''}</p>
 
       <footer className={`lesson-bar ${phase === 'feedback' && !pending ? (passed ? 'good' : 'bad') : ''}`}>
         {phase === 'feedback' ? (
-          <button type="button" className="btn primary wide" onClick={next} autoFocus>Continue</button>
+          <button type="button" className="btn primary wide" onClick={next}>Continue</button>
         ) : (
           <>
             <button type="button" className="btn ghost" onClick={skip} disabled={phase === 'grading'}>I don't know</button>

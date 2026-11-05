@@ -21,6 +21,8 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
   const [result, setResult] = useState<CodeRunResult | null>(null);
   const [running, setRunning] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
+  /** Tab indents, which would trap keyboard users: Escape releases it, so Escape then Tab (or Shift+Tab) moves on. */
+  const tabMovesFocus = useRef(false);
 
   function update(next: string) {
     setSource(next);
@@ -63,14 +65,18 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
         autoCapitalize="off"
         autoCorrect="off"
         aria-label="Your code"
+        aria-describedby="editor-keys-hint"
         onChange={(e) => update(e.target.value)}
+        onBlur={() => { tabMovesFocus.current = false; }}
         onKeyDown={(e) => {
-          if (e.key === 'Tab') {
+          if (e.key === 'Escape') tabMovesFocus.current = true;
+          else if (e.key === 'Tab' && !e.shiftKey && !tabMovesFocus.current) {
             e.preventDefault();
             insert('  ');
           }
         }}
       />
+      <p id="editor-keys-hint" className="sr-only">In the editor, Tab inserts two spaces. Press Escape and then Tab, or Shift and Tab, to move on.</p>
       {!checked && (
         <div className="keys" role="group" aria-label="Code symbols">
           <button type="button" className="key wide" onMouseDown={(e) => e.preventDefault()} onClick={() => insert('  ')}>Tab</button>
@@ -87,6 +93,7 @@ export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props
           <span className="hint">Some tests are hidden. Check runs all of them.</span>
         </div>
       )}
+      <p className="sr-only" role="status" aria-live="polite">{running ? 'Running tests' : ''}</p>
       {result && !checked && !blind && <TestResults result={result} />}
     </div>
   );
