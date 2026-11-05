@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 import { Course, type GradeResponse } from '@trainer/shared';
-import { CSP, createApp } from './app';
+import { createServer } from 'node:http';
+import { connect } from 'node:net';
+import { CSP, applyServerTimeouts, createApp } from './app';
 import type { Grader } from './grader';
 
 const course = Course.parse({
@@ -153,5 +155,58 @@ describe('rate limiter behind a proxy and under churn (S2-3)', () => {
     // the sweep runs on this request; every earlier client has been forgotten and is allowed again
     expect((await post(proxied, { 'x-forwarded-for': '10.0.0.1' })).status).toBe(200);
     expect((await post(proxied, { 'x-forwarded-for': '10.0.0.1' })).status).toBe(429);
+  });
+});
+
+describe('read-only paths and connection limits (N-S2-8)', () => {
+  const get = serve({ staticDir: dir });
+
+  it('anything but GET/HEAD on a page or asset path is 405 with Allow, not an HTML 404', async () => {
+    for (const path of ['/', '/sw.js', '/assets/app-abc123.js', '/lesson/x', '/nothing']) {
+      for (const method of ['POST', 'PUT', 'DELETE', 'PATCH']) {
+        const res = await get(path, { method });
+        expect(res.status, `${method} ${path}`).toBe(405);
+        expect(res.headers.get('allow')).toBe('GET, HEAD');
+        expect(res.headers.get('content-type')).toMatch(/json/);
+      }
+    }
+    expect((await get('/', { method: 'HEAD' })).status).toBe(200);
+    expect((await get('/', { method: 'GET' })).status).toBe(200);
+    const api = await get('/api/health', { method: 'POST' });
+    expect([api.status, api.headers.get('allow')]).toEqual([405, 'GET']); // API routes keep their own, more specific answer
+  });
+
+  it('sets sane defaults and honours overrides', () => {
+    const server = createApp({ course }).listen(0);
+    try {
+      applyServerTimeouts(server);
+      expect([server.headersTimeout, server.requestTimeout, server.keepAliveTimeout]).toEqual([15_000, 30_000, 5_000]);
+      applyServerTimeouts(server, { headersTimeoutMs: 1, requestTimeoutMs: 2, keepAliveTimeoutMs: 3 });
+      expect([server.headersTimeout, server.requestTimeout, server.keepAliveTimeout]).toEqual([1, 2, 3]);
+    } finally {
+      server.close();
+    }
+  });
+
+  it('cuts off a request body that is dribbled in slowly, while a normal request still works', async () => {
+    // Node checks request timeouts on an interval (30 s by default); a short one keeps the test quick.
+    const server = applyServerTimeouts(createServer({ connectionsCheckingInterval: 100 }, createApp({ course, grader })).listen(0), { headersTimeoutMs: 300, requestTimeoutMs: 400 });
+    const { port } = server.address() as AddressInfo;
+    try {
+      const closedAfter = await new Promise<number>((resolve) => {
+        const start = Date.now();
+        const socket = connect(port, '127.0.0.1', () => {
+          socket.write('POST /api/grade HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{');
+          const drip = setInterval(() => socket.write(' '), 100);
+          socket.on('close', () => { clearInterval(drip); resolve(Date.now() - start); });
+          socket.on('error', () => {});
+        });
+      });
+      expect(closedAfter).toBeLessThan(3000); // the default would hold it for minutes
+      const ok = await fetch(`http://127.0.0.1:${port}/api/health`);
+      expect(ok.status).toBe(200);
+    } finally {
+      server.close();
+    }
   });
 });
