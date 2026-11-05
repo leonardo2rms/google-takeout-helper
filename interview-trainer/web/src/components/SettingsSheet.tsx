@@ -21,17 +21,17 @@ interface Pending {
 }
 
 const TOGGLES: { key: keyof Pick<Settings, 'confetti' | 'haptics' | 'tips' | 'confidence'>; label: string; hint?: string }[] = [
-  { key: 'confetti', label: 'Confetti on big moments', hint: 'Only for real milestones, and never when your device asks for reduced motion.' },
+  { key: 'confetti', label: 'Confetti on big moments', hint: 'Only for real milestones; off when your device asks for reduced motion.' },
   { key: 'haptics', label: 'Vibration on correct answers', hint: 'Where your device supports it.' },
   {
     key: 'confidence',
     label: 'Ask "How sure are you?"',
-    hint: 'An optional one-tap rating before you check an answer. Being sure and wrong brings a question back sooner; guessing and being right keeps it short. Skippable every time.',
+    hint: 'A one-tap rating before you check. Sure and wrong brings a question back sooner. Skippable.',
   },
   {
     key: 'tips',
     label: "Interviewer's tip",
-    hint: `About 1 session in ${TIP_ONE_IN} shows a short reminder of something you already know, with +${TIP_BONUS_XP} XP. It is decided by the date and your session count, never gates anything, and costs nothing.`,
+    hint: `About 1 session in ${TIP_ONE_IN} shows a short reminder, worth +${TIP_BONUS_XP} XP.`,
   },
 ];
 
@@ -131,7 +131,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
 
       <section>
         <h3>Your data</h3>
-        <p className="muted">Everything is stored on this device only. A backup file is the way to move to a new phone or to be safe if the browser clears its storage.</p>
+        <p className="muted">Stored on this device only. A backup file moves you to a new phone and protects you if the browser clears its storage.</p>
         <div className="stack">
           <button type="button" className="btn secondary wide" onClick={download}>Download backup</button>
           <button type="button" className="btn secondary wide" onClick={() => void copy()}>Copy backup text</button>

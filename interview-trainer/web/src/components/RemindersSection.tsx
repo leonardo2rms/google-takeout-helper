@@ -57,7 +57,7 @@ export function RemindersSection({ progress, update }: Props) {
     <section aria-labelledby="reminders-h">
       <h3 id="reminders-h">Reminders</h3>
       <p className="muted">
-        Totally optional. Pick a time that suits you; nothing is sent from a server and nothing is tracked. A reminder never asks for more than a few minutes, and you can skip any day.
+        Optional. Nothing is sent from a server and nothing is tracked.
       </p>
 
       <div className="field">
@@ -76,7 +76,7 @@ export function RemindersSection({ progress, update }: Props) {
         <p className="hint" data-testid="reminder-ics-off">Calendar files cannot be downloaded from this hosted page. Open the installed app to add a repeating event.</p>
       )}
       <p className="muted">
-        The calendar event repeats at that time{progress.profile.restDays.length ? ', skipping your rest days' : ''} and works even when this app is closed. Re-importing it updates the same event.
+        The event repeats daily{progress.profile.restDays.length ? ', skipping your rest days' : ''} and works while the app is closed.
       </p>
 
       {canNotify && (
@@ -85,8 +85,7 @@ export function RemindersSection({ progress, update }: Props) {
           <span>
             <b>Notify me when I open the app</b>
             <small>
-              Once a day at most, only after your reminder time and only if something is due. Browsers can usually not wake this app while it is closed, so
-              this will not arrive on its own: use the calendar event for that.
+              At most once a day, after your reminder time, if something is due. Browsers usually cannot wake this app while it is closed: use the calendar event for that.
             </small>
           </span>
         </label>

@@ -97,7 +97,7 @@ test.describe('reminders: notification when the app is opened', () => {
     await page.goto('/');
     await openReminders(page);
     const toggle = page.getByTestId('reminder-notify');
-    await expect(page.getByRole('dialog')).toContainText('Browsers can usually not wake this app while it is closed');
+    await expect(page.getByRole('dialog')).toContainText('Browsers usually cannot wake this app while it is closed');
     await toggle.check();
     await expect(toggle).toBeChecked();
     expect((await stored(page))!.prefs.reminders.notify).toBe(true);

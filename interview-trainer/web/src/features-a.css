@@ -78,6 +78,10 @@ mark { background: var(--ochre-tint); color: var(--ink); border-bottom: 2px soli
 .badge-icon { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 1.5px solid var(--ochre); border-radius: var(--r2); color: var(--ochre); }
 .trophies { margin: 8px 0 18px; display: grid; gap: 10px; }
 .trophy-group h3 { font: 500 var(--fs-12) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); margin: 12px 0 8px; }
+.locked-badges > summary { min-height: 44px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 600; }
+.badge-grid.compact { gap: 0; }
+.badge-grid.compact .badge { border: 0; border-bottom: 1px solid var(--hairline); border-radius: 0; padding: 8px 0; }
+.badge-grid.compact .badge-icon { width: 30px; height: 30px; }
 .badge-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .badge { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px dashed var(--edge); border-radius: var(--r2); min-width: 0; background: none; }
 .badge.got { border-style: solid; border-color: var(--edge); border-left: 4px solid var(--ochre); background: var(--sheet); }
@@ -118,7 +122,6 @@ mark { background: var(--ochre-tint); color: var(--ink); border-bottom: 2px soli
 .mock-history-day { font: 500 var(--fs-13) var(--mono); font-variant-numeric: tabular-nums slashed-zero; color: var(--graphite); }
 .mock-results { padding-bottom: 120px; display: grid; gap: 14px; align-content: start; }
 .mock-score { display: grid; gap: 6px; }
-.mock-score .big-number { font-size: var(--fs-72); line-height: 1; letter-spacing: -.04em; font-weight: 500; }
 .mock-qlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .mock-q { border: 1px solid var(--edge); border-left-width: 4px; border-radius: var(--r2); padding: 0 12px; min-width: 0; background: var(--sheet); }
 .mock-q.good { border-left-color: var(--teal); }

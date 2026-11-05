@@ -48,6 +48,10 @@ test.describe('achievements', () => {
     await expect(page.getByTestId('badge-count')).toHaveText(`3/${ACHIEVEMENTS.length}`);
     await expect(page.getByTestId('badge-first-lesson')).toHaveAttribute('data-unlocked', 'true');
     await expect(page.getByTestId('badge-first-lesson')).toContainText(/Unlocked Nov 4, 2026/);
+    // locked badges wait in one tidy disclosure instead of a wall of dashed cards
+    await expect(page.getByTestId('badge-streak-30')).toBeHidden();
+    await page.getByTestId('locked-badges').locator('summary').click();
+    await expect(page.getByTestId('badge-streak-30')).toBeVisible();
     await expect(page.getByTestId('badge-streak-30')).toHaveAttribute('data-unlocked', 'false');
     await expect(page.getByTestId('badge-streak-30')).toContainText('Locked');
     await expect(page.getByTestId('badge-streak-30')).toContainText('30 days in a row');
@@ -164,7 +168,7 @@ test.describe('achievements', () => {
     await useClock(page);
     await seed(page, { [KEY_V2]: v2() });
     await page.goto('/#/progress');
-    const text = (await page.getByTestId('trophy-case').innerText()).toLowerCase();
+    const text = ((await page.getByTestId('trophy-case').textContent()) ?? '').toLowerCase();
     for (const bad of ['lose', 'lost', 'hurry', 'expire', 'last chance', 'limited', "don't break"]) expect(text).not.toContain(bad);
   });
 });
