@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import compression from 'compression';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import {
   ExplainRequest, GradeRequest, allQuestions, explainableQuestions, openParts,
@@ -85,6 +86,7 @@ export function createApp({ course, grader, tutor, staticDir, rateLimitPerMinute
   app.disable('x-powered-by');
   if (trustProxy !== undefined) app.set('trust proxy', trustProxy);
   app.use(securityHeaders);
+  app.use(compression()); // the bundle is ~875 kB of JSON-heavy JavaScript: about a quarter of that on the wire
   app.use(express.json({ limit: '32kb' }));
 
   app.get('/api/health', (_req, res) => {

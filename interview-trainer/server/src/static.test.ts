@@ -44,6 +44,7 @@ const dir = mkdtempSync(join(tmpdir(), 'trainer-deploy-'));
 mkdirSync(join(dir, 'assets'));
 writeFileSync(join(dir, 'index.html'), '<!doctype html><title>spa</title>');
 writeFileSync(join(dir, 'assets', 'app-abc123.js'), 'console.log(1)');
+writeFileSync(join(dir, 'assets', 'big-def456.js'), `const course = ${JSON.stringify(Array.from({ length: 400 }, (_, i) => ({ id: `q/${i}`, prompt: 'What is the time complexity?' })))};`);
 writeFileSync(join(dir, 'sw.js'), '// sw');
 writeFileSync(join(dir, 'manifest.webmanifest'), '{}');
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -86,6 +87,22 @@ describe('caching headers', () => {
   it('hashed assets are immutable; the shell, service worker and manifest are always revalidated', async () => {
     expect((await get('/assets/app-abc123.js')).headers.get('cache-control')).toBe('public, max-age=31536000, immutable');
     for (const path of ['/sw.js', '/manifest.webmanifest', '/', '/lesson/x']) expect((await get(path)).headers.get('cache-control')).toBe('no-cache');
+  });
+});
+
+describe('compression (S2-2)', () => {
+  const get = serve({ staticDir: dir });
+
+  it('compresses large text responses for clients that accept gzip, and says so', async () => {
+    const res = await get('/assets/big-def456.js', { headers: { 'accept-encoding': 'gzip' } });
+    expect(res.headers.get('content-encoding')).toBe('gzip');
+    expect(res.headers.get('vary')).toMatch(/Accept-Encoding/i);
+    expect(await res.text()).toContain('What is the time complexity?'); // transparently decoded by fetch
+  });
+
+  it('sends identity to clients that do not accept it, and leaves tiny files alone', async () => {
+    expect((await get('/assets/big-def456.js', { headers: { 'accept-encoding': 'identity' } })).headers.get('content-encoding')).toBeNull();
+    expect((await get('/assets/app-abc123.js', { headers: { 'accept-encoding': 'gzip' } })).headers.get('content-encoding')).toBeNull();
   });
 });
 
