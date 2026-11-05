@@ -75,9 +75,9 @@ lessons:
             }
         options:
           - { id: a, text: "It swallows CancellationException, so cancelling the coroutine won't stop it" }
-          - { id: b, text: "`delay` can't be used in a try block" }
-          - { id: c, text: "Suspend functions can't catch exceptions" }
-          - { id: d, text: "`log.warn` blocks the dispatcher" }
+          - { id: b, text: "`delay` cannot be used inside a try block in a suspend function" }
+          - { id: c, text: "A suspend function cannot catch exceptions from another suspend function" }
+          - { id: d, text: "`log.warn` is not allowed inside a `catch` block of a suspend function" }
         answer: a
         explanation: "Cancellation is delivered as a CancellationException at a suspension point. Catching `Exception` (or `Throwable`) swallows it. Rethrow it (`if (e is CancellationException) throw e`) or catch more specific types."
 
@@ -189,9 +189,9 @@ lessons:
             }
         options:
           - { id: a, text: "\"sibling done\" is printed; the failure of the first child doesn't cancel it" }
-          - { id: b, text: "Nothing is printed; the sibling is cancelled" }
-          - { id: c, text: "The exception is rethrown by supervisorScope" }
-          - { id: d, text: "It deadlocks" }
+          - { id: b, text: "Nothing is printed; the failing child cancels its sibling, just like in `coroutineScope`" }
+          - { id: c, text: "The exception is rethrown by `supervisorScope` after the sibling finishes" }
+          - { id: d, text: "It deadlocks, because `supervisorScope` waits for a child that already failed" }
         answer: a
         explanation: "A supervisor's children fail independently. The uncaught exception from a `launch` child goes to the CoroutineExceptionHandler (or the thread's handler); it neither cancels siblings nor is rethrown by the scope. With `coroutineScope`, the sibling would be cancelled and the exception rethrown."
 
@@ -223,10 +223,10 @@ lessons:
         options:
           - { id: a, text: "withTimeoutOrNull" }
           - { id: b, text: "withTimeout" }
-          - { id: c, text: "coroutineScope" }
-          - { id: d, text: "yield" }
+          - { id: c, text: "supervisorScope" }
+          - { id: d, text: "awaitCancellation" }
         answer: a
-        explanation: "`withTimeout` throws TimeoutCancellationException (a CancellationException subclass, so careful with broad catches). `withTimeoutOrNull` returns null."
+        explanation: "`withTimeout` throws TimeoutCancellationException (a CancellationException subclass, so careful with broad catches). `withTimeoutOrNull` returns null. `supervisorScope` and `awaitCancellation` have no time limit at all."
 
       - type: open
         hint: "Which of the three calls depend on each other, and in which scope would you start the independent ones?"
@@ -315,10 +315,10 @@ lessons:
       - type: single
         prompt: "A test written with `runTest` takes a real 10 seconds, although the code under test only calls `delay(10_000)`. What is the most likely cause?"
         options:
-          - { id: a, text: "The code runs on a hard-coded dispatcher such as `Dispatchers.Default` or `Dispatchers.IO`, so its `delay` uses real time instead of the test scheduler's virtual time" }
-          - { id: b, text: "`runTest` skips delays inside `launch` but never inside `async`" }
-          - { id: c, text: "Virtual time only works for delays shorter than a few seconds" }
-          - { id: d, text: "`runTest` can skip `Thread.sleep`, but not `delay`" }
+          - { id: a, text: "The code runs on a hard-coded dispatcher such as `Dispatchers.IO`, so its `delay` uses real time instead of virtual time" }
+          - { id: b, text: "`runTest` skips delays only in the test body itself, never in code started with `launch` or `async`" }
+          - { id: c, text: "Virtual time only works for delays shorter than a few seconds, so longer ones run in real time" }
+          - { id: d, text: "`delay` is only skipped under `runBlocking` with a test dispatcher, so `runTest` waits the full time" }
         answer: a
         explanation: "`runTest` runs the test body on a `TestScheduler` that advances virtual time whenever all coroutines are idle, so `delay(10_000)` costs nothing. A dispatcher the code creates or hard-codes bypasses that scheduler. Inject the `CoroutineDispatcher` (production: `Dispatchers.IO`; test: `StandardTestDispatcher(testScheduler)`) so the test controls time."
 
@@ -337,8 +337,8 @@ lessons:
             }
         options:
           - { id: a, text: "It prints \"caught\", and then `load()` still throws IllegalStateException(\"boom\")" }
-          - { id: b, text: "It prints \"caught\" and returns 42" }
-          - { id: c, text: "It prints \"caught\" and then suspends forever" }
+          - { id: b, text: "It prints \"caught\" and returns 42, because the catch handles the failure" }
+          - { id: c, text: "It prints \"caught\" and then suspends forever, waiting for the failed child" }
           - { id: d, text: "It returns 42, and the exception goes to the default exception handler" }
         answer: a
         explanation: "A failing `async` child cancels its parent scope as soon as it fails, whether or not anyone awaits it. The `try/catch` handles the exception at `await()` but cannot undo that cancellation, so `coroutineScope` rethrows the child's failure when it completes. Fix: use `supervisorScope { }` and handle each `await()` yourself, or catch inside the `async` block and return a result type."
