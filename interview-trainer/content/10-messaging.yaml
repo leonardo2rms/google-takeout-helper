@@ -99,7 +99,7 @@ lessons:
         prompt: "Select ALL settings that reduce the chance of losing a write that the producer has already seen acknowledged."
         options:
           - { id: a, text: "acks=all on the producer" }
-          - { id: b, text: "Replication factor 3 with min.insync.replicas=2" }
+          - { id: b, text: "Replication factor 3 with min.insync.replicas=2 (which is enforced for acks=all writes)" }
           - { id: c, text: "Unclean leader election disabled" }
           - { id: d, text: "acks=1, because the leader's acknowledgment is enough" }
           - { id: e, text: "A larger linger.ms so batches are bigger" }

@@ -288,9 +288,9 @@ lessons:
           - "Add the new nullable column in a migration; the running code ignores it"
           - "Deploy code that writes to both the old and the new column"
           - "Backfill the new column for existing rows, in batches"
-          - "Deploy code that reads only the new column"
+          - "Deploy code that reads and writes only the new column"
           - "Drop the old column in a later migration"
-        explanation: "Dual writes start before the backfill so no row can be changed in the gap, and the old column stays until no running version reads it. Every step is compatible with the previous app version, which matters during rolling deployments where old and new instances run side by side. A single `ALTER TABLE ... RENAME COLUMN` breaks the instances that are still running the old code."
+        explanation: "Dual writes start before the backfill so no row can be changed in the gap, and the old column stays until no running version reads or writes it. Every step is compatible with the previous app version, which matters during rolling deployments where old and new instances run side by side. A single `ALTER TABLE ... RENAME COLUMN` breaks the instances that are still running the old code."
 
       - type: single
         prompt: "Cache-aside: a reader misses and loads the OLD row from the database. Before it stores that value in the cache, a writer updates the row and deletes the cache key. Then the reader stores the old value. What is the state now, and what bounds the damage?"
