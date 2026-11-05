@@ -3,6 +3,7 @@ import {
   READINESS_TEXT, allQuestions, buildDailySession, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
+import { ChallengeCard } from '../components/ChallengeCard';
 import { OnboardingCard } from '../components/OnboardingCard';
 import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
@@ -146,6 +147,8 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
         <span className="cta" aria-hidden="true">{hero.cta}</span>
       </a>
+
+      <ChallengeCard course={course} progress={progress} today={today} />
 
       {countdown && (
         <div className="countdown" data-testid="countdown">

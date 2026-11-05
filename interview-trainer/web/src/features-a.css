@@ -47,3 +47,8 @@
 .pill.status-mastered { background: var(--green-bg); color: var(--green-text); }
 .lib-empty { padding: 16px 0; }
 .lib-search { padding-top: 6px; }
+
+/* ---------- daily challenge ---------- */
+.card.challenge { margin: 0 0 12px; }
+.card.challenge.done { border-style: dashed; }
+.card.challenge .btn { flex: none; min-height: 44px; }
