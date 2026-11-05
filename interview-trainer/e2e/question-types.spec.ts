@@ -92,7 +92,7 @@ test.describe('wrong answers are marked, explained and come back', () => {
       await expect(page.locator('.kicker')).toContainText('Try again');
       await solveAndContinue(page, q);
       // First attempt missed, so the lesson is not perfect, but it completes with a recovered answer.
-      await expect(page.locator('.summary h1')).toHaveText('Lesson complete!');
+      await expect(page.locator('.summary h1')).toHaveText('Lesson complete');
     });
   }
 });
@@ -216,7 +216,7 @@ test.describe('every lesson can be completed perfectly', () => {
       await page.locator('.prompt').waitFor();
       for (const q of lesson.questions) await solveAndContinue(page, q);
 
-      await expect(page.locator('.summary h1')).toHaveText('Perfect lesson!');
+      await expect(page.locator('.summary h1')).toHaveText('Clean run');
       await expect(page.locator('.tile.acc')).toContainText('100%');
       await page.getByRole('button', { name: 'Continue', exact: true }).click();
       await expect(page.locator('.stat').first()).toContainText('1'); // streak started

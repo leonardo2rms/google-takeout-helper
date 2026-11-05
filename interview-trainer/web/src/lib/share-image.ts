@@ -4,13 +4,33 @@ export const CARD_W = 1080;
 export const CARD_H = 1350;
 export const CARD_FILE = 'interview-trainer-progress.png';
 
-const token = (name: string, fallback: string) => {
-  try {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-  } catch {
-    return fallback;
-  }
-};
+/**
+ * The card is always drawn on the light "drafting sheet" palette (the same values as the light theme tokens in styles.css),
+ * whatever theme the app is in: a picture that leaves the app should look the same wherever it lands. Every pairing here is
+ * one the contrast script checks (ink, graphite on paper; paper on ink).
+ */
+const C = { paper: '#F2F4F6', sheet: '#FBFCFD', ink: '#0F1B26', graphite: '#4A5967', edge: '#7B8996', hairline: '#D3D9DF', cobalt: '#2447C4' };
+
+const SANS = '"Plex Sans Var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+const MONO = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+const sans = (size: number, weight = 600) => `${weight} ${size}px ${SANS}`;
+const mono = (size: number, weight = 500) => `${weight} ${size}px ${MONO}`;
+
+// Lucide (ISC) shapes, drawn with the same 24x24 grid as the in-app icons (see components/icons.tsx).
+const FLAME = 'M12 3q1 4 4 6.5t3 5.5a1 1 0 0 1-14 0 5 5 0 0 1 1-3 1 1 0 0 0 5 0c0-2-1.5-3-1.5-5q0-2 2.5-4';
+const CHECK = 'M20 6 9 17l-5-5';
+
+function icon(ctx: CanvasRenderingContext2D, d: string, x: number, y: number, size: number, color: string, width: number): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 24, size / 24);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke(new Path2D(d));
+  ctx.restore();
+}
 
 function fit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text;
@@ -19,118 +39,140 @@ function fit(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): str
   return `${t.trimEnd()}…`;
 }
 
-/** Draws the card on a canvas using the app's colour tokens. Pure drawing: the data comes from `buildShareCard`. */
+/** Letter-spaced uppercase label in the mono face (canvas has no letter-spacing property everywhere, so it is drawn glyph by glyph). */
+function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size = 26, align: 'left' | 'right' = 'left'): void {
+  ctx.font = mono(size, 500);
+  ctx.fillStyle = C.graphite;
+  ctx.textAlign = 'left';
+  const gap = size * 0.12;
+  const upper = text.toUpperCase();
+  const width = [...upper].reduce((w, ch) => w + ctx.measureText(ch).width + gap, -gap);
+  let cx = align === 'right' ? x - width : x;
+  for (const ch of upper) {
+    ctx.fillText(ch, cx, y);
+    cx += ctx.measureText(ch).width + gap;
+  }
+}
+
+/** A gauge of `ticks` segments, filled in proportion to `pct` (the same idiom as the in-app progress gauges). */
+function gauge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, pct: number, ticks = 20): void {
+  const gap = 4;
+  const seg = (w - gap * (ticks - 1)) / ticks;
+  const on = Math.round((Math.min(100, Math.max(0, pct)) / 100) * ticks);
+  for (let i = 0; i < ticks; i++) {
+    ctx.fillStyle = i < on ? C.ink : C.hairline;
+    ctx.fillRect(x + i * (seg + gap), y, seg, h);
+  }
+}
+
+/** Draws the card on a canvas. Pure drawing: the data comes from `buildShareCard`. */
 export function drawShareCard(canvas: HTMLCanvasElement, card: ShareCard): void {
   canvas.width = CARD_W;
   canvas.height = CARD_H;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('no canvas');
-  const c = {
-    bg: token('--bg', '#ffffff'),
-    surface: token('--surface', '#f7f7f7'),
-    border: token('--border', '#e5e5e5'),
-    text: token('--text', '#3c3c3c'),
-    muted: token('--muted', '#777777'),
-    green: token('--green', '#58cc02'),
-    greenDark: token('--green-dark', '#58a700'),
-    blue: token('--blue', '#1cb0f6'),
-    red: token('--red', '#ff4b4b'),
-  };
-  const font = (size: number, weight = 700) => `${weight} ${size}px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
   const M = 80;
   const inner = CARD_W - 2 * M;
-
-  ctx.fillStyle = c.bg;
-  ctx.fillRect(0, 0, CARD_W, CARD_H);
-  ctx.fillStyle = c.green;
-  ctx.fillRect(0, 0, CARD_W, 24);
-
   ctx.textBaseline = 'alphabetic';
   ctx.textAlign = 'left';
-  ctx.fillStyle = c.text;
-  ctx.font = font(52, 800);
-  ctx.fillText('Interview Trainer', M, 130);
 
-  // Streak
-  ctx.fillStyle = c.greenDark;
-  ctx.font = font(260, 800);
-  ctx.fillText(String(card.streak), M, 440);
-  const numW = ctx.measureText(String(card.streak)).width;
-  ctx.fillStyle = c.text;
-  ctx.font = font(56, 700);
-  ctx.fillText('day streak', M + numW + 28, 440);
+  // the sheet: paper, with a drawing border
+  ctx.fillStyle = C.paper;
+  ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.strokeStyle = C.ink;
+  ctx.lineWidth = 3;
+  ctx.strokeRect(36, 36, CARD_W - 72, CARD_H - 72);
 
-  // Rank
-  ctx.fillStyle = c.surface;
-  ctx.strokeStyle = c.border;
-  ctx.lineWidth = 4;
+  // title block
+  ctx.fillStyle = C.ink;
   ctx.beginPath();
-  ctx.roundRect(M, 490, inner, 120, 28);
+  ctx.roundRect(M, 92, 72, 72, 12);
   ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = c.muted;
-  ctx.font = font(34, 600);
-  ctx.fillText('Rank', M + 36, 562);
-  ctx.fillStyle = c.text;
-  ctx.font = font(56, 800);
-  ctx.textAlign = 'right';
-  ctx.fillText(card.rank, CARD_W - M - 36, 568);
+  icon(ctx, CHECK, M + 16, 108, 40, C.paper, 2.6);
+  ctx.fillStyle = C.ink;
+  ctx.font = sans(52, 600);
+  ctx.fillText('Interview Trainer', M + 100, 144);
+  label(ctx, 'Progress', CARD_W - M, 142, 26, 'right');
+  ctx.fillStyle = C.hairline;
+  ctx.fillRect(M, 196, inner, 2);
+
+  // streak
+  label(ctx, 'Streak', M, 270);
+  icon(ctx, FLAME, M, 300, 100, C.ink, 1.6);
+  ctx.fillStyle = C.ink;
+  ctx.font = mono(220, 500);
   ctx.textAlign = 'left';
+  ctx.fillText(String(card.streak), M + 130, 470);
+  const numW = ctx.measureText(String(card.streak)).width;
+  ctx.fillStyle = C.graphite;
+  ctx.font = mono(52, 500);
+  ctx.fillText(card.streak === 1 ? 'day' : 'days', M + 130 + numW + 24, 470);
 
-  // Readiness
-  ctx.fillStyle = c.muted;
-  ctx.font = font(34, 600);
-  ctx.fillText('Readiness', M, 700);
-  ctx.fillStyle = c.text;
-  ctx.font = font(120, 800);
-  ctx.fillText(String(card.readinessScore), M, 820);
-  const scoreW = ctx.measureText(String(card.readinessScore)).width;
-  ctx.font = font(44, 700);
-  ctx.fillText(card.readinessLabel, M + scoreW + 28, 800);
-  ctx.fillStyle = c.muted;
-  ctx.font = font(34, 500);
-  ctx.fillText(`${card.coveragePct}% of the course seen`, M + scoreW + 28, 850);
-
-  // Topics
-  const rows = [
-    card.strongest && { label: card.weakest ? 'Strongest topic' : 'Topic', ...card.strongest, color: c.green },
-    card.weakest && { label: card.strongest ? 'Weakest topic' : 'Topic', ...card.weakest, color: c.blue },
-  ].filter((r): r is { label: string; title: string; pct: number; color: string } => Boolean(r));
-  let y = 950;
-  for (const r of rows) {
-    ctx.fillStyle = c.muted;
-    ctx.font = font(32, 600);
-    ctx.fillText(r.label, M, y);
-    ctx.fillStyle = c.text;
-    ctx.font = font(40, 800);
+  // ruled readout: rank, readiness, coverage
+  const rows: [string, string][] = [
+    ['Rank', card.rank],
+    ['Readiness', `${card.readinessScore}  ${card.readinessLabel}`],
+    ['Course seen', `${card.coveragePct}%`],
+  ];
+  let y = 560;
+  ctx.fillStyle = C.ink;
+  ctx.fillRect(M, y, inner, 3);
+  for (const [name, value] of rows) {
+    label(ctx, name, M, y + 54, 28);
+    ctx.fillStyle = C.ink;
+    ctx.font = sans(46, 600);
     ctx.textAlign = 'right';
-    ctx.fillText(`${r.pct}%`, CARD_W - M, y + 2);
+    ctx.fillText(fit(ctx, value, inner - 360), CARD_W - M, y + 58);
     ctx.textAlign = 'left';
-    const w = inner - 130;
-    ctx.fillText(fit(ctx, r.title, w), M, y + 56);
-    ctx.fillStyle = c.border;
-    ctx.beginPath();
-    ctx.roundRect(M, y + 78, inner, 22, 11);
-    ctx.fill();
-    ctx.fillStyle = r.color;
-    ctx.beginPath();
-    ctx.roundRect(M, y + 78, Math.max(22, (inner * r.pct) / 100), 22, 11);
-    ctx.fill();
-    y += 170;
+    y += 84;
+    ctx.fillStyle = C.hairline;
+    ctx.fillRect(M, y, inner, 2);
   }
 
-  ctx.fillStyle = c.muted;
-  ctx.font = font(28, 500);
-  ctx.fillText('Readiness is an estimate of recall, not a prediction of any result.', M, CARD_H - 70);
+  // topics
+  const topics = [
+    card.strongest && { name: card.weakest ? 'Strongest topic' : 'Topic', ...card.strongest },
+    card.weakest && { name: card.strongest ? 'Weakest topic' : 'Topic', ...card.weakest },
+  ].filter((r): r is { name: string; title: string; pct: number } => Boolean(r));
+  y = 892;
+  for (const t of topics) {
+    label(ctx, t.name, M, y, 26);
+    ctx.fillStyle = C.ink;
+    ctx.font = mono(44, 600);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${t.pct}%`, CARD_W - M, y + 6);
+    ctx.textAlign = 'left';
+    ctx.font = sans(42, 600);
+    ctx.fillText(fit(ctx, t.title, inner - 170), M, y + 54);
+    gauge(ctx, M, y + 78, inner, 20, t.pct);
+    y += 160;
+  }
+
+  // footer
+  ctx.fillStyle = C.hairline;
+  ctx.fillRect(M, CARD_H - 128, inner, 2);
+  ctx.fillStyle = C.graphite;
+  ctx.font = sans(27, 400);
+  ctx.fillText('Readiness is an estimate of recall, not a prediction of any result.', M, CARD_H - 80);
+}
+
+/** Waits for the app font so the picture is drawn in Plex Sans, not the fallback (errors and missing support are harmless). */
+async function fontsReady(): Promise<void> {
+  try {
+    await Promise.all([document.fonts.load(sans(52, 600)), document.fonts.load(sans(27, 400))]);
+  } catch {
+    /* draw with the fallback font */
+  }
 }
 
 /** Renders the card to a PNG blob; null when the browser cannot (no canvas / toBlob). */
-export function renderShareCard(card: ShareCard): Promise<Blob | null> {
+export async function renderShareCard(card: ShareCard): Promise<Blob | null> {
   try {
+    await fontsReady();
     const canvas = document.createElement('canvas');
     drawShareCard(canvas, card);
-    return new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
+    return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png'));
   } catch {
-    return Promise.resolve(null);
+    return null;
   }
 }

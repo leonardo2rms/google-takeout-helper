@@ -1,4 +1,5 @@
 import { HINT_COST } from '@trainer/shared';
+import { Icon } from './icons';
 import { Inline } from './Inline';
 
 interface Props {
@@ -14,14 +15,16 @@ export function Hint({ text, revealed, canReveal, onReveal }: Props) {
   if (revealed) {
     return (
       <p className="hint-box" role="note" data-testid="hint-text">
-        <b>💡 Hint</b> <Inline text={text} />
+        <Icon name="lightbulb" />
+        <span><b>Hint</b><Inline text={text} /></span>
       </p>
     );
   }
   if (!canReveal) return null;
   return (
-    <button type="button" className="btn secondary small hint-btn" data-testid="hint-btn" onClick={onReveal}>
-      💡 Hint <span>(−{HINT_COST} XP)</span>
+    <button type="button" className="btn small hint-btn" data-testid="hint-btn" onClick={onReveal}>
+      <Icon name="lightbulb" />
+      <span>Hint (−{HINT_COST} XP)</span>
     </button>
   );
 }

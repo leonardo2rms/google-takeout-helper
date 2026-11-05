@@ -31,7 +31,9 @@ function courseContent(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), courseContent()],
+  // The single-file build must inline the font into the CSS (build-standalone.mjs allows one JS and at most one CSS file).
+  build: { assetsInlineLimit: mode === 'standalone' ? 100_000 : 4096 },
   server: { host: true, proxy: { '/api': 'http://localhost:8787' } },
-});
+}));

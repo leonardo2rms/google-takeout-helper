@@ -1,6 +1,16 @@
 import { useEffect, useRef } from 'react';
 
-const COLORS = ['#58cc02', '#1cb0f6', '#ffc800', '#ff9600', '#ce82ff', '#ff4b4b'];
+/** Drawn from the design tokens so the burst matches the theme (ink, cobalt, teal, ochre, vermilion). */
+const TOKENS = ['--ink', '--cobalt', '--teal', '--ochre', '--vermilion'] as const;
+const FALLBACK = ['#0F1B26', '#2447C4', '#00695F', '#8A5300', '#AE320C'];
+function palette(): string[] {
+  try {
+    const cs = getComputedStyle(document.documentElement);
+    return TOKENS.map((t, i) => cs.getPropertyValue(t).trim() || FALLBACK[i]!);
+  } catch {
+    return FALLBACK;
+  }
+}
 
 /**
  * A short confetti burst on a canvas (~1.2 s, no dependencies). Decorative: aria-hidden and pointer-events none.
@@ -20,6 +30,7 @@ export function Confetti({ onDone }: { onDone?: () => void }) {
     }
     const w = (canvas.width = window.innerWidth);
     const h = (canvas.height = window.innerHeight);
+    const COLORS = palette();
     const parts = Array.from({ length: 70 }, (_, i) => ({
       x: w / 2 + (Math.random() - 0.5) * 80,
       y: h * 0.35,

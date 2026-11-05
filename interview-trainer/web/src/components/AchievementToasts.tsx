@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { dismissBadgeToast, useBadgeToast } from '../lib/toasts';
+import { Icon, isIconName } from './icons';
 
 /** How long a notice stays: long enough to read, and it can always be dismissed. */
 const SHOW_MS = 6000;
@@ -22,15 +23,15 @@ export function AchievementToasts() {
     <div className="badge-toast-region" role="status" aria-live="polite">
       {toast && (
         <div className="badge-toast" data-testid="badge-toast" key={toast.id}>
-          <button type="button" className="icon-btn" aria-label="Dismiss badge notification" onClick={() => dismissBadgeToast(toast.id)}>✕</button>
-          <span className="badge-emoji" aria-hidden="true">{toast.badges[0]!.emoji}</span>
+          <span className="badge-icon" aria-hidden="true"><Icon name={isIconName(toast.badges[0]!.icon) ? toast.badges[0]!.icon : 'award'} size={20} /></span>
           <span className="badge-toast-text">
             <b>{toast.badges.length === 1 ? `Badge unlocked: ${toast.badges[0]!.title}` : `${toast.badges.length} badges unlocked`}</b>
             <small>
-              {toast.badges.length === 1 ? toast.badges[0]!.description : toast.badges.map((b) => b.title).join(', ')}
+              {toast.badges.length === 1 ? toast.badges[0]!.description : `${toast.badges.map((b) => b.title).join(', ')}.`}
               {' '}You can see all of them on the Progress page.
             </small>
           </span>
+          <button type="button" className="icon-btn" aria-label="Dismiss badge notification" onClick={() => dismissBadgeToast(toast.id)}><Icon name="x" /></button>
         </div>
       )}
     </div>

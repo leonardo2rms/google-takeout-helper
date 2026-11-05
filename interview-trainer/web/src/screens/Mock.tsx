@@ -3,6 +3,7 @@ import {
   MOCK_LENGTHS, MOCK_MINUTES, MOCK_REWARDED_PER_DAY, MOCK_XP_CAP, applyMock, buildMock, dayKey, defaultMinutes, mockSeed,
   type Course, type MockConfig, type MockLength, type Progress, type Question,
 } from '@trainer/shared';
+import { Icon } from '../components/icons';
 import { MockHistory } from '../components/MockHistory';
 import { MockResults, type SavedMock } from '../components/MockResults';
 import { MockRun, type MockRunResult } from '../components/MockRun';
@@ -63,8 +64,8 @@ export function MockScreen({ course, progress, grade }: Props) {
   if (stage.name === 'marking') {
     const answered = stage.questions.length;
     return (
-      <div className="summary" data-testid="mock-marking">
-        <div className="trophy" aria-hidden="true">📝</div>
+      <div className="summary plain" data-testid="mock-marking">
+        <p className="label">Mock interview</p>
         <h1>{stage.run.timedOut ? 'Time is up' : 'Marking your answers'}</h1>
         <p className="muted" role="status">Checking {stage.done} of {answered}…</p>
       </div>
@@ -110,7 +111,7 @@ export function MockScreen({ course, progress, grade }: Props) {
   return (
     <div className="home mock-setup">
       <header className="page-top">
-        <a className="icon-btn back" href="#/" aria-label="Back to home">←</a>
+        <a className="icon-btn back" href="#/" aria-label="Back to home"><Icon name="arrow-left" /></a>
         <h1>Mock interview</h1>
       </header>
 

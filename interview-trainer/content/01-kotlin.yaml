@@ -1,7 +1,6 @@
 id: kotlin
 title: Kotlin Essentials
-emoji: "🧩"
-color: "#7f52ff"
+icon: braces
 description: Null safety, idioms and the language features seniors are expected to know cold.
 lessons:
   - id: kotlin-null-types

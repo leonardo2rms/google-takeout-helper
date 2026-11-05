@@ -1,7 +1,6 @@
 id: testing
 title: Testing & Quality
-emoji: "🧪"
-color: "#f2559b"
+icon: flask-conical
 description: Test strategy, Spring test slices, Testcontainers, mocking pitfalls, coroutine testing, flaky tests and testing AI features.
 lessons:
   - id: testing-strategy

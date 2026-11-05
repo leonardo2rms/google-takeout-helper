@@ -1,7 +1,6 @@
 id: security-observability
 title: Security & Observability
-emoji: "🛡️"
-color: "#5c7cfa"
+icon: shield-check
 description: Web security basics, authentication and authorization, secrets, plus logs, metrics, traces, SLOs and incident debugging.
 lessons:
   - id: security-web

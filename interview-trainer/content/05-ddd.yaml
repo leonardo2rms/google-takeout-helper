@@ -1,7 +1,6 @@
 id: ddd
 title: Domain-Driven Design
-emoji: "🏛️"
-color: "#ce82ff"
+icon: blocks
 description: Aggregates, value objects, bounded contexts and how DDD shapes service boundaries.
 lessons:
   - id: ddd-tactical

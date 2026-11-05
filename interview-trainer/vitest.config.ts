@@ -19,7 +19,7 @@ function virtualCourse(): Plugin {
 export default defineConfig({
   plugins: [virtualCourse()],
   test: {
-    include: ['shared/src/**/*.test.ts', 'server/src/**/*.test.ts', 'web/src/**/*.test.ts', 'content/**/*.test.ts'],
+    include: ['scripts/**/*.test.ts', 'shared/src/**/*.test.ts', 'server/src/**/*.test.ts', 'web/src/**/*.test.ts', 'content/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       include: ['shared/src/**', 'server/src/**', 'web/src/lib/**'],

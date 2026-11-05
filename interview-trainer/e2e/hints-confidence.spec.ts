@@ -35,7 +35,7 @@ test.describe('hints', () => {
     await answerCorrectly(page, Q1);
     await check(page);
     await next(page);
-    await expect(page.locator('.xp-chip')).toHaveText(`⚡ ${10 - HINT_COST}`);
+    await expect(page.locator('.xp-chip')).toHaveText(`XP ${10 - HINT_COST}`);
 
     // the next question has its own hint state: hidden until asked for, and the button only exists where a hint does
     await expect(page.getByTestId('hint-text')).toHaveCount(0);

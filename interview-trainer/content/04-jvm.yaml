@@ -1,7 +1,6 @@
 id: jvm
 title: JVM Internals
-emoji: "☕"
-color: "#ff9600"
+icon: cpu
 description: Memory layout, garbage collection, the JIT, the memory model and virtual threads.
 lessons:
   - id: jvm-memory

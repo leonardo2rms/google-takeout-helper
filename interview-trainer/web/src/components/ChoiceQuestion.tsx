@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
 import { seededShuffle, type MultiQ, type SingleQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 import { Inline } from './Inline';
 import { ResultCue, type ResultState } from './ResultCue';
+
+const TAG = { correct: 'Correct', wrong: 'Incorrect', missed: 'Answer' } as const;
 
 interface Props {
   q: SingleQ | MultiQ;
@@ -29,7 +32,7 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
   return (
     <div className="options" role={multi ? 'group' : 'radiogroup'} aria-label="Answer options">
       {multi && <p className="hint">Select all that apply</p>}
-      {options.map((o) => {
+      {options.map((o, index) => {
         const isSel = selected.includes(o.id);
         let state = '';
         if (checked) {
@@ -46,8 +49,11 @@ export function ChoiceQuestion({ q, seed, checked, onAnswer }: Props) {
             disabled={checked}
             onClick={() => toggle(o.id)}
           >
-            <span className="marker" aria-hidden="true">{state === 'wrong' ? '✗' : state === 'correct' || state === 'missed' ? '✓' : isSel ? (multi ? '✓' : '●') : ''}</span>
+            <span className="marker" aria-hidden="true">
+              {state === 'wrong' ? <Icon name="x" size={15} strokeWidth={2.75} /> : state || isSel ? <Icon name="check" size={15} strokeWidth={2.75} /> : String.fromCharCode(65 + index)}
+            </span>
             <span className="option-text"><Inline text={o.text} /><ResultCue state={state as ResultState} /></span>
+            {state && <span className="tagtxt" aria-hidden="true">{TAG[state as 'correct' | 'wrong' | 'missed']}</span>}
           </button>
         );
       })}

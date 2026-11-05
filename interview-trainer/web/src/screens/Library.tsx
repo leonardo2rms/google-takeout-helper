@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { STATUS_LABEL, TYPE_LABEL, allQuestions, searchLibrary, type Course, type Progress, type Question } from '@trainer/shared';
+import { Icon } from '../components/icons';
 import { Inline } from '../components/Inline';
 import { QuestionTools } from '../components/QuestionTools';
 import { plural } from '../lib/format';
 import { useToday } from '../lib/today';
+import { unitStyle } from '../lib/unit-style';
 
 interface Props {
   course: Course;
@@ -39,7 +41,7 @@ export function Library({ course, progress }: Props) {
   );
   const savedCount = Object.keys(progress.bookmarks).length;
   const filtered = Boolean(text.trim() || type || unitId || Object.values(on).some(Boolean));
-  const emojiOf = (id: string) => course.units.find((u) => u.id === id)?.emoji ?? '';
+  const styleOf = (id: string) => unitStyle(course.units.find((u) => u.id === id) ?? { id });
 
   const reset = () => {
     setText('');
@@ -52,7 +54,7 @@ export function Library({ course, progress }: Props) {
   return (
     <div className="home library-page">
       <header className="page-top">
-        <a className="icon-btn back" href="#/" aria-label="Back to home">←</a>
+        <a className="icon-btn back" href="#/" aria-label="Back to home"><Icon name="arrow-left" /></a>
         <h1>Library</h1>
       </header>
 
@@ -123,12 +125,12 @@ export function Library({ course, progress }: Props) {
             <li key={e.q.id} className="lib-item" data-testid="lib-item" data-qid={e.q.id}>
               <p className="lib-prompt"><Inline text={e.q.prompt} /></p>
               <p className="lib-meta">
-                <span>{emojiOf(e.unitId)} {e.unitTitle}</span>
+                <span className="unit-tag" style={styleOf(e.unitId).style}><Icon name={styleOf(e.unitId).icon} size="1.1em" />{e.unitTitle}</span>
                 <span>{TYPE_LABEL[e.q.type]}</span>
                 <span className={`pill status-${e.status}`} data-testid="lib-status">{STATUS_LABEL[e.status]}</span>
               </p>
               <div className="lib-actions">
-                <a className="btn small secondary" href={`#/q/${e.q.id}`} aria-label={`Practise this question: ${plain(e.q.prompt)}`} data-testid="lib-practise">Practise this one</a>
+                <a className="btn small secondary" href={`#/q/${e.q.id}`} aria-label={`Practise this one: ${plain(e.q.prompt)}`} data-testid="lib-practise">Practise this one</a>
                 {!e.note && !e.bookmarked && (
                   <button type="button" className="btn small ghost" onClick={() => setEditing(editing === e.q.id ? null : e.q.id)} aria-expanded={editing === e.q.id}>
                     {editing === e.q.id ? 'Hide' : 'Save or note'}

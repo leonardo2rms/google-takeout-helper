@@ -185,9 +185,12 @@ const Lesson = RawLesson.transform((lesson) => ({
 export const Unit = z.object({
   id: slug,
   title: z.string().min(1),
-  emoji: z.string().min(1),
-  /** Any CSS colour; used for the unit's header and path nodes. */
-  color: z.string().default('#58cc02'),
+  /** Name of an icon in the web app's icon set (`web/src/components/icons.tsx`), e.g. `braces`. Unknown or missing names fall back to a default icon. */
+  icon: z.string().regex(/^[a-z][a-z0-9-]*$/, 'an icon name such as "braces"').optional(),
+  /** Legacy, optional and no longer rendered (the UI uses `icon`). Kept so older course files still validate. */
+  emoji: z.string().min(1).optional(),
+  /** Legacy, optional and no longer rendered: unit colours come from the design tokens (`--pen-<id>`). */
+  color: z.string().optional(),
   description: z.string().min(1),
   lessons: z.array(Lesson).min(1),
 });

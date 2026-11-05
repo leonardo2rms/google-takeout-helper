@@ -1,3 +1,4 @@
+import { Icon, isIconName } from './icons';
 import { ACHIEVEMENT_GROUPS, achievementStatus, type AchievementGroup, type Progress } from '@trainer/shared';
 
 /** All badges, grouped. Locked ones are shown dimmed with what it takes: nothing is hidden, nothing expires. */
@@ -19,7 +20,7 @@ export function TrophyCase({ progress }: { progress: Progress }) {
                 data-testid={`badge-${def.id}`}
                 data-unlocked={on ? 'true' : 'false'}
               >
-                <span className="badge-emoji" aria-hidden="true">{def.emoji}</span>
+                <span className="badge-icon" aria-hidden="true"><Icon name={isIconName(def.icon) ? def.icon : 'award'} size={20} /></span>
                 <span className="badge-text">
                   <b>{def.title}</b>
                   <small>{def.description}</small>

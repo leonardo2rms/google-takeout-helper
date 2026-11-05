@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { CHALLENGE_XP, TYPE_LABEL, challengeQuestion, challengeResult, challengeStreak, unitOfFor, type Course, type Progress } from '@trainer/shared';
 import { plural } from '../lib/format';
+import { Icon } from './icons';
 
 interface Props {
   course: Course;
@@ -21,7 +22,7 @@ export function ChallengeCard({ course, progress, today }: Props) {
   if (result) {
     return (
       <div className="card challenge done" data-testid="challenge-card" data-result={result}>
-        <span className="emoji" aria-hidden="true">{result === 'pass' ? '✅' : '🗓️'}</span>
+        <span className="tile-i" aria-hidden="true"><Icon name={result === 'pass' ? 'circle-check' : 'calendar-check'} size={22} /></span>
         <span className="hero-text">
           <b>Daily challenge: {result === 'pass' ? 'passed' : 'done'}</b>
           <small data-testid="challenge-streak">
@@ -34,13 +35,14 @@ export function ChallengeCard({ course, progress, today }: Props) {
   }
   return (
     <a className="card challenge" href="#/challenge" data-testid="challenge-card" data-result="none">
-      <span className="emoji" aria-hidden="true">🧩</span>
+      <span className="tile-i" aria-hidden="true"><Icon name="puzzle" size={22} /></span>
       <span className="hero-text">
         <b>Daily challenge</b>
         <small>
           {TYPE_LABEL[q.type]}{topic ? ` · ${topic.title}` : ''} · +{CHALLENGE_XP} XP if you get it first try{streakText}
         </small>
       </span>
+      <Icon name="chevron-right" className="go" />
     </a>
   );
 }

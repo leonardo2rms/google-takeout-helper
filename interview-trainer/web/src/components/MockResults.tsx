@@ -3,7 +3,9 @@ import { MOCK_WEAK_BELOW, PASS_SCORE, buildReport, clockText, type Course, type 
 import { isAnswered, mockResults } from '../lib/mock-marking';
 import { outcomeScore, type Answer, type Outcome } from '../lib/evaluate';
 import { Feedback } from './Feedback';
+import { Icon } from './icons';
 import { Inline } from './Inline';
+import { unitStyle } from '../lib/unit-style';
 import { plural } from '../lib/format';
 
 export interface SavedMock {
@@ -40,14 +42,14 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
   const results = useMemo(() => mockResults(course, questions, answers, outcomes, flagged), [course, questions, answers, outcomes, flagged]);
   const report = useMemo(() => buildReport(results), [results]);
   const titleOf = (id: string) => course.units.find((u) => u.id === id)?.title ?? id;
-  const emojiOf = (id: string) => course.units.find((u) => u.id === id)?.emoji ?? '';
+  const unitOf = (id: string) => course.units.find((u) => u.id === id);
   const pendingSelf = questions.filter((q) => q.type === 'open' && isAnswered(q, answers[q.id]) && outcomes[q.id]?.open?.needsSelfAssessment);
   const notReached = report.total - report.answered;
 
   return (
     <div className="home mock-results" data-testid="mock-results">
       <header className="page-top">
-        <a className="icon-btn back" href="#/" aria-label="Back to home">←</a>
+        <a className="icon-btn back" href="#/" aria-label="Back to home"><Icon name="arrow-left" /></a>
         <h1>Mock interview results</h1>
       </header>
 
@@ -75,14 +77,14 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
         <h2 id="mock-topics-title">By topic</h2>
         <ul className="topics" data-testid="mock-topics">
           {report.byTopic.map((t) => (
-            <li key={t.unitId} data-testid={`mock-topic-${t.unitId}`} data-weak={t.weak}>
+            <li key={t.unitId} data-testid={`mock-topic-${t.unitId}`} data-weak={t.weak} style={unitStyle(unitOf(t.unitId) ?? { id: t.unitId }).style}>
               <div className="topic-head">
-                <span aria-hidden="true">{emojiOf(t.unitId)}</span>
+                <span className="glyph" aria-hidden="true"><Icon name={unitStyle(unitOf(t.unitId) ?? { id: t.unitId }).icon} /></span>
                 <b>{titleOf(t.unitId)}</b>
                 <span className="muted">{t.pct}%</span>
               </div>
               <div className="meter" role="progressbar" aria-label={`${titleOf(t.unitId)} score`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={t.pct}>
-                <div style={{ width: `${t.pct}%`, background: course.units.find((u) => u.id === t.unitId)?.color }} />
+                <div style={{ width: `${t.pct}%` }} />
               </div>
               <div className="topic-foot">
                 <small className="muted">{plural(t.n, 'question')}{t.weak ? ' · weak spot' : ''}</small>
@@ -111,7 +113,10 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
                   <summary>
                     <span className="mock-q-num">{i + 1}</span>
                     <span className="mock-q-text"><Inline text={q.prompt} /></span>
-                    <span className="mock-q-state">{st.label}{flagged.has(q.id) ? ' · flagged' : ''}</span>
+                    <span className="mock-q-state">
+                      {st.tone !== 'none' && <Icon name={st.tone === 'good' ? 'check' : st.tone === 'bad' ? 'x' : 'contrast'} size="1.1em" strokeWidth={2.5} />}
+                      {st.label}{flagged.has(q.id) ? ' · flagged' : ''}
+                    </span>
                   </summary>
                   {o && <Feedback q={q} outcome={o} onCoveredChange={(covered) => onOutcome(q.id, { ...o, open: o.open && { ...o.open, covered } })} />}
                 </details>

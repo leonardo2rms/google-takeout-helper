@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { seededShuffle, type MatchQ } from '@trainer/shared';
 import type { Answer } from '../lib/evaluate';
+import { Icon } from './icons';
 import { Inline } from './Inline';
 import { ResultCue, type ResultState } from './ResultCue';
 
@@ -63,6 +64,7 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 type="button"
                 data-side="left"
                 data-pair={chosen[i] !== null ? i : undefined}
+                data-no={chosen[i] !== null ? i + 1 : undefined}
                 className={`match-item ${active === i ? 'active' : ''} ${chosen[i] !== null ? 'paired' : ''} ${state}`}
                 aria-pressed={active === i}
                 disabled={checked}
@@ -71,6 +73,7 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 <Inline text={p.left} />
                 {chosen[i] !== null && <span className="sr-only">, paired with {chosen[i]}</span>}
                 <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} />
+                {state && <Icon name={state === 'correct' ? 'check' : 'x'} className="vmark" strokeWidth={2.5} />}
               </button>
             );
           })}
@@ -85,6 +88,7 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 type="button"
                 data-side="right"
                 data-pair={owner !== -1 ? owner : undefined}
+                data-no={owner !== -1 ? owner + 1 : undefined}
                 className={`match-item ${owner !== -1 ? 'paired' : ''} ${state}`}
                 disabled={checked}
                 onClick={() => pickRight(r)}
@@ -92,6 +96,7 @@ export function MatchQuestion({ q, seed, checked, onAnswer }: Props) {
                 <Inline text={r} />
                 {owner !== -1 && <span className="sr-only">, paired with {q.pairs[owner]!.left}</span>}
                 <ResultCue state={(state === 'correct' ? 'correct' : state === 'wrong' ? 'wrong' : '') as ResultState} />
+                {state && <Icon name={state === 'correct' ? 'check' : 'x'} className="vmark" strokeWidth={2.5} />}
               </button>
             );
           })}

@@ -1,7 +1,6 @@
 id: ai
 title: AI-Assisted Engineering
-emoji: "🤖"
-color: "#2b70c9"
+icon: bot
 description: Using AI assistants well, reviewing what they write, and building safe LLM features.
 lessons:
   - id: ai-coding

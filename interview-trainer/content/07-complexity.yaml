@@ -1,7 +1,6 @@
 id: complexity
 title: Algorithms & Complexity
-emoji: "📈"
-color: "#ff4b4b"
+icon: chart-line
 description: Read a snippet, name its Big-O, and know what the JVM collections really cost.
 lessons:
   - id: complexity-reading

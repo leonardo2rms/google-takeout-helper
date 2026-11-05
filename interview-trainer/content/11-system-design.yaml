@@ -1,7 +1,6 @@
 id: system-design
 title: System Design Essentials
-emoji: "📐"
-color: "#0fb5ae"
+icon: ruler
 description: Back-of-envelope numbers, rate limiting, partitioning, replication, caching and designing for failure.
 lessons:
   - id: sd-estimation-traffic
