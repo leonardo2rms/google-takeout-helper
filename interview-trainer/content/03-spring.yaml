@@ -352,7 +352,7 @@ lessons:
         explanation: "A lost update needs either detection (version check), exclusion (row lock) or a statement the database applies atomically. `synchronized` only covers one JVM, and with a proxy-based `@Transactional` the commit happens after the synchronized method has returned, so another thread can read the old value before the commit. Weaker isolation makes anomalies more likely, not less."
 
       - type: estimate
-        prompt: "Each request holds one connection for its outer transaction and then, while still holding it, needs a second connection for a `REQUIRES_NEW` call. The pool has 10 connections. What is the largest number of concurrent requests for which a pool deadlock is impossible?"
+        prompt: "Each request holds one connection for its outer transaction and then, while still holding it, needs a second connection for a `REQUIRES_NEW` call. The pool has 10 connections and nothing else uses it. What is the largest number of concurrent requests for which a pool deadlock is impossible?"
         answer: 9
         tolerance: 0
         unit: requests
