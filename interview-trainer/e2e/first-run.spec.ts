@@ -53,6 +53,7 @@ test.describe('first run', () => {
     await page.goto('/');
     await playLesson(page, lessons[0]!.id);
     await page.getByRole('button', { name: 'Back home', exact: true }).click();
+    await page.getByTestId('progress-link').waitFor();
     expect(await visibleIds(page)).toEqual(['challenge-card', 'due-card', 'progress-link']);
     await expect(page.getByTestId('more-practice')).toBeVisible(); // mixed practice, mock and library are one tap away
 
@@ -61,6 +62,7 @@ test.describe('first run', () => {
       await playLesson(page, l.id);
       await page.getByRole('button', { name: 'Back home', exact: true }).click();
     }
+    await page.getByTestId('library-link').waitFor();
     expect(await visibleIds(page)).toEqual([...ids]);
     await expect(page.getByTestId('more-practice')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/home-all-modes.png` });

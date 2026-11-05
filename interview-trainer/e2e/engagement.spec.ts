@@ -79,7 +79,7 @@ test.describe('daily goal ring', () => {
 
     await expect(page.locator('.summary h1')).toHaveText('Clean run');
     await expect(page.getByTestId('summary-goal')).toContainText('7 of 8 questions today');
-    await expect(page.getByTestId('next-review')).toContainText('tomorrow (7)');
+    await expect(page.getByTestId('next-review')).toContainText('7 questions tomorrow');
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/summary-perfect-lesson.png` });
 
@@ -312,7 +312,7 @@ test.describe('Daily Practice', () => {
     played.forEach((q, i) => i > 0 && expect(unitOf(q)).not.toBe(unitOf(played[i - 1]!)));
 
     await expect(page.getByTestId('summary-goal')).toContainText('8 of 8 questions today');
-    await expect(page.getByTestId('summary-goal')).toContainText('Daily goal met');
+    await expect(page.getByTestId('summary-goal')).toContainText('Goal met');
     await expect(page.getByTestId('celebration')).toBeVisible();
     await homeAfterSummary(page);
     await expect(goalText(page)).toHaveText('8/8');

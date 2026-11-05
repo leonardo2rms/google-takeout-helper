@@ -174,7 +174,7 @@ test.describe('library', () => {
 
   test('an unknown question id shows the not-found page', async ({ page }) => {
     await page.goto('/#/q/no-such/1');
-    await expect(page.getByRole('heading', { name: 'Lesson not found' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Question not found' })).toBeVisible();
   });
 
   test('the Library is linked from Home and shows how many are saved', async ({ page }) => {
