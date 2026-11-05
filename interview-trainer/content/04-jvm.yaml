@@ -64,7 +64,7 @@ lessons:
         options:
           - { id: a, text: "Listeners stay reachable from a static root, so the GC can never collect them" }
           - { id: b, text: "`mutableListOf` returns a non-thread-safe list, so concurrent adds are lost and memory grows" }
-          - { id: c, text: "A Kotlin `object` is allocated outside the heap, so the GC cannot shrink it" }
+          - { id: c, text: "A Kotlin `object` is allocated outside the heap, so the GC has no way to shrink it" }
           - { id: d, text: "The GC never collects objects that are stored inside a collection such as a List" }
         answer: a
         explanation: "The GC collects what is unreachable from GC roots (statics, thread stacks, JNI refs). A forgotten listener, ThreadLocal or unbounded cache keeps whole object graphs alive. Thread safety affects correctness, not retention; a Kotlin `object` lives on the heap; and collection elements are collected like any other object once the collection itself is unreachable. Fix with explicit deregistration, weak references or a bounded cache."
@@ -76,7 +76,7 @@ lessons:
           - { id: a, text: "Non-heap memory (metaspace, stacks, direct buffers, code cache) pushed the process over the limit" }
           - { id: b, text: "The garbage collector is disabled in containers, so garbage piles up beyond `-Xmx`" }
           - { id: c, text: "`-Xmx` is ignored when running in Docker, so the heap grew past the container limit" }
-          - { id: d, text: "The container limit applies to the heap only, so a sampling error in the metrics hid the real heap size" }
+          - { id: d, text: "The container limit applies to the heap, so a sampling error in the metrics hid the real heap size" }
         answer: a
         explanation: "Process RSS = heap + metaspace + thread stacks + direct/NIO buffers + code cache + GC structures; the limit applies to the whole process, and the JVM honours `-Xmx` and runs its GC in containers. Leave headroom (e.g. `-XX:MaxRAMPercentage=70`) rather than setting the heap to the full container limit."
 
@@ -107,7 +107,7 @@ lessons:
             [6.871s][info][gc] GC(23) Pause Full (G1 Compaction Pause) 3951M->3950M(4096M) 2301.2ms
         options:
           - { id: a, text: "The live data fills the heap: full GCs reclaim almost nothing, so it is a leak or an undersized heap" }
-          - { id: b, text: "It is healthy: the heap shrinks slightly on every collection, so the GC is keeping up" }
+          - { id: b, text: "It is healthy: the heap shrinks slightly on each collection, so the GC is keeping up" }
           - { id: c, text: "The young generation is too small, so objects are promoted early; increase `-Xmn`" }
           - { id: d, text: "GC threads are starved by a CPU limit, so the pauses are long; raise `-XX:ParallelGCThreads`" }
         answer: a
@@ -158,8 +158,8 @@ lessons:
         options:
           - { id: a, text: "It starts interpreted; hot code is later compiled by the tiered JIT (C1, then C2)" }
           - { id: b, text: "Classes are loaded lazily and have to be downloaded from the network on first use" }
-          - { id: c, text: "A garbage collection always runs at the first call to compact the heap layout" }
-          - { id: d, text: "Bytecode is only verified on the first call of a method, and that verification dominates the cost" }
+          - { id: c, text: "A garbage collection runs at the first call to compact the heap layout" }
+          - { id: d, text: "Bytecode is verified on the first call of a method, and that verification dominates the cost" }
         answer: a
         explanation: "The first calls run in the interpreter while the JVM profiles; hot code is then compiled by the tiered JIT (C1, then C2) with profile-guided optimisations. Class loading and verification are one-off and small by comparison, and no GC is triggered by a first call. That's why microbenchmarks need warm-up (use JMH, not `System.nanoTime` loops) and why services show a latency bump right after deployment."
 
@@ -172,7 +172,7 @@ lessons:
             var counter = 0
         options:
           - { id: a, text: "Often less than 2,000,000: volatile gives visibility, but `++` is not atomic" }
-          - { id: b, text: "Exactly 2,000,000, because volatile makes every read-modify-write operation atomic" }
+          - { id: b, text: "Exactly 2,000,000, because volatile makes each read-modify-write operation atomic" }
           - { id: c, text: "Exactly 1,000,000, because the second thread's volatile writes overwrite the first's" }
           - { id: d, text: "Always 0, because volatile blocks writes coming from other threads" }
         answer: a
@@ -194,11 +194,11 @@ lessons:
         prompt: Virtual threads (Java 21) give the biggest win for which workload?
         options:
           - { id: a, text: "Many concurrent tasks that mostly block on I/O (HTTP calls, JDBC)" }
-          - { id: b, text: "Tight CPU-bound numeric loops that keep every core busy for minutes" }
+          - { id: b, text: "Tight CPU-bound numeric loops that keep each core busy for minutes" }
           - { id: c, text: "A single long-running batch job that reads one big file sequentially" }
           - { id: d, text: "Code that holds `synchronized` blocks around slow network calls on JDK 21" }
         answer: a
-        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and the last option is a pinning hazard (next question)."
+        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and holding a `synchronized` block around network calls is a pinning hazard (next question)."
 
       - type: single
         prompt: "In JDK 21, a virtual thread blocks on I/O while inside a `synchronized` block. What is the effect, and the usual remedy?"
@@ -251,7 +251,7 @@ lessons:
                 which is held by "worker-1"
         options:
           - { id: a, text: "A deadlock: each thread waits for a lock the other holds. Fix it with a consistent lock order or `tryLock`" }
-          - { id: b, text: "Thread pool starvation: all workers are busy, so add more worker threads" }
+          - { id: b, text: "Thread pool starvation: the workers are busy, so add more worker threads" }
           - { id: c, text: "A long GC pause: both threads are stopped, so increase the heap" }
           - { id: d, text: "Normal contention on a hot lock: both threads will proceed as soon as the holder is done" }
         answer: a
@@ -284,9 +284,9 @@ lessons:
             }
         options:
           - { id: a, text: "C2 may prove that `d` never escapes the method and eliminate the allocation (scalar replacement), keeping `x` and `y` in registers" }
-          - { id: b, text: "The JVM always places such short-lived objects on the thread stack instead of the heap" }
+          - { id: b, text: "The JVM places short-lived objects like this on the thread stack instead of the heap" }
           - { id: c, text: "Escape analysis moves `d` into Metaspace so that the garbage collector never has to see it" }
-          - { id: d, text: "Nothing can change: the JIT is not allowed to remove an allocation, because the garbage collector must be able to see every object" }
+          - { id: d, text: "Nothing can change: the JIT is not allowed to remove an allocation, because the garbage collector needs to see each object" }
         answer: a
         explanation: "Escape analysis asks whether an object can be seen outside the method (stored in a field, passed to a non-inlined call, returned). If not, HotSpot's optimising compiler can replace the object by its fields and skip the allocation entirely. It is an optimisation, never a guarantee, and it depends on inlining: once `d` is passed to a call that is not inlined, it escapes and is allocated normally."
 
@@ -326,8 +326,8 @@ lessons:
         options:
           - { id: a, text: "The GC work took ~20 ms; the JVM waited ~1.8 s for threads to reach the safepoint, so look for a thread slow to poll, not collector tuning" }
           - { id: b, text: "The collection itself took about 1.8 s of the pause, so the heap should be enlarged or another collector chosen to shorten it, as the log shows" }
-          - { id: c, text: "The JVM spent 1.8 s resizing Metaspace while holding every application thread stopped" }
-          - { id: d, text: "This is normal: the 'Reaching safepoint' phase is always the longest part of a pause, so ignore it" }
+          - { id: c, text: "The JVM spent 1.8 s resizing Metaspace while holding each application thread stopped" }
+          - { id: d, text: "This is normal: the 'Reaching safepoint' phase is the longest part of a pause, so ignore it" }
         answer: a
         explanation: "A safepoint pause has two parts: time to safepoint (waiting until every Java thread has stopped at a poll) and the work done while stopped. All threads that already stopped sit idle during the first part, so the application sees the whole 1.8 s. GC logs that report only the collection time hide this; `-Xlog:safepoint` shows it. Tools that sample stacks or async-profiler help find the thread that was slow to arrive."
 
