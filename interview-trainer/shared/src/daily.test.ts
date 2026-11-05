@@ -129,7 +129,7 @@ describe('buildDailySession (real course)', () => {
     let p = emptyProgress();
     const seenUnits = new Set<string>();
     const unitOf = unitOfFor(course);
-    for (let day = 0; day < 40 && Object.keys(p.cards).length < all.length; day++) {
+    for (let day = 0; day < all.length && Object.keys(p.cards).length < all.length; day++) { // worst case: one new question a day
       const d = addDays(today, day);
       const plan = buildDailySession(course, p, d);
       for (const q of plan.questions) {
