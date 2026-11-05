@@ -41,8 +41,8 @@ lessons:
         options:
           - { id: a, text: "Broken access control (IDOR): Alice is authenticated but never authorised for this invoice; check ownership on each access" }
           - { id: b, text: "SQL injection: the id is concatenated into a query, so the fix is to switch to prepared statements" }
-          - { id: c, text: "Cross-site scripting: the JSON response is returned unescaped, so HTML-encode every field before sending it" }
-          - { id: d, text: "Weak token generation: Alice's token must be guessable, so issue longer random tokens" }
+          - { id: c, text: "Cross-site scripting: the JSON response is returned unescaped, so HTML-encode each field before sending it" }
+          - { id: d, text: "Weak token generation: Alice's token is guessable, so issue longer random tokens" }
         answer: a
         explanation: "Authentication answered 'who are you?'; authorization must still answer 'may you do this to that record?'. Broken access control tops the OWASP Top 10. The token worked and nothing was injected or reflected into a page: the server simply returned another user's record. Hard-to-guess ids are not a fix, only obscurity. Scope the query by the caller (`WHERE id = ? AND customer_id = ?`) or check the permission centrally."
 
@@ -154,7 +154,7 @@ lessons:
           - { id: a, text: "RED is for request-driven services (Rate, Errors, Duration); USE is for resources such as CPU and pools (Utilization, Saturation, Errors)" }
           - { id: b, text: "RED is for resources such as CPU, disks and connection pools (Rate, Errors, Duration); USE is for services (Utilization, Saturation, Errors)" }
           - { id: c, text: "RED stands for Reliability, Efficiency and Durability; USE stands for Uptime, Security and Elasticity" }
-          - { id: d, text: "Both methods only measure host resources: RED covers CPU and memory, USE covers disks and network" }
+          - { id: d, text: "Both methods measure host resources: RED covers CPU and memory, USE covers disks and network" }
         answer: a
         explanation: "RED looks at a service from its callers' side; USE looks at a resource from the machine's side. Saturation (work waiting, such as a full pool or a queue) is often the earliest warning. Report duration as percentiles (p95, p99): averages hide the slow tail."
 
@@ -223,8 +223,8 @@ lessons:
         prompt: "Which of these is the best page-worthy alert for a checkout API with a 99.9% availability SLO?"
         options:
           - { id: a, text: "The error budget is burning far faster than allowed (high burn rate over a long and a short window)" }
-          - { id: b, text: "CPU on any host exceeds 70% for one minute, because saturation always precedes an outage" }
-          - { id: c, text: "Any single HTTP 500 response, because every server error is a failed customer request" }
+          - { id: b, text: "CPU on a host exceeds 70% for one minute, because saturation precedes an outage and users feel it later" }
+          - { id: c, text: "A single HTTP 500 response, because a server error is a failed customer request" }
           - { id: d, text: "A garbage-collection pause longer than 50 ms occurs, because pauses add to checkout latency" }
         answer: a
         explanation: "Page on symptoms users feel and that need a human now, tied to the SLO. Causes such as CPU or GC are for dashboards and tickets: they fire without user impact and miss problems that have other causes. The short window makes the alert reset quickly once the problem stops."
@@ -242,7 +242,7 @@ lessons:
                  `- fx-service  GET  /rate    TIMEOUT 1050 ms
         options:
           - { id: a, text: "The call from pricing-service to fx-service, which took about 1050 ms and timed out" }
-          - { id: b, text: "auth-service, because authentication runs first and every later call has to wait for it" }
+          - { id: b, text: "auth-service, because authentication runs first and each later call has to wait for it" }
           - { id: c, text: "The database query in pricing-service, since SQL is the usual cause of slow requests" }
           - { id: d, text: "cart-service, since it is the middle call and carts are usually the slowest part" }
         answer: a
