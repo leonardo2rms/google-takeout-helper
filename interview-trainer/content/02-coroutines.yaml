@@ -214,9 +214,9 @@ lessons:
           - "    while (true) {"
           - "        emit(i++)"
           - "        delay(1000)"
-          - "    }"
+          - "    } // while"
           - "}"
-        explanation: "State before the loop, `emit` then `delay` inside it. The loop is infinite but cooperative: `emit` and `delay` are cancellation points, so cancelling the collector stops it."
+        explanation: "State before the loop, `emit` then `delay` inside it, so the first value arrives at once and the next one a second later. The loop is infinite but cooperative: `emit` and `delay` are cancellation points, so cancelling the collector stops it."
 
       - type: single
         prompt: Which call returns `null` instead of throwing when the block exceeds its time limit?

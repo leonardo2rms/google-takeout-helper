@@ -27,14 +27,15 @@ lessons:
         explanation: "These are Martin Fowler's definitions (after Meszaros). Names vary between libraries (Mockito calls almost everything a 'mock', and its mocks check calls with `verify` after the fact), but the roles differ. Prefer stubs and fakes that let you assert on outcomes; reach for mocks and spies when the interaction itself is the behaviour, such as 'an email was sent'."
 
       - type: single
-        prompt: "What does `@WebMvcTest(OrderController::class)` set up?"
+        prompt: "A test checks how a custom serialiser writes `Money` as JSON. What does annotating the test class with `@JsonTest` set up?"
         options:
-          - { id: a, text: "Just the web layer for that controller, with JSON handling, validation and MockMvc, but no service beans" }
-          - { id: b, text: "The full application context with each bean, plus an embedded server on a random port, so real HTTP calls can be made" }
-          - { id: c, text: "The JPA repositories alone, running against an embedded database with schema auto-creation switched on" }
-          - { id: d, text: "Nothing from Spring: it is plain JUnit with no application context, and MockMvc has to be created by hand" }
+          - { id: a, text: "The JSON mapper as Spring Boot configures it for the app, including `spring.jackson.*`, plus `JacksonTester` fields" }
+          - { id: b, text: "MockMvc with the controllers registered, so that the JSON is checked through the request mapping of the app" }
+          - { id: c, text: "A plain mapper with Jackson's own defaults, so the `spring.jackson.*` properties of the app are ignored" }
+          - { id: d, text: "The full application context and an embedded server on a random port, so that the JSON makes a real HTTP round trip" }
         answer: a
-        explanation: "Slice annotations load just one layer's auto-configuration, which is why they start fast. A full server on a random port is `@SpringBootTest(webEnvironment = RANDOM_PORT)`. Because services are not loaded, you provide them as mock beans or fakes."
+        explanation: "`@JsonTest` is the JSON slice: it applies only the JSON auto-configuration, so the mapper behaves as it does in the application (the `spring.jackson.*` properties and the serialisers and modules the slice picks up, such as JSON components), and `JacksonTester` fields can be injected to assert on the written JSON or to parse JSON back. No controllers, MockMvc, services or repositories are loaded and no server starts, which makes it the cheap way to pin down a serialisation contract such as a date format or a `Money` field. `@WebMvcTest` checks JSON too, but through a controller, and a full `@SpringBootTest` with a server is the real HTTP round trip."
+        tags: [spring, testing, json, test-slices]
 
       - type: single
         prompt: "Which statement about `@DataJpaTest` is accurate?"
