@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { isStandalone } from './lib/sample-grader';
 import './styles.css';
+import './features-a.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -8,13 +8,15 @@ interface Props {
   checked: boolean;
   run: RunCodeFn;
   onAnswer: (a: Answer | null) => void;
+  /** Mock interview: no "Run tests" and no results, so nothing tells the learner how they are doing until the end. */
+  blind?: boolean;
 }
 
 // Symbols that are slow to reach on a phone keyboard.
 const KEYS = ['{', '}', '(', ')', '[', ']', ';', '=', '>', '<', '"', "'", '+', '-', '*', '/', '!', '&', '|', '.', ','];
 
 /** A small code editor for phones and desktops, with a "Run tests" loop before the final check. */
-export function CodeQuestion({ q, checked, run, onAnswer }: Props) {
+export function CodeQuestion({ q, checked, run, onAnswer, blind = false }: Props) {
   const [source, setSource] = useState(q.starter.replace(/\n$/, ''));
   const [result, setResult] = useState<CodeRunResult | null>(null);
   const [running, setRunning] = useState(false);
@@ -77,13 +79,15 @@ export function CodeQuestion({ q, checked, run, onAnswer }: Props) {
           ))}
         </div>
       )}
-      <div className="run-row">
-        <button type="button" className="btn secondary small" disabled={checked || running} onClick={() => void runTests()}>
-          {running ? 'Running…' : '▶ Run tests'}
-        </button>
-        <span className="hint">Some tests are hidden. Check runs all of them.</span>
-      </div>
-      {result && !checked && <TestResults result={result} />}
+      {!blind && (
+        <div className="run-row">
+          <button type="button" className="btn secondary small" disabled={checked || running} onClick={() => void runTests()}>
+            {running ? 'Running…' : '▶ Run tests'}
+          </button>
+          <span className="hint">Some tests are hidden. Check runs all of them.</span>
+        </div>
+      )}
+      {result && !checked && !blind && <TestResults result={result} />}
     </div>
   );
 }

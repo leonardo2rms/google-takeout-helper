@@ -1,16 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  allQuestions, applySession, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
+  CHALLENGE_XP, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, recordChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, outcomesOf, pickMix, previewInterval,
   reviewForecast, reviewQueue, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { fetchHealth, gradeOpen } from './lib/api';
 import type { GradeFn } from './lib/evaluate';
-import { inDays } from './lib/format';
+import { inDays, plural } from './lib/format';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
-import { getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
+import { AchievementToasts } from './components/AchievementToasts';
+import { backfillBadges, getProgress, requestPersistence, updateProgress, useProgress } from './lib/store';
 import { Home } from './screens/Home';
+import { Library } from './screens/Library';
+import { MockScreen } from './screens/Mock';
 import { LessonScreen } from './screens/Lesson';
 import { ProgressScreen } from './screens/ProgressScreen';
 import { Summary, type Finished } from './screens/Summary';
@@ -33,9 +36,19 @@ const go = (route: string) => {
 const MIX_SIZE = 8;
 const REVIEW_SIZE = 10;
 
-type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic';
+type PracticeKind = 'mix' | 'review' | 'daily' | 'warmup' | 'topic' | 'one' | 'challenge';
 
 export function App() {
+  useEffect(() => backfillBadges(), []);
+  return (
+    <>
+      <Screens />
+      <AchievementToasts />
+    </>
+  );
+}
+
+function Screens() {
   const route = useHashRoute();
   const { progress, update, reset } = useProgress();
   const [health, setHealth] = useState<HealthResponse | null>(null);
@@ -56,20 +69,25 @@ export function App() {
     });
   }, []);
 
-  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string) => {
+  const finish = useCallback((title: string, summary: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => {
     const today = dayKey(new Date());
     const outcomes = outcomesOf(summary);
     let before: Progress = getProgress();
     let events: SessionEvent[] = [];
+    // A session of one question (Library practice, the daily challenge) earns no "perfect lesson" bonus.
+    const baseXp = kind && summary.perfect ? summary.xp - XP_PERFECT_BONUS : summary.xp;
+    const pass = summary.accuracy >= 1;
+    let challengeBonus = 0;
     updateProgress((p) => {
       before = p;
+      challengeBonus = kind === 'challenge' && pass && !p.challenge[today] ? CHALLENGE_XP : 0;
       const res = applySession(
         p,
-        { lessonId, accuracy: summary.accuracy, xp: summary.xp, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes },
+        { lessonId, kind: kind ? 'single' : undefined, accuracy: summary.accuracy, xp: baseXp + challengeBonus, missed: summary.missed, recovered: summary.recovered, cleared: summary.correct, outcomes, hinted: summary.hinted, confidence: summary.confidence },
         { today, course },
       );
       events = res.events;
-      return res.progress;
+      return kind === 'challenge' ? recordChallenge(res.progress, today, pass) : res.progress;
     });
     const after = getProgress();
     if (before.stats.sessions === 0) requestPersistence(); // ask the browser to keep our storage once there is something worth keeping
@@ -87,6 +105,10 @@ export function App() {
       goalAfter: goalToday(after, today),
       forecast: reviewForecast(after.cards, Object.keys(outcomes), today),
       tip: tipEvent && tipQuestion ? { text: explanationOf(tipQuestion), bonusXp: tipEvent.bonusXp } : null,
+      extraNotes:
+        kind === 'challenge'
+          ? [`Daily challenge ${pass ? `passed (+${challengeBonus} XP)` : 'done'}. Challenge streak: ${plural(challengeStreak(after, today).current, 'day')}.`]
+          : [],
     });
     go('/done');
   }, []);
@@ -124,6 +146,21 @@ export function App() {
   const practice = (kind: PracticeKind, title: string, unitId?: string) => (
     <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} reviewHint={reviewHint} onFinish={finish} />
   );
+  if (route === '/library') return <Library course={course} progress={progress} />;
+  if (route === '/mock') return <MockScreen course={course} progress={progress} grade={grade} />;
+  if (route === '/challenge') {
+    // Today's featured question. Once it has a result, a replay is plain practice (no XP, no streak).
+    const today = dayKey(new Date());
+    const q = challengeQuestion(course, today);
+    if (!q) return <NotFound />;
+    return challengeResult(progress, today) ? practice('one', 'Practise one question', q.id) : practice('challenge', 'Daily challenge');
+  }
+  if (route.startsWith('/q/')) {
+    // One question from the Library: a session of one (it never counts as a "perfect lesson").
+    const q = findQuestion(course, route.slice('/q/'.length));
+    if (!q) return <NotFound />;
+    return practice('one', 'Practise one question', q.id);
+  }
   if (route === '/mix') return practice('mix', 'Mixed practice');
   if (route === '/review') return practice('review', 'Review due');
   if (route === '/daily') return practice('daily', 'Today');
@@ -147,7 +184,7 @@ export function App() {
   return <Home course={course} progress={progress} health={health} update={update} onReset={reset} />;
 }
 
-const COLORS: Record<PracticeKind, string> = { mix: '#1cb0f6', review: '#ff9600', daily: '#58cc02', warmup: '#58cc02', topic: '#ce82ff' };
+const COLORS: Record<PracticeKind, string> = { mix: '#1cb0f6', review: '#ff9600', daily: '#58cc02', warmup: '#58cc02', topic: '#ce82ff', one: '#1cb0f6', challenge: '#ffc800' };
 
 /** Picks the questions for a session once, when the screen mounts, so answering does not reshuffle it. */
 function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string): Question[] {
@@ -156,6 +193,14 @@ function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string):
   switch (kind) {
     case 'review':
       return reviewQueue(progress, allQuestions(course), today, unitOfFor(course)).all.slice(0, REVIEW_SIZE);
+    case 'challenge': {
+      const c = challengeQuestion(course, today);
+      return c ? [c] : [];
+    }
+    case 'one': {
+      const one = findQuestion(course, unitId ?? '');
+      return one ? [one] : [];
+    }
     case 'daily':
       return buildDailySession(course, progress, today).questions;
     case 'warmup':
@@ -178,7 +223,7 @@ function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }
   progress: Progress;
   grade?: GradeFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
-  onFinish: (title: string, s: SessionSummary) => void;
+  onFinish: (title: string, s: SessionSummary, lessonId?: string, kind?: 'single' | 'challenge') => void;
 }) {
   const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
 
@@ -201,7 +246,7 @@ function Practice({ kind, title, unitId, progress, grade, reviewHint, onFinish }
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
       onExit={() => go('/')}
-      onFinish={(s) => onFinish(title, s)}
+      onFinish={(s) => onFinish(title, s, undefined, kind === 'one' ? 'single' : kind === 'challenge' ? 'challenge' : undefined)}
     />
   );
 }

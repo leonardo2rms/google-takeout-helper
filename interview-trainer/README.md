@@ -17,6 +17,7 @@ comfortable on a phone.
 | **Habit loop** | A **Today** card (8 interleaved questions: due reviews, weak spots, new material), a **daily goal ring**, a **forgiving streak** (earned freezes, chosen rest days), **ranks** (Associate to Fellow) and celebrations scaled to real milestones. See [Engagement](#engagement-and-progress). |
 | **Spaced repetition** | Every question you answer becomes a scheduled card (SM-2-lite). **Review due** shows what is ready, missed questions never get lost, and the schedule respects your interview date. |
 | **Progress** | Per-topic mastery and an honest **readiness** estimate, weak-spot targeting, XP, stars per lesson, an optional interview-date countdown and plan. Stored in `localStorage`; **export / import** a backup file. |
+| **Learning tools** | **Hints** that cost a little XP, optional **confidence** ratings (wrong-but-sure comes back sooner), **bookmarks and private notes**, a searchable **Library** (`#/library`), a **daily challenge** (one deterministic question per date), 27 **badges** with a trophy case, and a timed **mock interview** (`#/mock`). See [Learning features](docs/learning-features.md). |
 | **Offline** | PWA: the whole course ships in the JS bundle and an app-shell service worker caches it. Works with no network. |
 
 ## Run it
@@ -111,6 +112,8 @@ milestones{key -> day}        dedupes celebrations ("rank:3", "streak:7", "unit:
 - **Several tabs / the installed app at once** stay in sync via the `storage` event, and every write re-reads the latest state first so one tab cannot clobber another.
 - The app asks the browser for persistent storage (`navigator.storage.persist()`) after the first finished session, and on iPhone Safari (not installed) shows a one-time "Add to Home Screen" tip, because Safari may clear script-written storage of sites you have not installed after about a week of inactivity.
 
+Later additions are optional fields with defaults (`shared/src/extras.ts`: `calibration`, `bookmarks`, `notes`, `challenge`, `achievements`, `mocks`, `passedByType`, and `cards[].hc`), so `Progress` stays `version: 2` and old data loads unchanged; all of them are included in backups and merges. Details in [docs/learning-features.md](docs/learning-features.md).
+
 ### Export, import and moving to a new phone
 
 Settings -> **Your data**:
@@ -129,6 +132,8 @@ npm run e2e        # builds the app, serves it with AI grading off, drives it in
 day (the page clock is moved with `page.clock`), freezes and rest days, Daily Practice, onboarding, export/import (including garbage and tampered files),
 two tabs staying in sync, celebrations with and without reduced motion, the readiness page, and 390px layout / tap-target / keyboard checks. Storage is
 seeded with `localStorage` blobs so each test starts from an exact state.
+
+`e2e/hints-confidence.spec.ts`, `library.spec.ts`, `challenge.spec.ts`, `achievements.spec.ts` and `mock.spec.ts` cover the learning features (hints and XP, ratings and hypercorrection, notes and the Library, the deterministic daily challenge across days, silent backfill and toasts, the mock run, time-up with the page clock, scorecard, capped rewards). Run several suites side by side with `E2E_PORT=4181 npx playwright test --workers=2`.
 
 `e2e/question-types.spec.ts` plays **every question type through the real UI** (reading the correct answers from the
 YAML, so it stays in sync with the content), and asserts the feedback, the XP awarded and that the page never
@@ -168,6 +173,7 @@ validate the structure and cross-field rules (answers exist, blanks match, rubri
   options: [{ id: a, text: "O(n²)" }, { id: b, text: "O(n)" }]
   answer: a
   explanation: "Shown after checking. `backticks` render as inline code."
+  hint: "Optional nudge, never the answer. Revealing it costs 3 XP."   # any question type
 
 # short coding challenge: tap tokens into blanks  ([[n]] = blank n; bank needs >= 1 distractor)
 - type: fill
@@ -290,6 +296,5 @@ generated, so it works offline and is deterministic; the AI only grades.
 
 - **Architecture board** (drag & connect components, validate against a reference topology): the question schema is a
   discriminated union (`shared/src/schema.ts`), so it is one new type plus one component. Deliberately left out for now.
-- Next batch (specified, not built): achievements/badges, confidence ratings and calibration, a daily challenge, user-chosen reminders (a calendar `.ics` first), a weekly recap card.
-- Later: timed "mock interview" mode, teach-back prompts, a shareable progress card, a transfer code / QR for moving between devices.
+- Specified, not built here: user-chosen reminders (a calendar `.ics` first), a weekly recap card, teach-back prompts, a shareable progress card, a transfer code / QR for moving between devices. (Hints, confidence, bookmarks and notes, the Library, the daily challenge, achievements and mock interviews are built: see [docs/learning-features.md](docs/learning-features.md).)
 - Real code execution for coding challenges (sandboxed Kotlin runner) instead of AI grading.

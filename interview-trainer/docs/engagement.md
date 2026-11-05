@@ -50,6 +50,6 @@ All of it is pure: `today` is always passed in, there is no `Date.now()` in `sha
 
 ## Not built yet (specified)
 
-Achievements, confidence ratings, daily challenge, reminders (`.ics` first), weekly recap, mock interviews, teach-back, share card,
-transfer code/QR. The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
+Reminders (`.ics` first), weekly recap, teach-back, share card, transfer code/QR. (Achievements, confidence ratings, the daily challenge
+and mock interviews are built: see [`learning-features.md`](learning-features.md).) The `Progress` type has room: later additive fields (`challenge`, `mocks`, `calibration`, ...) are optional and get
 defaults in `normalizeProgress`, so they need no migration.

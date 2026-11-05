@@ -3,6 +3,7 @@ import {
   READINESS_TEXT, allQuestions, buildDailySession, goalToday, planFor, rankFor, readiness, reviewQueue, streakStatus, unitOfFor,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
+import { ChallengeCard } from '../components/ChallengeCard';
 import { OnboardingCard } from '../components/OnboardingCard';
 import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
@@ -147,6 +148,8 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         <span className="cta" aria-hidden="true">{hero.cta}</span>
       </a>
 
+      <ChallengeCard course={course} progress={progress} today={today} />
+
       {countdown && (
         <div className="countdown" data-testid="countdown">
           {countdown.chip && <span className="pill on">{countdown.chip}</span>}
@@ -176,6 +179,22 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         <span>
           <b>Progress</b>
           <small data-testid="readiness-line">Readiness {ready.score} · {READINESS_TEXT[ready.label]}</small>
+        </span>
+      </a>
+
+      <a className="card action mock-link" href="#/mock" data-testid="mock-link">
+        <span className="emoji" aria-hidden="true">⏱️</span>
+        <span>
+          <b>Mock interview</b>
+          <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
+        </span>
+      </a>
+
+      <a className="card action library-link" href="#/library" data-testid="library-link">
+        <span className="emoji" aria-hidden="true">📚</span>
+        <span>
+          <b>Library</b>
+          <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
         </span>
       </a>
 

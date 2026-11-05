@@ -18,6 +18,8 @@ export interface Finished {
   forecast: ForecastBucket[];
   /** "Worth remembering": the explanation of something already learned, with its bonus XP. */
   tip?: { text: string; bonusXp: number } | null;
+  /** Extra factual lines (e.g. the daily challenge result), shown with the other notes. */
+  extraNotes?: string[];
 }
 
 /** What a headline moment says: a title and one line of meaning. Calm and factual. */
@@ -91,7 +93,7 @@ export function Summary({ finished, settings, onHome }: { finished: Finished; se
   }, [big, settings.confetti, settings.haptics]);
 
   const top = celebration && celebration.type !== 'tip' ? headline(celebration) : null;
-  const notes = events.map((e) => note(e, celebration?.type)).filter((n): n is string => n !== null);
+  const notes = [...events.map((e) => note(e, celebration?.type)).filter((n): n is string => n !== null), ...(finished.extraNotes ?? [])];
   const g = finished.goalAfter;
 
   return (

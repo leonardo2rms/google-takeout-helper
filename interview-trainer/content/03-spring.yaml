@@ -8,6 +8,7 @@ lessons:
     title: Beans, proxies & transactions
     questions:
       - type: single
+        hint: "Which object receives the call when a method calls another method of its own class?"
         prompt: "`placeOrder` is called from a controller. Why is `save` NOT transactional?"
         code:
           source: |
@@ -33,6 +34,7 @@ lessons:
         explanation: "Spring AOP wraps the bean in a proxy; only calls that come through the proxy are intercepted. A call from inside the same instance goes straight to `this.save`. Fix: move `save` to another bean, annotate `placeOrder`, or use programmatic `TransactionTemplate`."
 
       - type: single
+        hint: "Spring has to subclass your class. What does Kotlin do to classes by default, and what changes that?"
         prompt: "A Kotlin `@Service` class fails at startup because Spring can't create a CGLIB proxy for a final class. What is the idiomatic fix?"
         options:
           - { id: a, text: "Apply the kotlin-spring (all-open) compiler plugin so Spring-annotated classes become open" }
@@ -54,6 +56,7 @@ lessons:
         explanation: "Constructor injection makes dependencies explicit and mandatory, and circular dependencies fail fast instead of being silently tolerated. With a single constructor `@Autowired` isn't even needed."
 
       - type: single
+        hint: "When does the constructor injection of the prototype happen, and how many times is the singleton constructed?"
         prompt: "A singleton bean has a `@Scope(\"prototype\")` bean injected through its constructor. How many prototype instances does the singleton use?"
         options:
           - { id: a, text: "One: it's injected once, when the singleton is created" }
@@ -64,6 +67,7 @@ lessons:
         explanation: "Injection happens once. To get a fresh instance per use, inject an `ObjectProvider<T>` (call `getObject()`), or use a scoped proxy."
 
       - type: single
+        hint: "Which kinds of exception trigger a rollback by default?"
         prompt: What happens to the data when this method runs?
         code:
           source: |
@@ -81,6 +85,7 @@ lessons:
         explanation: "Kotlin has no checked exceptions, but `IOException` is still a checked type from Spring's point of view. Use `@Transactional(rollbackFor = [Exception::class])` or throw an unchecked exception."
 
       - type: fill
+        hint: "Each annotation maps to a part of the HTTP request: the verb, a URL segment, the body."
         prompt: Complete the REST controller annotations.
         template: |
           @RestController
@@ -119,6 +124,7 @@ lessons:
         explanation: "The proxy is created after initialisation, which is why `@PostConstruct` runs on the raw bean (so a `@Transactional` method called from it is not transactional) and why other beans receive the proxy, not the original."
 
       - type: open
+        hint: "Start from what the starter dependencies put on the classpath and the conditions guarding each configuration class."
         prompt: How does Spring Boot auto-configuration work, and how would you find out why a bean wasn't created?
         modelAnswer: "@SpringBootApplication enables auto-configuration, which loads the candidate configuration classes listed in META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports. Each is guarded by conditions such as @ConditionalOnClass, @ConditionalOnProperty and @ConditionalOnMissingBean, so it only applies if the classpath and properties match and your own beans haven't already defined the same thing (user config backs off the default). To debug, start with --debug (or debug=true) to print the conditions evaluation report, or use the Actuator conditions endpoint."
         keyPoints:
@@ -156,6 +162,7 @@ lessons:
     title: Data, web & performance
     questions:
       - type: single
+        hint: "One query for the orders, then count how many lazy loads follow."
         prompt: "`items` is a lazy `@OneToMany`. For 100 orders, how many SQL queries does this run?"
         code:
           source: |
@@ -181,6 +188,7 @@ lessons:
         explanation: "Fetch joins/entity graphs load the association in the same query; batch fetching turns N queries into N/batch. EAGER doesn't fix it for `findAll()` (it still issues one select per parent) and makes every other query heavier. An index speeds each query but doesn't reduce their number."
 
       - type: single
+        hint: "Compare how long the connection is borrowed with how long you actually need it."
         prompt: "Spring Boot enables `spring.jpa.open-in-view` by default. What is its main production risk?"
         options:
           - { id: a, text: "The DB connection is held for the whole web request, and lazy loading in the view/serialisation layer hides N+1s, risking pool exhaustion" }
@@ -201,6 +209,7 @@ lessons:
         explanation: "Reactive stacks pay off for high-concurrency, I/O-bound workloads with non-blocking drivers end to end. Blocking JDBC on a WebFlux event loop is an outage waiting to happen. For CPU-bound work, reactive gives you nothing."
 
       - type: single
+        hint: "Look under the `spring.threads` prefix."
         prompt: Which Spring Boot 3.2+ property switches request handling to virtual threads?
         options:
           - { id: a, text: "spring.threads.virtual.enabled=true" }
@@ -211,6 +220,7 @@ lessons:
         explanation: "It needs Java 21+. Virtual threads help with blocking I/O concurrency; they don't make CPU-bound work faster, and a bounded resource (like the DB pool) is still your real limit."
 
       - type: fill
+        hint: "One annotation fills the cache on a read; the other empties it."
         prompt: Cache exchange rates per currency, and allow clearing the whole cache.
         template: |
           @Service
@@ -227,6 +237,7 @@ lessons:
         explanation: "`@Cacheable` skips the method on a hit; `@CachePut` always runs and updates the cache; `@CacheEvict` removes entries. Remember the same proxy caveat as `@Transactional`: self-invocation bypasses caching."
 
       - type: spot
+        hint: "Look for a repository call inside a loop."
         prompt: This endpoint is fast with 10 orders and slow with 10,000. Tap the line that causes it.
         source: |
           @Transactional(readOnly = true)
@@ -240,6 +251,7 @@ lessons:
         explanation: "Per order, this line lazy-loads `items` and runs a customer lookup: two extra queries per row (N+1). Fetch what you need up front (join fetch / entity graph), load the customers with one `findAllById`, or use a DTO projection."
 
       - type: estimate
+        hint: "With a batch size of 10, how many lazy loads cover 100 parents? Don't forget the initial query."
         prompt: "100 orders each have a lazy `items` collection, and `hibernate.default_batch_fetch_size` is 10. You touch `items` of every order. How many SQL queries run in total, including the one that loads the orders?"
         answer: 11
         tolerance: 0

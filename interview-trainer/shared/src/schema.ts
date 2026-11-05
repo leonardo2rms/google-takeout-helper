@@ -14,6 +14,8 @@ const common = {
   code: CodeBlock.optional(),
   /** Shown after the answer is checked, whether the learner was right or wrong. */
   explanation: z.string().min(1),
+  /** Optional nudge that does not give the answer away. Revealing it costs XP and caps the review quality. */
+  hint: z.string().min(1).max(220).optional(),
   difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
   tags: z.array(z.string()).default([]),
 };

@@ -17,9 +17,14 @@ interface Pending {
   exportedAt: string | null;
 }
 
-const TOGGLES: { key: keyof Pick<Settings, 'confetti' | 'haptics' | 'tips'>; label: string; hint?: string }[] = [
+const TOGGLES: { key: keyof Pick<Settings, 'confetti' | 'haptics' | 'tips' | 'confidence'>; label: string; hint?: string }[] = [
   { key: 'confetti', label: 'Confetti on big moments', hint: 'Only for real milestones, and never when your device asks for reduced motion.' },
   { key: 'haptics', label: 'Vibration on correct answers', hint: 'Where your device supports it.' },
+  {
+    key: 'confidence',
+    label: 'Ask "How sure are you?"',
+    hint: 'An optional one-tap rating before you check an answer. Being sure and wrong brings a question back sooner; guessing and being right keeps it short. Skippable every time.',
+  },
   {
     key: 'tips',
     label: "Interviewer's tip",
@@ -107,7 +112,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
       </section>
 
       <section>
-        <h3>Effects</h3>
+        <h3>Effects and prompts</h3>
         {TOGGLES.map((t) => (
           <label key={t.key} className="toggle-row">
             <input type="checkbox" checked={progress.settings[t.key]} onChange={(e) => update((p) => ({ ...p, settings: { ...p.settings, [t.key]: e.target.checked } }))} />

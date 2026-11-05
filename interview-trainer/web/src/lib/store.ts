@@ -1,9 +1,10 @@
 import { useCallback, useSyncExternalStore } from 'react';
 import course from 'virtual:course';
 import {
-  KEY_V2, allQuestions, dayKey, emptyProgress, exportProgress, loadProgress, mergeProgress, saveProgress,
-  type Progress, type StorageLike,
+  KEY_V2, allQuestions, backfillAchievements, dayKey, emptyProgress, exportProgress, loadProgress, mergeProgress, saveProgress, silentUnlock,
+  unlockAchievements, type Progress, type StorageLike,
 } from '@trainer/shared';
+import { pushBadgeToast } from './toasts';
 
 /**
  * The single source of truth for progress, shared by every component and kept in sync across tabs.
@@ -65,17 +66,32 @@ function commit(next: Progress) {
   emit();
 }
 
-/** Applies `fn` to the latest progress (including writes from other tabs) and saves the result. `fn` runs synchronously. */
-export function updateProgress(fn: (p: Progress) => Progress): void {
+const badgeCtx = () => ({ course, today: dayKey(new Date()) });
+
+/**
+ * Applies `fn` to the latest progress (including writes from other tabs) and saves the result. `fn` runs synchronously.
+ * Badges are evaluated after every write, so no screen has to remember to; a new one raises a quiet toast, unless the
+ * write is `silent` (an import or the first-time backfill: what the data already earned is not "just" achieved).
+ */
+export function updateProgress(fn: (p: Progress) => Progress, opts: { silent?: boolean } = {}): void {
   ensure();
   const changed = syncFromStorage();
-  const next = fn(current!);
+  let next = fn(current!);
   if (next === current) {
     if (changed) emit();
     return;
   }
+  if (opts.silent) next = silentUnlock(next, badgeCtx());
+  else {
+    const res = unlockAchievements(next, badgeCtx());
+    next = res.progress;
+    pushBadgeToast(res.unlocked);
+  }
   commit(next);
 }
+
+/** Once per profile: records the badges an older profile has already earned, without any celebration. */
+export const backfillBadges = (): void => updateProgress((p) => backfillAchievements(p, badgeCtx()), { silent: true });
 
 export const getProgress = (): Progress => ensure();
 
@@ -100,8 +116,8 @@ export function useProgress() {
 // ---------- backup ----------
 
 export const exportText = (): string => exportProgress(ensure(), new Date());
-export const replaceProgress = (p: Progress): void => updateProgress(() => p);
-export const mergeIntoProgress = (incoming: Progress): void => updateProgress((cur) => mergeProgress(cur, incoming, migrationCtx()));
+export const replaceProgress = (p: Progress): void => updateProgress(() => p, { silent: true });
+export const mergeIntoProgress = (incoming: Progress): void => updateProgress((cur) => mergeProgress(cur, incoming, migrationCtx()), { silent: true });
 export const importContext = migrationCtx;
 
 // ---------- keeping the data safe ----------

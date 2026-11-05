@@ -114,7 +114,7 @@ function questionsOf(course: Course, unitId: string): Question[] {
 export function weakness(p: Progress, q: Question, today: Day): number {
   const c = cardFor(p, q);
   if (!c) return 0;
-  return 1 - strength(c, today) + (0.3 * Math.min(c.lapses, 3)) / 3 + (p.missed.includes(q.id) ? 0.3 : 0);
+  return 1 - strength(c, today) + (0.3 * Math.min(c.lapses, 3)) / 3 + (p.missed.includes(q.id) ? 0.3 : 0) + (c.hc ? 0.2 : 0);
 }
 
 /**

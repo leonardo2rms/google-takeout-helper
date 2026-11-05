@@ -49,6 +49,7 @@ lessons:
         explanation: "Long contexts get cluttered with dead ends and stale decisions. A clean context with the current state and rules (e.g. CLAUDE.md-style project instructions) usually beats trying to rescue a long one."
 
       - type: single
+        hint: "Who wrote the tests, and what assumptions did that author share with the code?"
         prompt: "The assistant wrote both a function and its unit tests, and they all pass. Is that sufficient evidence the function is correct?"
         options:
           - { id: a, text: "No: the tests share the same assumptions as the code. Review them against the spec and add edge-case/property tests" }
@@ -59,6 +60,7 @@ lessons:
         explanation: "If the model misunderstood the requirement, it will usually encode the same misunderstanding in both code and tests. Write (or at least carefully read) tests from the requirement, include boundaries, and mutation-test if it matters."
 
       - type: single
+        hint: "Think about what leaves your control once the text is pasted."
         prompt: A teammate wants to paste a production database dump with customer emails into a public AI chat tool to debug a query. What is the right call?
         options:
           - { id: a, text: "Don't: use anonymised/synthetic data and an approved tool under your company's data policy" }
@@ -85,6 +87,7 @@ lessons:
     title: Building LLM features
     questions:
       - type: single
+        hint: "What does a model not know unless you hand it over?"
         prompt: What is the primary purpose of retrieval-augmented generation (RAG)?
         options:
           - { id: a, text: "Ground the model in your own, current documents by retrieving relevant passages and including them in the prompt" }
@@ -105,6 +108,7 @@ lessons:
         explanation: "Embeddings map text to vectors where similar meaning means small distance. Production systems often combine this with keyword (BM25) search and metadata filters."
 
       - type: multi
+        hint: "Think about what the model is allowed to DO after reading untrusted text."
         prompt: Select ALL sound mitigations against prompt injection in an LLM app that reads web pages and emails.
         options:
           - { id: a, text: "Treat retrieved and user content as untrusted data: delimit it and never let it act as instructions" }
@@ -116,6 +120,7 @@ lessons:
         explanation: "You cannot reliably prompt your way out of injection, so limit the blast radius: minimal permissions, server-side authorisation checks, and deterministic validation between the model and anything with side effects."
 
       - type: single
+        hint: "How would you tell luck from a real improvement?"
         prompt: How do you know whether a prompt change actually improved your feature?
         options:
           - { id: a, text: "Run it against an eval set of representative cases (including hard ones) and compare scores before and after" }
@@ -126,6 +131,7 @@ lessons:
         explanation: "LLM outputs vary, so anecdotes mislead. Grade with code where possible, otherwise with a model judge calibrated against human labels, and track regressions as you change prompts or models."
 
       - type: single
+        hint: "Which part of the request never changes between calls?"
         prompt: "Each request to your LLM feature includes the same 20,000-token policy document followed by a short user question. What is the best cost and latency optimisation?"
         options:
           - { id: a, text: "Use prompt caching: keep the static document as a stable prefix so repeated reads are cheap and fast" }
@@ -166,6 +172,7 @@ lessons:
         explanation: "These fit together in a real feature: retrieval (embeddings + RAG) supplies the facts, caching keeps the long stable prefix cheap, an eval set tells you whether a change helped, and injection defences treat retrieved text as data, never as instructions."
 
       - type: code
+        hint: "Each chunk starts `size - overlap` characters after the previous one."
         prompt: "RAG splits documents into overlapping chunks. Write `chunkText(text, size, overlap)`: chunks of at most `size` characters, each starting `size - overlap` characters after the previous one, stopping once a chunk reaches the end of the text. Empty text gives `[]`. If `overlap` is not smaller than `size`, throw an error whose message mentions \"overlap\"."
         starter: |
           function chunkText(text, size, overlap) {
@@ -204,6 +211,7 @@ lessons:
         explanation: "Overlap keeps a sentence that straddles a boundary intact in at least one chunk, which helps retrieval. Two classic bugs: an infinite loop when `overlap >= size` (the step is zero or negative), and emitting a useless tail chunk that is entirely contained in the previous one: the `break` once a chunk reaches the end prevents it."
 
       - type: open
+        hint: "Separate what the model decides from what the code enforces."
         prompt: Design the guardrails for a customer-support chatbot that can issue refunds through a tool call.
         modelAnswer: "The model must never be the authority. The refund tool should be least-privilege and enforced server-side: it re-checks that the order belongs to the authenticated customer, caps amounts, limits frequency and requires human approval above a threshold. Treat all customer text (and any retrieved content) as untrusted to defend against prompt injection, and validate tool arguments against a schema before executing. Log every tool call for audit, rate-limit abuse, monitor and evaluate conversations (including adversarial test cases), and provide a fallback to a human agent."
         keyPoints:

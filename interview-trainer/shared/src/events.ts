@@ -20,6 +20,13 @@ export interface LessonResult {
   /** Per-question outcome; derived from missed / recovered / cleared when omitted. */
   outcomes?: Record<QuestionId, Outcome>;
   confidence?: Record<QuestionId, Confidence>;
+  /** Question ids whose hint was revealed: their review quality is capped. */
+  hinted?: string[];
+  /**
+   * `lesson` (default) is a normal session. `single` (one question: library practice, the daily challenge) and `mock`
+   * never count as a "perfect lesson" and never show a tip.
+   */
+  kind?: 'lesson' | 'single' | 'mock';
   /** Distinct questions resolved; defaults to the number of outcomes. */
   answered?: number;
 }
@@ -72,6 +79,30 @@ export function tipQuestion(p: Progress, questions: readonly Question[], today: 
 
 export const explanationOf = (q: Question): string => q.explanation ?? (q.type === 'open' ? q.modelAnswer : '');
 
+/** Calibration counts (how often "sure" was right) and the per-type pass counters behind some badges. */
+function tally(
+  p: Progress,
+  r: LessonResult,
+  outcomes: Record<QuestionId, Outcome>,
+  questions: readonly Question[],
+): Pick<Progress, 'calibration' | 'passedByType'> {
+  const n: [number, number, number] = [...p.calibration.n];
+  const right: [number, number, number] = [...p.calibration.right];
+  for (const [id, c] of Object.entries(r.confidence ?? {})) {
+    const o = outcomes[id];
+    if (!o) continue;
+    n[c - 1]!++;
+    if (o === 'first') right[c - 1]!++;
+  }
+  const typeOf = new Map(questions.map((q) => [q.id, q.type] as const));
+  const passedByType = { ...p.passedByType };
+  for (const [id, o] of Object.entries(outcomes)) {
+    const t = typeOf.get(id);
+    if (t && (o === 'first' || o === 'retry')) passedByType[t] = (passedByType[t] ?? 0) + 1;
+  }
+  return { calibration: { n, right }, passedByType };
+}
+
 /**
  * The single write path for a finished session. Pure: returns the next progress plus what happened,
  * so the UI can celebrate without re-deriving anything.
@@ -85,20 +116,22 @@ export function applySession(
   const questions = allQuestions(course);
   const outcomes = r.outcomes ?? outcomesOf({ missed: r.missed, recovered: r.recovered, correct: r.cleared ?? [] });
   const answered = r.answered ?? Object.keys(outcomes).length;
-  const firstTry = Object.values(outcomes).filter((o) => o === 'first').length;
+  // `answered` can be lower than the number of outcomes (a mock credits the goal only partly): first tries never exceed it.
+  const firstTry = Math.min(answered, Object.values(outcomes).filter((o) => o === 'first').length);
 
   const beforeRank = rankFor(p.xp);
   const beforeGoal = goalToday(p, today);
   const beforeReady = readiness(course, p, today);
   const beforeTopics = topicStats(course, p, today);
 
-  const tipQ = tipFor(p, today).show ? tipQuestion(p, questions, today) : null;
+  const regular = (r.kind ?? 'lesson') === 'lesson';
+  const tipQ = regular && tipFor(p, today).show ? tipQuestion(p, questions, today) : null;
   const bonus = tipQ ? TIP_BONUS_XP : 0;
 
   const basics = applyBasics(p, r, today, r.xp + bonus);
   const streak = advanceStreak(p, today);
   const newDay = p.lastDay !== today && !p.days[today];
-  const perfect = r.accuracy >= 1 && answered > 0;
+  const perfect = regular && r.accuracy >= 1 && answered > 0;
 
   const next: Progress = {
     ...p,
@@ -107,7 +140,7 @@ export function applySession(
     longestStreak: streak.longestStreak,
     freezes: streak.freezes,
     lastDay: streak.lastDay,
-    cards: applyToCards(p.cards, outcomes, questions, today, { deadline: p.profile.interviewDate, confidence: r.confidence }),
+    cards: applyToCards(p.cards, outcomes, questions, today, { deadline: p.profile.interviewDate, confidence: r.confidence, hinted: r.hinted }),
     days: recordDay(p, today, { xp: r.xp + bonus, answered, firstTry }),
     stats: {
       sessions: p.stats.sessions + 1,
@@ -117,6 +150,7 @@ export function applySession(
       practiceDays: p.stats.practiceDays + (newDay ? 1 : 0),
     },
     milestones: { ...p.milestones },
+    ...tally(p, r, outcomes, questions),
   };
 
   const events: SessionEvent[] = [];

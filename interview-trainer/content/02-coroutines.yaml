@@ -8,6 +8,7 @@ lessons:
     title: Structured concurrency
     questions:
       - type: single
+        hint: "One is for fire-and-forget work; the other lets you wait for a value later."
         prompt: What do `launch` and `async` return?
         options:
           - { id: a, text: "`launch` returns a Job; `async` returns a Deferred<T>" }
@@ -38,6 +39,7 @@ lessons:
         explanation: "`launch` doesn't run the block immediately on the same single-threaded event loop, so B prints first. `coroutineScope` suspends until its children finish (C at 50 ms), then D prints. A is a child of the outer runBlocking and fires at 100 ms."
 
       - type: multi
+        hint: "Think about parent and child: what happens to children when the parent is cancelled, and to the parent when a child fails?"
         prompt: Select ALL guarantees of structured concurrency.
         options:
           - { id: a, text: "A parent does not complete until all its children complete" }
@@ -49,6 +51,7 @@ lessons:
         explanation: "The dispatcher has nothing to do with lifetime: the scope owns the child. `GlobalScope` is explicitly the opposite, an unscoped coroutine that lives until the process ends or it finishes."
 
       - type: single
+        hint: "Blocking calls need a pool sized for waiting, not for CPU cores."
         prompt: Which dispatcher is the right default for a blocking JDBC call inside a coroutine?
         options:
           - { id: a, text: "Dispatchers.IO" }
@@ -59,6 +62,7 @@ lessons:
         explanation: "`Dispatchers.Default` is sized to CPU cores and is for CPU-bound work: blocking it starves other coroutines. `Dispatchers.IO` uses an elastic pool (64 threads by default) made for blocking calls."
 
       - type: single
+        hint: "What else does `catch (e: Exception)` catch, and how is cancellation signalled inside a coroutine?"
         prompt: What is wrong with this code?
         code:
           source: |
@@ -79,6 +83,7 @@ lessons:
         explanation: "Cancellation is delivered as a CancellationException at a suspension point. Catching `Exception` (or `Throwable`) swallows it. Rethrow it (`if (e is CancellationException) throw e`) or catch more specific types."
 
       - type: fill
+        hint: "You need a scope that waits for its children, and a way to start work without waiting for it yet."
         prompt: Load a user and their orders concurrently.
         template: |
           suspend fun loadScreen(): Pair<User, List<Order>> = [[1]] {
@@ -91,6 +96,7 @@ lessons:
         explanation: "`coroutineScope` makes the two `async` calls children of the current coroutine (failure cancels both) and returns when both are done. Total latency becomes max(user, orders) instead of the sum. `runBlocking` would block the calling thread."
 
       - type: spot
+        hint: "Look for a call that parks the thread rather than suspending the coroutine."
         prompt: This coroutine blocks its thread and defeats the concurrency. Tap the offending line.
         source: |
           suspend fun refresh(): Pair<List<User>, List<Order>> = coroutineScope {
@@ -112,6 +118,7 @@ lessons:
         explanation: "Default and IO share one thread pool but have separate limits, so blocking on IO doesn't starve CPU work. Unconfined is mostly for tests and special cases because the resumption thread is unpredictable."
 
       - type: open
+        hint: "Think about lifetime: who cancels it, and who ever sees its exceptions?"
         prompt: Why is `GlobalScope.launch` discouraged, and what would you use inside a Spring service instead?
         modelAnswer: "GlobalScope coroutines are not tied to any lifecycle: they can't be cancelled with the component, they leak if they hang, and their exceptions don't propagate to a caller. Prefer suspend functions with `coroutineScope`/`supervisorScope` so work is bound to the caller, or, for background work owned by a bean, a dedicated CoroutineScope (SupervisorJob + an injected dispatcher) that is cancelled in @PreDestroy. Injecting the dispatcher also makes the code testable."
         keyPoints:
@@ -149,6 +156,7 @@ lessons:
     title: Flow & failure handling
     questions:
       - type: single
+        hint: "Compare it with a sequence: does merely declaring it do any work?"
         prompt: "`flow { emit(1) }` is declared but nobody collects it. When does the lambda run?"
         options:
           - { id: a, text: "Only when (and each time) it is collected: Flow is cold" }
@@ -159,6 +167,7 @@ lessons:
         explanation: "A cold flow runs its producer block per collector. Use `shareIn`/`stateIn` to turn it into a hot flow shared among collectors."
 
       - type: single
+        hint: "Of the shared flows, which one always has a current value for a late collector?"
         prompt: "You need to expose \"the latest UI state\" that new collectors immediately receive, and that skips equal consecutive values. Which type fits best?"
         options:
           - { id: a, text: "StateFlow" }
@@ -221,6 +230,7 @@ lessons:
         explanation: "`withTimeout` throws TimeoutCancellationException (a CancellationException subclass, so careful with broad catches). `withTimeoutOrNull` returns null."
 
       - type: open
+        hint: "Which of the three calls depend on each other, and in which scope would you start the independent ones?"
         prompt: "A Spring Boot endpoint calls three downstream REST APIs one after the other, 200 ms each. How would you cut the latency with coroutines, and what do you watch out for?"
         modelAnswer: "Run the independent calls concurrently with `async` inside a `coroutineScope`, so latency is roughly the slowest call (~200 ms) instead of 600 ms. Use a non-blocking client (WebClient) or Dispatchers.IO for blocking clients. Decide failure semantics: in a plain coroutineScope one failure cancels the siblings; use supervisorScope or per-call error handling if partial results are acceptable. Add timeouts (withTimeout) and limit concurrency (e.g. a Semaphore) so you don't flood downstreams."
         keyPoints:

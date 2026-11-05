@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
 import { READINESS_TEXT, readiness, topicStats, type Course, type Progress } from '@trainer/shared';
+import { Calibration } from '../components/Calibration';
+import { MockHistory } from '../components/MockHistory';
+import { TrophyCase } from '../components/TrophyCase';
 import { useToday } from '../lib/today';
 
 interface Props {
@@ -34,6 +37,8 @@ export function ProgressScreen({ course, progress }: Props) {
         </p>
       </section>
 
+      <Calibration progress={progress} />
+
       {weakest && (
         <a className="card action" href={`#/topic/${weakest.unitId}`} data-testid="weakest-topic">
           <span className="emoji" aria-hidden="true">🎯</span>
@@ -67,6 +72,10 @@ export function ProgressScreen({ course, progress }: Props) {
           </li>
         ))}
       </ul>
+
+      <MockHistory mocks={progress.mocks} />
+
+      <TrophyCase progress={progress} />
     </div>
   );
 }
