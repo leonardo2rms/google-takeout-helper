@@ -309,7 +309,7 @@ lessons:
         explanation: "First, it sends the aggregate's internal domain events straight to a public topic, so every refactoring of the domain model breaks subscribers; map them to deliberately designed, versioned integration events. Second, it is a dual write: the broker send is not part of the database transaction, so a crash or rollback leaves the two out of sync. Write the integration event to an outbox table in the same transaction and let a relay publish it."
 
       - type: fill
-        prompt: Compose two business rules into one that holds only when both hold.
+        prompt: "Compose two business rules into one that holds only when both hold, and that evaluates the second rule only if the first one holds (short-circuit)."
         template: |
           fun interface Specification<T> {
               fun isSatisfiedBy(candidate: T): Boolean
