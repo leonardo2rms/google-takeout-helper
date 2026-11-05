@@ -13,17 +13,20 @@ import { fileURLToPath } from 'node:url';
 import { loadCourse } from '../shared/src/load-content';
 import type { Course } from '../shared/src';
 
-type Opt = { id: string; text: string };
-type Choice = { id: string; unit: string; prompt: string; code?: string; kind: 'single' | 'multi'; options: Opt[]; correct: Set<string> };
+export type Opt = { id: string; text: string };
+export type Choice = { id: string; unit: string; prompt: string; code?: string; kind: 'single' | 'multi'; options: Opt[]; correct: Set<string> };
 
 /** Ratchet limits (see docs/content-guide.md, "Balanced options"). Chance for 4 options is 25%. */
-export const LIMITS = { unitLongest: 0.35, unitLongestHard: 0.45, overallLongest: 0.3 } as const;
+export const LIMITS = { unitLongest: 0.35, unitLongestHard: 0.45, overallLongest: 0.3, overallTop2: 0.7, overallCorr: 0.3, multiTopK: 0.25 } as const;
 
 const ABSOLUTES = /\b(always|never|only|all|none|must|cannot|can't|every|entirely|guarantees?|guaranteed|impossible|no longer|any)\b/i;
 const HEDGES = /\b(usually|typically|generally|often|mostly|may|might|can|could|depends|unless|except|roughly|approximately|by default|in most|tends? to|at least|up to|rather than|but)\b/i;
 const STOP = new Set(
   'a an the and or of to in on at is are was be it its as by for with that this these those from not no do does what which when how why you your can will than then into if are use used using'.split(' '),
 );
+
+/** Prose of an option: code spans removed, so identifiers such as `Any` or `all` are not mistaken for absolute claims. */
+const prose = (s: string) => s.replace(/`[^`]*`/g, ' ');
 
 const words = (s: string): string[] =>
   (s.toLowerCase().match(/[a-z][a-z0-9_]{2,}/g) ?? []).filter((w) => !STOP.has(w));
@@ -74,6 +77,9 @@ export type Stats = {
   corr: number;
   /** singles whose answer has no absolute word while at least one distractor does */
   absolutesOnlyInDistractors: number;
+  /** answers / distractors containing an absolute word ("always", "never", "only", "all", ...) */
+  absAnswers: number;
+  absDistractors: number;
   /** singles whose answer is the only option with a hedging word */
   onlyHedged: number;
   /** singles whose answer is uniquely the most specific (numbers, code spans, punctuation) option */
@@ -98,7 +104,7 @@ export function measure(all: Choice[], unit: string): Stats {
   const singles = cs.filter((c) => c.kind === 'single');
   const multis = cs.filter((c) => c.kind === 'multi');
   const s: Stats = {
-    unit, singles: singles.length, longest: 0, top2: 0, corr: 0, absolutesOnlyInDistractors: 0, onlyHedged: 0, mostSpecific: 0, onlyOverlap: 0, noOverlapAnswers: 0, noOverlapDistractors: 0, distractors: 0, ratioOver2: 0,
+    unit, singles: singles.length, longest: 0, top2: 0, corr: 0, absolutesOnlyInDistractors: 0, absAnswers: 0, absDistractors: 0, onlyHedged: 0, mostSpecific: 0, onlyOverlap: 0, noOverlapAnswers: 0, noOverlapDistractors: 0, distractors: 0, ratioOver2: 0,
     multis: multis.length, multiTopK: 0, offenders: [],
   };
   let corrSum = 0;
@@ -117,7 +123,9 @@ export function measure(all: Choice[], unit: string): Stats {
       corrSum += r;
       corrN++;
     }
-    if (!ABSOLUTES.test(ans.text) && wrong.some((o) => ABSOLUTES.test(o.text))) s.absolutesOnlyInDistractors++;
+    if (!ABSOLUTES.test(prose(ans.text)) && wrong.some((o) => ABSOLUTES.test(prose(o.text)))) s.absolutesOnlyInDistractors++;
+    if (ABSOLUTES.test(prose(ans.text))) s.absAnswers++;
+    s.absDistractors += wrong.filter((o) => ABSOLUTES.test(prose(o.text))).length;
     if (HEDGES.test(ans.text) && !wrong.some((o) => HEDGES.test(o.text))) s.onlyHedged++;
     if (uniqueMax(c.options, (o) => specificity(o.text)) === ans) s.mostSpecific++;
     const pw = new Set(words(`${c.prompt} ${c.code ?? ''}`));
@@ -143,30 +151,50 @@ export function lint(course: Course): { overall: Stats; units: Stats[] } {
   return { overall: measure(all, 'ALL'), units: course.units.map((u) => measure(all, u.id)) };
 }
 
-export type Violation = { scope: string; rate: number; limit: number; offenders: string[] };
+export type Violation = { scope: string; what: string; value: number; limit: number; offenders: string[] };
+
+/** Whole questions allowed at `rate` of `n`, rounded up so a tiny unit is not punished for one question. */
+const allowedCount = (n: number, rate: number) => Math.ceil(n * rate - 1e-9);
 
 /** The ratchet: what `content.test.ts` asserts. Returns the violations (empty = pass). */
 export function violations(r: { overall: Stats; units: Stats[] }): Violation[] {
   const out: Violation[] = [];
-  const rate = (s: Stats) => (s.singles ? s.longest / s.singles : 0);
+  const rate = (n: number, d: number) => (d ? n / d : 0);
   for (const u of r.units) {
-    if (rate(u) > LIMITS.unitLongest) out.push({ scope: `unit ${u.unit}`, rate: rate(u), limit: LIMITS.unitLongest, offenders: u.offenders });
-    else if (rate(u) > LIMITS.unitLongestHard) out.push({ scope: `unit ${u.unit}`, rate: rate(u), limit: LIMITS.unitLongestHard, offenders: u.offenders });
+    const v = rate(u.longest, u.singles);
+    const limit = v > LIMITS.unitLongestHard ? LIMITS.unitLongestHard : LIMITS.unitLongest;
+    if (u.longest > allowedCount(u.singles, LIMITS.unitLongest) || v > LIMITS.unitLongestHard)
+      out.push({ scope: `unit ${u.unit}`, what: 'the correct option is the strictly longest', value: v, limit, offenders: u.offenders });
   }
-  if (rate(r.overall) > LIMITS.overallLongest) out.push({ scope: 'all units', rate: rate(r.overall), limit: LIMITS.overallLongest, offenders: r.overall.offenders });
+  const o = r.overall;
+  if (rate(o.longest, o.singles) > LIMITS.overallLongest)
+    out.push({ scope: 'all units', what: 'the correct option is the strictly longest', value: rate(o.longest, o.singles), limit: LIMITS.overallLongest, offenders: o.offenders });
+  if (rate(o.top2, o.singles) > LIMITS.overallTop2)
+    out.push({ scope: 'all units', what: 'the correct option is among the two longest', value: rate(o.top2, o.singles), limit: LIMITS.overallTop2, offenders: [] });
+  if (o.corr > LIMITS.overallCorr)
+    out.push({ scope: 'all units', what: 'option length correlates with correctness (mean point-biserial r)', value: o.corr, limit: LIMITS.overallCorr, offenders: [] });
+  if (rate(o.multiTopK, o.multis) > LIMITS.multiTopK)
+    out.push({ scope: 'multi questions', what: 'the correct set is exactly the longest options', value: rate(o.multiTopK, o.multis), limit: LIMITS.multiTopK, offenders: [] });
   return out;
 }
 
 export function describeViolations(v: Violation[]): string {
+  const fmt = (x: Violation, n: number) => (x.what.includes('correlates') ? n.toFixed(2) : `${(n * 100).toFixed(0)}%`);
   return v
-    .map((x) => `${x.scope}: the correct option is the strictly longest in ${(x.rate * 100).toFixed(0)}% of single-choice questions (limit ${(x.limit * 100).toFixed(0)}%). Shorten the correct option (move detail to the explanation) or lengthen/enrich the distractors in:\n    ${x.offenders.join('\n    ')}`)
+    .map(
+      (x) =>
+        `${x.scope}: ${x.what} at ${fmt(x, x.value)} (limit ${fmt(x, x.limit)}).` +
+        (x.offenders.length
+          ? ` Shorten the correct option (move detail into the explanation) or make the distractors as long and as specific as the answer, in:\n    ${x.offenders.join('\n    ')}`
+          : ' Make wrong options as detailed as the right one; see docs/content-guide.md, "Balanced options".'),
+    )
     .join('\n');
 }
 
 const pct = (n: number, d: number) => (d ? `${((n / d) * 100).toFixed(0)}%`.padStart(4) : '   -');
 
 export function report(r: { overall: Stats; units: Stats[] }): string {
-  const head = 'unit'.padEnd(20) + ['single', 'longest', 'top2', 'corr', 'abs-only-wrong', 'only-hedged', 'most-specific', 'only-overlap', 'no-overlap A/D', 'len>2x', 'multi top-k'].map((h) => h.padStart(15)).join('');
+  const head = 'unit'.padEnd(20) + ['single', 'longest', 'top2', 'corr', 'abs A/D', 'only-hedged', 'most-specific', 'only-overlap', 'no-overlap A/D', 'len>2x', 'multi top-k'].map((h) => h.padStart(15)).join('');
   const row = (s: Stats) =>
     s.unit.padEnd(20) +
     [
@@ -174,7 +202,7 @@ export function report(r: { overall: Stats; units: Stats[] }): string {
       pct(s.longest, s.singles),
       pct(s.top2, s.singles),
       s.corr.toFixed(2),
-      pct(s.absolutesOnlyInDistractors, s.singles),
+      `${pct(s.absAnswers, s.singles).trim()}/${pct(s.absDistractors, s.distractors).trim()}`,
       pct(s.onlyHedged, s.singles),
       pct(s.mostSpecific, s.singles),
       pct(s.onlyOverlap, s.singles),
@@ -192,8 +220,11 @@ if (isMain) {
   const course = loadCourse(resolve(dirname(fileURLToPath(import.meta.url)), '../content'));
   const r = lint(course);
   console.log(report(r));
-  console.log(`\nchance for 4 options: longest 25%, top2 50%. limits: unit <= ${LIMITS.unitLongest * 100}% (never above ${LIMITS.unitLongestHard * 100}%), overall <= ${LIMITS.overallLongest * 100}%.`);
+  console.log(
+    `\nchance for 4 options: longest 25%, top2 50%, corr 0. limits: unit longest <= ${LIMITS.unitLongest * 100}% (rounded up to a whole question, never above ${LIMITS.unitLongestHard * 100}%), overall longest <= ${LIMITS.overallLongest * 100}%, top2 <= ${LIMITS.overallTop2 * 100}%, corr <= ${LIMITS.overallCorr}, multi top-k <= ${LIMITS.multiTopK * 100}%.`,
+  );
   const v = violations(r);
   if (process.argv.includes('--list')) console.log(`\nAnswer is the strictly longest option:\n  ${r.overall.offenders.join('\n  ')}`);
   console.log(v.length ? `\nRATCHET FAILS\n${describeViolations(v)}` : '\nratchet OK');
+  if (v.length) process.exitCode = 1;
 }

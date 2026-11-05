@@ -223,10 +223,36 @@ A wrong option should be *the answer a learner who has a specific misunderstandi
 - Start from the explanation: name the misconception behind each wrong option and say it in the explanation ("`also` returns the receiver too, but as `it`"). If you cannot name one, the option is filler; cut it.
 - Keep options **parallel** in length, grammar and specificity. The longest, most hedged option is usually the right one in careless questions; do not let that pattern form.
 - No joke options, no "none/all of the above", no double negatives, no options that are true but irrelevant to the prompt.
-- Avoid absolute words only in wrong options ("always", "never"); mix them across right and wrong.
+- Avoid absolute words only in wrong options ("always", "never"); mix them across right and wrong. A correct option may say "never" or "only" when that is the fact; a distractor may hedge ("usually", "often").
 - A distractor must be **definitely wrong**, not "wrong in most cases". If an expert could argue for it, fix the question.
 - For `fill`, distractors should be tokens that are *syntactically plausible* in the blank (`!!` for `?.`), not unrelated words. For `order`, make it possible to get the order wrong in an instructive way (a plausible but incorrect dependency order). For `match`, make every right-hand text plausible for every left item at a glance, differing in the detail that matters.
 - Randomisation hides position, so the answer ids (`a`, `b`, ...) carry no meaning; do not reference them in explanations.
+
+### Balanced options
+
+Learners (and interviewers who read the app's questions) learn quickly that the right answer is "the long, careful one". When that holds, the readiness numbers measure test-taking instead of knowledge. An audit of the first version of the course found the correct option was the strictly longest in 86% of single-choice questions (chance for four options is 25%), and that distractors were short strawmen ("Never retry anything", "Only test manually"). Both are now guarded by a test, so write for balance from the start:
+
+- **Same size, same detail.** All options of a question get a similar length (within a factor of about 1.5) and a similar level of specificity: if the answer names a flag, a number or a mechanism, a distractor names one too. Do not let the answer be the only option with a reason clause ("..., because ..."), a code span, a number or a hedge.
+- **Move the detail into the `explanation`.** If the correct option needs two lines of conditions, state the essence in the option and put the caveats in the explanation, where every learner sees them.
+- **Make distractors real misconceptions** that an engineer could hold and that the explanation then names and refutes ("a `+=` in a loop is fine because the JIT turns it into one `StringBuilder`"). Obviously silly options teach nothing and make the answer guessable by elimination.
+- **Vary which option is longest.** Of four options, the answer should be the longest about a quarter of the time, in the middle about half of the time and the shortest about a quarter of the time. After writing a question, look at which option is longest; if it is the answer, lengthen a distractor or trim the answer.
+- **Short answers are fine** (`O(n log n)`, `Dispatchers.IO`): then give every option the same shape (`O(n), since ...`) or the same kind of name instead of padding only the wrong ones.
+- **Same vocabulary.** Every option should reuse words from the prompt; an option that shares nothing with the question is easy to rule out.
+- **Mix absolutes and hedges** across right and wrong options (see above), and in `multi` questions do not let the correct set be exactly the longest options.
+
+`npm run content:lint` prints the baseline per unit: how often the answer is the strictly longest option and among the two longest, the mean correlation between option length and correctness, absolute words in answers versus distractors, answers that are the only hedged or the most detailed option, options that share no vocabulary with the prompt, the longest-to-shortest ratio, and how often a `multi` answer set is the longest options. Chance for four options is 25% (longest) and 50% (two longest), with a correlation of 0.
+
+`content/balance.test.ts` turns the headline numbers into a ratchet that fails with the list of offending question ids:
+
+| Measure | Limit |
+| --- | --- |
+| Answer is the strictly longest option, per unit | at most 35% of its single-choice questions (rounded up to a whole question, e.g. 3 of 8), and never above 45% |
+| Answer is the strictly longest option, whole course | at most 30% |
+| Answer is among the two longest, whole course | at most 70% |
+| Mean correlation of option length and correctness | at most 0.3 |
+| `multi` answer set equals the longest options | at most 25% of `multi` questions |
+
+Ties do not count as "longest". Never raise a limit to make a build pass: shorten the answer or enrich the distractors in the listed questions. Changing option text does not affect cards or progress, but never change *which* option is correct or the number of options when you balance a question (see [Changing existing questions](#changing-existing-questions)).
 
 ## Writing rubrics and follow-ups
 
@@ -258,7 +284,7 @@ Do this for every question before you commit. It is the step that most often fin
 7. **Security content is defensive only.** Teach how to recognise, prevent, detect and respond (validation, authz, least privilege, secrets handling, safe defaults). No working exploits, payloads or step-by-step attack instructions; a short name or a vulnerable snippet for a `spot` question is fine, a weaponised one is not. The same applies to prompt-injection items: teach the defence (untrusted data in delimiters, least privilege tools, output checks), not a recipe.
 8. **Names and tone**: use the standard names (Little's law, CAP, idempotency); no jokes at the expense of the learner; explanations say *why*, not only *what*.
 9. **Rubric check**: read your `modelAnswer` as the grader would; does it cover every key point, and nothing the rubric does not mention?
-10. Run `npm run content:check && npx vitest run content`.
+10. Run `npm run content:check && npm run content:lint && npx vitest run content`.
 
 ## Changing existing questions
 
