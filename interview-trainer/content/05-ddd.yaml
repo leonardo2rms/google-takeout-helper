@@ -24,10 +24,10 @@ lessons:
           - { id: a, text: "Reference other aggregates by their identity, not by object reference" }
           - { id: b, text: "Modify one aggregate per transaction" }
           - { id: c, text: "All changes go through the aggregate root, which enforces the invariants" }
-          - { id: d, text: "Every entity gets its own repository" }
+          - { id: d, text: "Repositories exist per aggregate root, not for each entity inside it" }
           - { id: e, text: "Make aggregates as large as possible: everything inside one stays consistent" }
-        answers: [a, b, c]
-        explanation: "An aggregate is a consistency boundary. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events. Repositories exist per aggregate root, not per entity."
+        answers: [a, b, c, d]
+        explanation: "An aggregate is a consistency boundary that is loaded and saved as a whole, so repositories exist per aggregate root, not per entity. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events."
 
       - type: single
         hint: "Where do the business rules live, and what do the entities themselves do?"
@@ -180,9 +180,9 @@ lessons:
           - { id: b, text: "Conformist" }
           - { id: c, text: "Open Host Service" }
           - { id: d, text: "Singleton Kernel" }
-          - { id: e, text: "Global Domain Model" }
-        answers: [a, b, c]
-        explanation: "Other real patterns: Customer/Supplier, Partnership, Published Language, Anti-Corruption Layer, Separate Ways. A conformist simply adopts the upstream's model; a shared kernel is a small commonly-owned subset."
+          - { id: e, text: "Published Language" }
+        answers: [a, b, c, e]
+        explanation: "Other real patterns: Customer/Supplier, Partnership, Anti-Corruption Layer, Separate Ways. A conformist simply adopts the upstream's model; a shared kernel is a small commonly-owned subset; an open host service is often paired with a published language, a documented exchange format. There is no Singleton Kernel."
 
       - type: single
         prompt: "Which event should carry a stable, versioned schema because other teams' services depend on it?"
@@ -337,13 +337,13 @@ lessons:
       - type: multi
         prompt: Select all practices that keep a modular monolith modular.
         options:
-          - { id: a, text: "Each module exposes a small public API and keeps its internals, including its entities and tables, private" }
+          - { id: a, text: "All modules share one set of entities and tables, to avoid duplicating any data" }
           - { id: b, text: "Modules may read or join each other's tables directly when that is faster than calling the API" }
-          - { id: c, text: "Modules communicate through that public API or through events, not through each other's repositories" }
+          - { id: c, text: "Modules communicate through a small public API or through events, not through each other's repositories" }
           - { id: d, text: "Module boundaries are verified in the build, for example by ArchUnit tests" }
           - { id: e, text: "Each module needs its own deployable and service discovery; otherwise it is not really a module" }
-        answers: [a, c, d]
-        explanation: "A modular monolith gets most of the benefit of service boundaries (clear ownership, independent change, a path to extract a module later) without network calls. The boundaries only last if they are enforced: package-private visibility, separate Gradle modules or tests that fail the build on illegal dependencies (ArchUnit, Spring Modulith's verification). Shared tables are the usual way they erode."
+        answers: [c, d]
+        explanation: "A modular monolith gets most of the benefit of service boundaries (clear ownership, independent change, a path to extract a module later) without network calls. Each module keeps its entities and tables private; one shared set of entities couples every module to every other. The boundaries only last if they are enforced: package-private visibility, separate Gradle modules or tests that fail the build on illegal dependencies (ArchUnit, Spring Modulith's verification). Shared tables are the usual way they erode."
 
       - type: estimate
         prompt: "An aggregate has 2,300 events. Snapshots are stored every 1,000 events (after events 1,000 and 2,000). The repository loads the latest snapshot and replays only the events after it. How many events are replayed?"

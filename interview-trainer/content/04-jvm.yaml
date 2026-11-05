@@ -35,9 +35,9 @@ lessons:
           - { id: b, text: "Young-generation collections are usually frequent and short" }
           - { id: c, text: "Every old-generation collection is always a full stop-the-world pause" }
           - { id: d, text: "Objects surviving several minor GCs are promoted to the old (tenured) generation" }
-          - { id: e, text: "In G1, humongous objects are allocated in the young generation" }
-        answers: [a, b, d]
-        explanation: "Modern collectors (G1, ZGC, Shenandoah) do much of the old-gen work concurrently. G1 allocates humongous objects (>= half a region) directly into dedicated humongous regions in the old generation."
+          - { id: e, text: "In G1, humongous objects are allocated directly in old-generation regions" }
+        answers: [a, b, d, e]
+        explanation: "Old-generation work does not need a full stop-the-world collection: G1 marks concurrently and then reclaims old regions in short mixed pauses, while ZGC and Shenandoah even compact concurrently. G1 allocates humongous objects (>= half a region) directly into dedicated humongous regions, which belong to the old generation."
 
       - type: single
         hint: "Think about collectors that do almost all of their work concurrently with the application."
@@ -182,12 +182,12 @@ lessons:
         prompt: Select all true statements about `synchronized` and `ReentrantLock`.
         options:
           - { id: a, text: "`synchronized` is reentrant" }
-          - { id: b, text: "`ReentrantLock` supports `tryLock` with a timeout" }
+          - { id: b, text: "`ReentrantLock` is fair by default: waiting threads get the lock in arrival order" }
           - { id: c, text: "Releasing a monitor happens-before a later acquisition of the same monitor" }
           - { id: d, text: "`ReentrantLock` is released at the end of the enclosing block, like a monitor" }
           - { id: e, text: "`synchronized` supports multiple `Condition`s per lock" }
-        answers: [a, b, c]
-        explanation: "With `ReentrantLock` you must `unlock()` in a `finally` block. Multiple conditions are a `Lock` feature (`newCondition()`); a monitor has a single wait set."
+        answers: [a, c]
+        explanation: "`synchronized` is reentrant, and releasing a monitor happens-before every later acquisition of it. `ReentrantLock` is non-fair by default; `ReentrantLock(true)` asks for fairness at a cost in throughput. It does offer `tryLock` with a timeout, and you must `unlock()` it in a `finally` block. Multiple conditions are a `Lock` feature (`newCondition()`); a monitor has a single wait set."
 
       - type: single
         hint: "Virtual threads make waiting cheap. Which workloads mostly wait?"

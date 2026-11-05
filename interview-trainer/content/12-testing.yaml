@@ -53,9 +53,9 @@ lessons:
           - { id: b, text: "Mocking a third-party library's types directly throughout your code instead of wrapping them in an adapter you own" }
           - { id: c, text: "Chains of mocks returning other mocks (deep stubs) just to reach the one value the test needs" }
           - { id: d, text: "Replacing a slow external HTTP dependency with a fake in tests to keep them quick and deterministic" }
-          - { id: e, text: "Giving each test its own freshly created stub (no state shared between tests)" }
-        answers: [a, b, c]
-        explanation: "Interaction-heavy tests break on every refactoring that keeps behaviour the same, and mocks of types you do not own encode your guess of how the library behaves. Wrap third-party code behind your own interface; fakes for slow dependencies and per-test fixtures are good practice."
+          - { id: e, text: "Mocking simple value objects instead of creating real instances of them" }
+        answers: [a, b, c, e]
+        explanation: "Interaction-heavy tests break on every refactoring that keeps behaviour the same, and mocks of types you do not own encode your guess of how the library behaves. Value objects are cheap to build and carry real behaviour (equality, validation), so mocking them only adds setup and hides bugs. Wrap third-party code behind your own interface; fakes for slow dependencies are good practice."
 
       - type: fill
         lang: java

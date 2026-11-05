@@ -30,13 +30,13 @@ lessons:
       - type: multi
         prompt: "Ordinary B-tree indexes exist on `email` and on `created_at`. Select all predicates that generally stop the database from using the index for an efficient lookup."
         options:
-          - { id: a, text: "`WHERE lower(email) = 'ana@example.com'`" }
+          - { id: a, text: "`WHERE email = lower('Ana@Example.com')`" }
           - { id: b, text: "`WHERE email LIKE '%@example.com'`" }
           - { id: c, text: "`WHERE created_at >= '2024-05-01' AND created_at < '2024-05-02'`" }
           - { id: d, text: "`WHERE email = 'ana@example.com'`" }
           - { id: e, text: "`WHERE YEAR(created_at) = 2024`" }
-        answers: [a, b, e]
-        explanation: "An index is sorted by the stored column value. Wrapping the column in a function (`lower(email)`, `YEAR(created_at)`) means the planner would have to compute the function for every row, unless you create an expression (functional) index. A leading wildcard has no sorted prefix to seek on. A plain equality or a half-open range on the bare column is exactly what a B-tree is for; prefer the range form over a function on the column."
+        answers: [b, e]
+        explanation: "An index is sorted by the stored column value. Wrapping the column in a function (`YEAR(created_at)`) means the planner would have to compute the function for every row, unless you create an expression (functional) index. A function applied to the constant, as in `email = lower('Ana@Example.com')`, is evaluated once, so the index still serves the lookup. A leading wildcard has no sorted prefix to seek on. A plain equality or a half-open range on the bare column is exactly what a B-tree is for; prefer the range form over a function on the column."
 
       - type: estimate
         prompt: "Assume each B-tree page holds about 200 child pointers (fan-out 200). How many levels of pages must a lookup walk, root to leaf, to find one key among 1,000,000 keys?"
@@ -214,10 +214,10 @@ lessons:
           - { id: a, text: "Page cost stays about the same however deep you go, given an index on the sort columns" }
           - { id: b, text: "It neither skips nor repeats rows when new rows are inserted between page requests" }
           - { id: c, text: "The sort needs a unique tie-breaker, such as `(created_at, id)`, to make the cursor unambiguous" }
-          - { id: d, text: "It lets you jump straight to page 500 by number, just like OFFSET pagination does" }
+          - { id: d, text: "It cannot jump straight to page 500 by number the way OFFSET pagination can" }
           - { id: e, text: "It stays fast even when the sort columns have no supporting index, because it only reads one page" }
-        answers: [a, b, c]
-        explanation: "OFFSET n makes the database read and discard n rows, so deep pages get slower, and an insert before the current page shifts everything by one. Keyset remembers the last row seen and asks for rows after it (`WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT 20`), which an index can answer with a seek. The price: next/previous only, no random page numbers, and you do need the supporting index."
+        answers: [a, b, c, d]
+        explanation: "OFFSET n makes the database read and discard n rows, so deep pages get slower, and an insert before the current page shifts everything by one. Keyset remembers the last row seen and asks for rows after it (`WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT 20`), which an index can answer with a seek. The price: next/previous only, no jumping to a page number, and you do need the supporting index."
 
       - type: code
         prompt: "Implement `keysetPage(rows, cursor, limit)` for a feed sorted ascending by (`ts`, `id`). `rows` are `{id, ts}` objects in any order; `cursor` is `null` (first page) or the `{ts, id}` of the last row already seen. Return `{items, next}`: the next `limit` rows strictly after the cursor, and `next` = `{ts, id}` of the last returned item if more rows remain after the page, otherwise `null`."
