@@ -73,6 +73,7 @@ for (const scheme of ['light', 'dark'] as const) {
           await page.locator(ready).waitFor();
           expect(await overflow(page), `${name}: horizontal overflow`).toBeLessThanOrEqual(0);
           expect(await smallTargets(page), `${name}: targets under 44px`).toEqual([]);
+          if (width === 390 && ['home', 'progress', 'library'].includes(name)) await page.screenshot({ path: `${SHOTS}/${name}-${scheme}.png` });
         }
         await page.goto('/');
         await page.getByRole('button', { name: 'Settings', exact: true }).click();
