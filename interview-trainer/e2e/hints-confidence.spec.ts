@@ -34,8 +34,12 @@ test.describe('hints', () => {
 
     await answerCorrectly(page, Q1);
     await check(page);
+    // the reward shows the moment the answer is checked, not one tap later
+    await expect(page.locator('.xp-chip')).toContainText(`${10 - HINT_COST}`);
+    await expect(page.locator('.xp-gain')).toHaveText(`+${10 - HINT_COST}`);
     await next(page);
     await expect(page.locator('.xp-chip')).toHaveText(`XP ${10 - HINT_COST}`);
+    await expect(page.locator('.xp-gain')).toHaveCount(0);
 
     // the next question has its own hint state: hidden until asked for, and the button only exists where a hint does
     await expect(page.getByTestId('hint-text')).toHaveCount(0);

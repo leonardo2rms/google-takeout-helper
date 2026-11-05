@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { WEEKDAYS, cappedCount, forecastText, inDays, listNames, plural, prefersReducedMotion } from './format';
+import { WEEKDAYS, cappedCount, formatCount, formatDay, forecastText, inDays, listNames, plural, prefersReducedMotion } from './format';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -57,5 +57,16 @@ describe('format helpers', () => {
     expect(cappedCount(12)).toBe('12');
     expect(cappedCount(30)).toBe('30');
     expect(cappedCount(47)).toBe('30+');
+  });
+  it('formatDay shows a day key in the reader\'s locale, never shifted by a timezone', () => {
+    const expected = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(2026, 10, 4));
+    expect(formatDay('2026-11-04')).toBe(expected);
+    expect(formatDay('2026-11-04')).toMatch(/2026/);
+    expect(formatDay('not a day')).toBe('not a day');
+    expect(formatDay('2026-13-45')).not.toBe('');
+  });
+  it('formatCount groups digits the way toLocaleString does', () => {
+    expect(formatCount(1260)).toBe((1260).toLocaleString());
+    expect(formatCount(7)).toBe('7');
   });
 });

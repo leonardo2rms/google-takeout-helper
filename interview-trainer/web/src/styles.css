@@ -208,7 +208,8 @@ button.card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 
 .progress-line { display: grid; gap: 8px; margin: var(--s5) 0 var(--s2); }
 .progress-line .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.progress-line a { font-weight: 600; display: inline-flex; align-items: center; min-height: 44px; }
+.card.up-next { margin: var(--s4) 0 0; border-color: var(--cobalt); background: var(--cobalt-tint); }
+.card.up-next .no { flex: none; width: 38px; text-align: center; font: 600 var(--fs-14) var(--mono); color: var(--cobalt); }
 .segs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 6px; }
 .segs i { background: var(--hairline); border-radius: 1px; }
 .segs i.on { background: var(--ink); }
@@ -246,9 +247,11 @@ button.card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
 .gauge::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--step, 11.11%) - 2px), var(--paper) calc(var(--step, 11.11%) - 2px) var(--step, 11.11%)); }
 .xp-chip { display: inline-flex; gap: 6px; align-items: baseline; font: 600 var(--fs-14) var(--mono); font-variant-numeric: tabular-nums slashed-zero; white-space: nowrap; padding: 0 4px; }
 .xp-chip .label { font-size: var(--fs-12); }
+.xp-chip .xp-gain { color: var(--teal); font-size: var(--fs-12); }
 .lesson-body { flex: 1; min-width: 0; padding: 20px 16px 160px; display: flex; flex-direction: column; gap: 14px; }
 .lesson-body > * { min-width: 0; }
 .kicker { font: 500 var(--fs-12)/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--graphite); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.where { font: 500 var(--fs-12)/1.2 var(--mono); color: var(--graphite); margin-bottom: -6px; overflow-wrap: anywhere; }
 .kicker.follow { color: var(--cobalt); }
 .prompt { font-size: var(--fs-21); line-height: 1.35; letter-spacing: -.012em; overflow-wrap: anywhere; }
 .hint { color: var(--graphite); font-size: var(--fs-14); }
@@ -284,6 +287,15 @@ button.card { width: 100%; font: inherit; text-align: left; cursor: pointer; }
   font: var(--fs-14)/1.6 var(--mono); overflow-x: auto; white-space: pre; tab-size: 4; max-width: 100%;
 }
 .code[data-lang] { padding-top: 28px; }
+/* A soft edge appears on the side where there is more code to scroll to (the "local" layers cover it once you reach the end). */
+.code:not(.wrap) {
+  background:
+    linear-gradient(to right, var(--code) 30%, transparent) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--code) 30%, transparent) right center / 28px 100% no-repeat local,
+    linear-gradient(to right, var(--edge), transparent) left center / 12px 100% no-repeat scroll,
+    linear-gradient(to left, var(--edge), transparent) right center / 12px 100% no-repeat scroll,
+    var(--code);
+}
 .code[data-lang]::before {
   content: attr(data-lang); position: absolute; top: 0; left: 0; padding: 2px 8px; font: 500 var(--fs-11)/1.4 var(--mono); letter-spacing: .08em;
   text-transform: uppercase; color: var(--graphite); background: var(--hairline); border-bottom-right-radius: var(--r1);
@@ -422,10 +434,10 @@ details[open] > summary .i.chev { transform: rotate(180deg); }
 
 /* ---------- spot the bug ---------- */
 .spot { padding: 0; display: grid; overflow-x: auto; }
-.src-line { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; border-left: 3px solid transparent; padding: 4px 12px 4px 0; font: inherit; color: inherit; white-space: pre; border-radius: 0; }
+.src-line { display: flex; gap: 12px; align-items: center; width: 100%; min-height: 44px; text-align: left; background: none; border: 0; border-left: 3px solid transparent; padding: 4px 12px 4px 0; font: inherit; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; border-radius: 0; }
 .src-line:disabled { cursor: default; }
 .src-line .ln { flex: none; width: 2.6em; text-align: right; color: var(--graphite); user-select: none; font-size: var(--fs-12); }
-.src-line .src { min-width: 0; }
+.src-line .src { min-width: 0; flex: 1 1 auto; }
 .src-line:not(:disabled):active { background: var(--hairline); }
 .src-line.selected { background: var(--cobalt-tint); border-left-color: var(--cobalt); }
 .src-line.correct { background: var(--teal-tint); border-left-color: var(--teal); }

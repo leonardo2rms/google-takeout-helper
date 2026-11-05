@@ -47,7 +47,7 @@ test.describe('achievements', () => {
     await expect(case_).toBeVisible();
     await expect(page.getByTestId('badge-count')).toHaveText(`3/${ACHIEVEMENTS.length}`);
     await expect(page.getByTestId('badge-first-lesson')).toHaveAttribute('data-unlocked', 'true');
-    await expect(page.getByTestId('badge-first-lesson')).toContainText('Unlocked 2026-11-04');
+    await expect(page.getByTestId('badge-first-lesson')).toContainText(/Unlocked Nov 4, 2026/);
     await expect(page.getByTestId('badge-streak-30')).toHaveAttribute('data-unlocked', 'false');
     await expect(page.getByTestId('badge-streak-30')).toContainText('Locked');
     await expect(page.getByTestId('badge-streak-30')).toContainText('30 days in a row');

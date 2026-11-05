@@ -9,7 +9,7 @@ import { OnboardingCard } from '../components/OnboardingCard';
 import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
-import { plural } from '../lib/format';
+import { formatCount, plural } from '../lib/format';
 import { dueInToday, dueLine, homeTier, readinessLine } from '../lib/home-copy';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
@@ -184,7 +184,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
             {progress.freezes > 0 && <span className="freeze"><Icon name="snowflake" size="1.1em" /> {progress.freezes}</span>}
           </b>
         </button>
-        <span className="stat xp-stat" data-label="XP" title="Total XP" aria-label={`${progress.xp} XP`}><b>{progress.xp.toLocaleString('en-US')}</b></span>
+        <span className="stat xp-stat" data-label="XP" title="Total XP" aria-label={`${progress.xp} XP`}><b>{formatCount(progress.xp)}</b></span>
         <button
           type="button"
           className="goal-ring"
@@ -245,10 +245,22 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </details>
       )}
 
+      {nextLesson && (() => {
+        const ui = course.units.findIndex((u) => u.lessons.some((l) => l.id === nextLesson.id));
+        const li = course.units[ui]!.lessons.findIndex((l) => l.id === nextLesson.id);
+        return (
+          <a className="card up-next" href={`#/lesson/${nextLesson.id}`} data-testid="up-next">
+            <span className="no" aria-hidden="true">{ui + 1}.{li + 1}</span>
+            <span className="hero-text"><b>{nextLesson.title}</b><small>Up next · {plural(nextLesson.questions.length, 'question')}</small></span>
+            <span className="cta" aria-hidden="true">Start</span>
+          </a>
+        );
+      })()}
+
       <div className="progress-line">
         <div className="row">
           <span className="label">{done} / {total} lessons</span>
-          {nextLesson ? <a href={`#/lesson/${nextLesson.id}`}>Up next: {nextLesson.title}</a> : <span className="label">All lessons done</span>}
+          {!nextLesson && <span className="label">All lessons done</span>}
         </div>
         <div className="segs" aria-hidden="true">
           {Array.from({ length: total }, (_, i) => <i key={i} className={i < done ? 'on' : ''} />)}

@@ -54,7 +54,7 @@ export function OrderQuestion({ q, seed, checked, onAnswer }: Props) {
             disabled={checked || placed.includes(i)}
             onClick={() => commit([...placed, i])}
           >
-            {line}
+            {line.trimStart() /* the indentation is the answer's structure: it only shows once the line is placed */}
           </button>
         ))}
       </div>

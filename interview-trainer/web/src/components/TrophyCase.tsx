@@ -1,3 +1,4 @@
+import { formatDay } from '../lib/format';
 import { Icon, isIconName } from './icons';
 import { ACHIEVEMENT_GROUPS, achievementStatus, type AchievementGroup, type Progress } from '@trainer/shared';
 
@@ -24,7 +25,7 @@ export function TrophyCase({ progress }: { progress: Progress }) {
                 <span className="badge-text">
                   <b>{def.title}</b>
                   <small>{def.description}</small>
-                  <small className="badge-state">{on ? `Unlocked ${on}` : 'Locked'}</small>
+                  <small className="badge-state">{on ? `Unlocked ${formatDay(on)}` : 'Locked'}</small>
                 </span>
               </li>
             ))}

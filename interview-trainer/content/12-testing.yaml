@@ -24,7 +24,7 @@ lessons:
           - { left: "Spy", right: "Records how it was called (a Mockito spy does this by wrapping a real object) so the test can inspect the calls afterwards" }
           - { left: "Mock", right: "Is set up with expectations about the calls it should receive, and the test fails if they are not met" }
           - { left: "Fake", right: "Has a real but simplified implementation, such as an in-memory repository" }
-        explanation: "These are Martin Fowler's definitions (after Meszaros). Names vary between libraries (Mockito calls almost everything a 'mock', and its mocks check calls with `verify` after the fact), but the roles differ. Prefer stubs and fakes that let you assert on outcomes; reach for mocks and spies when the interaction itself is the behavior, such as 'an email was sent'."
+        explanation: "These are Martin Fowler's definitions (after Meszaros). Names vary between libraries (Mockito calls almost everything a 'mock', and its mocks check calls with `verify` after the fact), but the roles differ. Prefer stubs and fakes that let you assert on outcomes; reach for mocks and spies when the interaction itself is the behaviour, such as 'an email was sent'."
 
       - type: single
         prompt: "What does `@WebMvcTest(OrderController::class)` set up?"
@@ -55,7 +55,7 @@ lessons:
           - { id: d, text: "Replacing a slow external HTTP dependency with a fake in tests" }
           - { id: e, text: "Giving each test its own freshly created stub" }
         answers: [a, b, c]
-        explanation: "Interaction-heavy tests break on every refactoring that keeps behavior the same, and mocks of types you do not own encode your guess of how the library behaves. Wrap third-party code behind your own interface; fakes for slow dependencies and per-test fixtures are good practice."
+        explanation: "Interaction-heavy tests break on every refactoring that keeps behaviour the same, and mocks of types you do not own encode your guess of how the library behaves. Wrap third-party code behind your own interface; fakes for slow dependencies and per-test fixtures are good practice."
 
       - type: fill
         lang: java
@@ -129,9 +129,9 @@ lessons:
           - when: covered
             point: 4
             prompt: "Testcontainers makes the suite slower and needs Docker on CI. Is it worth it compared with an in-memory database such as H2?"
-            modelAnswer: "Usually yes when the code depends on real database behavior. H2 imitates only part of a real database's SQL dialect, types, locking and functions, so a test can pass on H2 and fail in production, or the reverse; native queries, JSON columns and migrations (Flyway or Liquibase) are common culprits. Testcontainers runs the same engine as production, so those get tested for real. Keep it fast by starting one container per test run, as a shared singleton reused across test classes. CI must provide Docker."
+            modelAnswer: "Usually yes when the code depends on real database behaviour. H2 imitates only part of a real database's SQL dialect, types, locking and functions, so a test can pass on H2 and fail in production, or the reverse; native queries, JSON columns and migrations (Flyway or Liquibase) are common culprits. Testcontainers runs the same engine as production, so those get tested for real. Keep it fast by starting one container per test run, as a shared singleton reused across test classes. CI must provide Docker."
             keyPoints:
-              - point: "An in-memory database differs from production in dialect, types and behavior, so tests can mislead"
+              - point: "An in-memory database differs from production in dialect, types and behaviour, so tests can mislead"
                 keywords: ["dialect", "differ", "behavio", "production"]
               - point: "Testcontainers runs the real engine, so migrations and native queries are tested for real"
                 keywords: ["same engine", "real engine", "migration", "native"]
@@ -145,7 +145,7 @@ lessons:
         kind: steps
         prompt: Put the test-driven development loop in order.
         lines:
-          - "Write a small failing test for the next behavior"
+          - "Write a small failing test for the next behaviour"
           - "Run it and confirm it fails for the expected reason"
           - "Write the simplest code that makes it pass"
           - "Run the tests and confirm they pass"
@@ -191,7 +191,7 @@ lessons:
           - { left: "Property-based test", right: "States an invariant, runs it on many generated inputs and shrinks a failure to a minimal example" }
           - { left: "Mutation testing", right: "Injects small bugs into the code to see whether any test notices" }
           - { left: "Integration test", right: "Exercises several real components together, such as your code with a real database" }
-        explanation: "Each answers a different question. Characterisation tests are the first step on untested legacy code: pin the behavior with the code as it is, then change it. Mutation testing measures how much your tests actually check, which line coverage cannot."
+        explanation: "Each answers a different question. Characterisation tests are the first step on untested legacy code: pin the behaviour with the code as it is, then change it. Mutation testing measures how much your tests actually check, which line coverage cannot."
 
       - type: code
         prompt: "Write `findFlaky(runs)`. Each run is `{ test, commit, passed }`. A test is flaky if, on the SAME commit, it both passed and failed. Return the names of the flaky tests, without duplicates, sorted alphabetically."
@@ -279,12 +279,12 @@ lessons:
       - type: single
         prompt: "A mutation testing tool changes `if (age >= 18)` to `if (age > 18)` and every test still passes. What does this tell you?"
         options:
-          - { id: a, text: "No test pins down the boundary at 18: the line may be covered, but nothing asserts that behavior" }
+          - { id: a, text: "No test pins down the boundary at 18: the line may be covered, but nothing asserts that behaviour" }
           - { id: b, text: "The code is correct and the tests are excellent" }
           - { id: c, text: "The mutation tool is broken" }
           - { id: d, text: "Line coverage must be below 100%" }
         answer: a
-        explanation: "A surviving mutant is a gap in the assertions. This is why mutation testing complements coverage: a test can execute a line without checking anything about it. (Some mutants are equivalent, meaning no test could tell them apart, but this one changes behavior at age 18.) Add a test for age 17, 18 and 19."
+        explanation: "A surviving mutant is a gap in the assertions. This is why mutation testing complements coverage: a test can execute a line without checking anything about it. (Some mutants are equivalent, meaning no test could tell them apart, but this one changes behaviour at age 18.) Add a test for age 17, 18 and 19."
 
       - type: open
         prompt: "Your team ships a feature where an LLM summarises support tickets. How do you test it?"

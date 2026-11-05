@@ -183,10 +183,12 @@ function Screens() {
   if (route.startsWith('/lesson/')) {
     const found = findLesson(course, route.slice('/lesson/'.length));
     if (!found) return <NotFound noun="Lesson" />;
+    const ui = course.units.indexOf(found.unit);
+    const num = `${ui + 1}.${found.unit.lessons.indexOf(found.lesson) + 1}`;
     return (
       <LessonScreen
         key={found.lesson.id}
-        title={found.lesson.title}
+        title={`${num} ${found.lesson.title}`}
         questions={found.lesson.questions}
         grade={grade}
         explain={explain}

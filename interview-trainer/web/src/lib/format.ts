@@ -25,3 +25,25 @@ export const prefersReducedMotion = (): boolean => {
 };
 
 export const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'] as const;
+
+/** A day key ("2026-11-04") for people, in their own locale and without a timezone shift ("Nov 4, 2026"). Falls back to the key itself. */
+export function formatDay(key: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
+  if (!m) return key;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  if (Number.isNaN(d.getTime())) return key;
+  try {
+    return new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+  } catch {
+    return key;
+  }
+}
+
+/** A number with the reader's own digit grouping ("1,260" or "1.260"). */
+export const formatCount = (n: number): string => {
+  try {
+    return n.toLocaleString();
+  } catch {
+    return String(n);
+  }
+};

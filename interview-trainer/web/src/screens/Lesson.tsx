@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize,
+  PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize, xpFor,
   type Confidence, type OpenQ, type Question, type SessionSummary,
 } from '@trainer/shared';
 import { AskWhy } from '../components/AskWhy';
@@ -96,6 +96,9 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
   // With a follow-up, the question counts as passed on the average of both answers.
   const overallScore = followUp && outcome ? (outcomeScore(followUp.main) + outcomeScore(outcome)) / 2 : null;
   const passed = outcome ? (overallScore !== null ? overallScore >= PASS_SCORE : isPass(outcome)) : false;
+
+  // The reward is shown the moment the answer is checked, not one tap later: the bar's XP already includes it.
+  const gain = phase === 'feedback' && q && passed && !pending ? xpFor(attempt + 1, hinted.has(q.id)) : 0;
 
   const check = useCallback(async () => {
     if (!view || !answer || phase !== 'answer') return;
@@ -205,10 +208,14 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
         >
           <div className="fill" style={{ width: `${Math.max(sessionProgress(session) * 100, 2)}%` }} />
         </div>
-        <span className="xp-chip" aria-label={`${session.xp} XP earned`}><span className="label" aria-hidden="true">XP</span> {session.xp}</span>
+        <span className="xp-chip" aria-label={`${session.xp + gain} XP earned`}>
+          <span className="label" aria-hidden="true">XP</span> {session.xp + gain}
+          {gain > 0 && <span className="xp-gain" aria-hidden="true">+{gain}</span>}
+        </span>
       </header>
 
       <div className="lesson-body">
+        <p className="where" data-testid="lesson-where">{title}</p>
         <p className={`kicker ${followUp ? 'follow' : ''}`}>
           {attempt > 0 && <Icon name="rotate-ccw" size="1.1em" />}
           {followUp && <Icon name="message-square-quote" size="1.1em" />}
