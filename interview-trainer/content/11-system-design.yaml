@@ -23,10 +23,10 @@ lessons:
       - type: single
         prompt: "A token bucket has capacity 10 and refills 5 tokens per second. A client has been idle for a minute. Which statement is true?"
         options:
-          - { id: a, text: "It can send 10 requests at once, and afterwards roughly 5 per second: a burst plus a sustained rate" }
-          - { id: b, text: "It can never send more than 5 requests in any single second" }
-          - { id: c, text: "It must wait one full second between any two requests" }
-          - { id: d, text: "It can send unlimited requests, because the bucket is full" }
+          - { id: a, text: "It can send 10 requests at once, then roughly 5 per second: a burst plus a sustained rate" }
+          - { id: b, text: "It can send no more than 5 requests in a single second, since 5 is the refill rate" }
+          - { id: c, text: "It must wait one full second between any two requests, because tokens arrive once per second" }
+          - { id: d, text: "It can send unlimited requests for a minute, because a full bucket does not run empty" }
         answer: a
         explanation: "The bucket size bounds the burst and the refill rate bounds the long-run average. After a quiet period the bucket is full, so 10 requests pass immediately (even 15 within that first second, counting refill). Once it is empty, only about 5 per second get through."
 
@@ -92,10 +92,10 @@ lessons:
       - type: single
         prompt: "Requests to a service vary wildly in cost (some take 10 ms, some 10 s). With plain round robin, a few instances end up overloaded while others idle. Which balancing strategy adapts to this?"
         options:
-          - { id: a, text: "Least outstanding requests (least connections): send the next request to the instance with the fewest in flight" }
-          - { id: b, text: "Strict round robin, but with more instances" }
-          - { id: c, text: "Hash the client IP so each client always lands on the same instance" }
-          - { id: d, text: "Always send to the first healthy instance in the list" }
+          - { id: a, text: "Least outstanding requests: send the next request to the instance with the fewest in flight" }
+          - { id: b, text: "Strict round robin, but with more instances so each one gets a smaller share of the traffic and the load evens out" }
+          - { id: c, text: "Hash the client IP so each client lands on the same instance, which spreads load evenly" }
+          - { id: d, text: "Send to the first healthy instance in the list, and fail over when it is down" }
         answer: a
         explanation: "Round robin assumes every request costs the same. Counting in-flight requests naturally steers new work away from instances stuck on slow ones. IP hashing gives stickiness, not balance, and can pile many clients behind one NAT onto one instance."
 
@@ -112,10 +112,10 @@ lessons:
 
             {"email":"alice@example.com","plan":"pro"}
         options:
-          - { id: a, text: "`public` lets shared caches such as the CDN store it and serve Alice's data to other users; personal responses should be `private` or `no-store`" }
-          - { id: b, text: "`max-age` is in milliseconds, so it expires after 3.6 seconds" }
-          - { id: c, text: "CDNs cannot cache JSON responses" }
-          - { id: d, text: "A response without a `Content-Length` header can never be cached" }
+          - { id: a, text: "`public` lets shared caches like the CDN serve Alice's data to other users; use `private` or `no-store`" }
+          - { id: b, text: "`max-age` is given in milliseconds, so the response expires after 3.6 seconds and is useless" }
+          - { id: c, text: "CDNs do not cache JSON responses, just static files such as images, scripts and stylesheets" }
+          - { id: d, text: "A response without a `Content-Length` header can never be cached, so the CDN will refuse it" }
         answer: a
         explanation: "`max-age` is in seconds. `public` explicitly allows shared caches to keep and reuse the response, which for per-user data leaks it to others. Cache static and public content at the edge; mark per-user responses `private` or `no-store`, or make the cache key include the user (and test it)."
 
@@ -161,10 +161,10 @@ lessons:
       - type: single
         prompt: "What does PACELC add to the CAP theorem?"
         options:
-          - { id: a, text: "Even when there is no partition (Else), a system still trades off latency against consistency, for example by waiting for replicas to acknowledge a write" }
-          - { id: b, text: "Partitions can be avoided entirely if there is enough redundancy" }
-          - { id: c, text: "Consistency and availability can both be fully kept during a partition" }
-          - { id: d, text: "A fourth guarantee, durability, that must be traded against partition tolerance" }
+          - { id: a, text: "Even with no partition (Else), you still trade latency against consistency, e.g. waiting for acks" }
+          - { id: b, text: "Partitions can be avoided if there is enough redundancy, so CAP's trade-off disappears" }
+          - { id: c, text: "Consistency and availability can both be fully kept during a partition if replicas are synchronous" }
+          - { id: d, text: "A fourth guarantee, durability, which has to be traded off against partition tolerance and latency" }
         answer: a
         explanation: "PACELC reads: if there is a Partition choose Availability or Consistency, Else choose Latency or Consistency. It captures the everyday cost of replication: a synchronous write is safer and slower, a nearby asynchronous replica is faster and may be stale."
 
@@ -210,10 +210,10 @@ lessons:
       - type: single
         prompt: "A sharded cache stores `product:42` (a viral item) on one node, which now takes 40% of all traffic and is saturating. Adding more shards barely helps. Which fix addresses the cause?"
         options:
-          - { id: a, text: "Spread that key's reads: keep a short-lived copy in every app instance (near cache), or store several copies under suffixed keys and read a random one" }
-          - { id: b, text: "Add more shards so the single key is divided across them" }
-          - { id: c, text: "Switch the shard function to modulo hashing" }
-          - { id: d, text: "Lengthen the TTL of every key in the cluster" }
+          - { id: a, text: "Spread that key's reads: a short-lived near cache in every app instance, or several copies under suffixed keys" }
+          - { id: b, text: "Add more shards, since consistent hashing then divides the hot key's data across the new nodes" }
+          - { id: c, text: "Switch the shard function to modulo hashing, which distributes the keys more evenly across nodes" }
+          - { id: d, text: "Lengthen the TTL of each key in the cluster, so that fewer reads reach the saturated node and the cache stays warm" }
         answer: a
         explanation: "One key lives on one shard, so more shards cannot split it: this is a hot key, not a capacity problem. Replicate the hot item (local caches, key suffixes `product:42#0..#7`, or a dedicated replica set) and detect hot keys with per-key metrics. Writes then have to update or expire every copy."
 
@@ -226,21 +226,21 @@ lessons:
             t=0.4s  GET  /profile                   -> replica-2   200 OK {"name":"Alicia"}
                                                        (replica-2 is about 2 s behind the primary)
         options:
-          - { id: a, text: "For a short window after a user's write, serve that user's reads from the primary (or from a replica known to have caught up)" }
-          - { id: b, text: "Switch the whole system to eventual consistency" }
-          - { id: c, text: "Let the browser cache the profile response for five minutes" }
-          - { id: d, text: "Add more replicas so one of them is sure to be current" }
+          - { id: a, text: "For a short time after a user's write, serve that user's reads from the primary (or a caught-up replica)" }
+          - { id: b, text: "Switch the whole system to eventual consistency, so that stale reads become acceptable to everyone" }
+          - { id: c, text: "Let the browser cache the profile response for five minutes, so the user never has to wait for a replica to catch up" }
+          - { id: d, text: "Add more replicas, so that the load balancer can find one of them that is already current" }
         answer: a
         explanation: "The cause is asynchronous replication lag. Read-your-writes only needs to hold for the writer: pin their reads to the primary, or to a replica that has applied their write's log position, for a few seconds. Everybody else can keep reading replicas. More replicas do not shorten lag, and the system is already eventually consistent."
 
       - type: multi
         prompt: Select ALL true statements about caching strategies and their failure modes.
         options:
-          - { id: a, text: "In cache-aside, the application reads the cache first and on a miss loads from the database and fills the cache" }
-          - { id: b, text: "A cache stampede happens when many requests miss on the same expired hot key at once and all go to the database" }
-          - { id: c, text: "Write-through updates the cache and the database as part of the same write, so recently written keys are rarely stale on read" }
-          - { id: d, text: "Write-behind (write-back) is the safest strategy against data loss because the cache absorbs every write" }
-          - { id: e, text: "Setting a TTL guarantees clients never see stale data" }
+          - { id: a, text: "In cache-aside, the app reads the cache first and on a miss loads from the database and fills the cache" }
+          - { id: b, text: "A cache stampede happens when many requests miss on the same expired hot key and all hit the database" }
+          - { id: c, text: "Write-through updates the cache and the database in the same write, so recently written keys are rarely stale" }
+          - { id: d, text: "Write-behind (write-back) is the safest strategy against data loss, because the cache absorbs and buffers every write" }
+          - { id: e, text: "Setting a TTL guarantees that clients never see stale data, because every entry expires on time and is reloaded" }
         answers: [a, b, c]
         explanation: "Write-behind acknowledges before the database has the data, so a cache crash loses recent writes: it buys speed, not safety. A TTL only bounds how long data can be stale. Stampedes are tamed with request coalescing (one loader per key), jittered TTLs or early refresh."
 

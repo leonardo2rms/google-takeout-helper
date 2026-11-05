@@ -19,12 +19,12 @@ lessons:
               Rows Removed by Filter: 999991
             Execution Time: 118.4 ms
         options:
-          - { id: a, text: "The database reads all one million rows to return nine of them; add an index on customer_id" }
+          - { id: a, text: "The database reads all one million rows to return nine; add an index on customer_id" }
           - { id: b, text: "The statistics are badly wrong (12 estimated vs 9 actual), so run ANALYZE and nothing else" }
-          - { id: c, text: "The query needs more work_mem so the filter fits in memory" }
-          - { id: d, text: "The table is too small to need an index; add LIMIT 9 instead" }
+          - { id: c, text: "The query needs more work_mem, because the filter spills to disk while it scans the table" }
+          - { id: d, text: "The table is too small to need an index, so add LIMIT 9 and let the scan stop early" }
         answer: a
-        explanation: "`Rows Removed by Filter: 999991` next to `rows=9` is the signature of a missing index: almost everything that is read is thrown away. The estimate (12) is close to the truth (9), so the statistics are fine. With a B-tree index on `customer_id` the database can jump straight to the matching rows. Always compare estimated and actual rows before blaming the planner."
+        explanation: "`Rows Removed by Filter: 999991` next to `rows=9` is the signature of a missing index: almost everything that is read is thrown away. The estimate (12) is close to the truth (9), so the statistics are fine; `work_mem` matters for sorts and hashes, not for a filter; and a million-row table is not small. With a B-tree index on `customer_id` the database can jump straight to the matching rows. Always compare estimated and actual rows before blaming the planner."
         difficulty: easy
 
       - type: multi
@@ -103,10 +103,10 @@ lessons:
       - type: single
         prompt: "Two on-call doctors each run: check that at least 2 doctors are on call, then set their own row to off-call. Both transactions run at the same time, both commit, and zero doctors are on call. Each transaction updated only its own row. What happened and what is a dependable remedy?"
         options:
-          - { id: a, text: "Write skew; run these transactions at SERIALIZABLE (and retry on serialization failures), or lock the rows that the check reads" }
-          - { id: b, text: "A dirty read; switch to READ COMMITTED" }
-          - { id: c, text: "A lost update; add a @Version column to each doctor's row" }
-          - { id: d, text: "A non-repeatable read; switch to REPEATABLE READ and nothing else is needed" }
+          - { id: a, text: "Write skew; run these transactions at SERIALIZABLE (and retry on failures), or lock the rows the check reads" }
+          - { id: b, text: "A dirty read; the second transaction saw uncommitted data, so switch to READ COMMITTED" }
+          - { id: c, text: "A lost update; add a @Version column to each doctor's row so the second commit fails" }
+          - { id: d, text: "A non-repeatable read; switching to REPEATABLE READ is enough and nothing else is needed" }
         answer: a
         explanation: "Each transaction made a decision based on a read that the other transaction's write invalidated, yet they wrote different rows, so row-level conflict detection (including @Version on each row) never fires. This is write skew, possible under snapshot isolation (including Postgres REPEATABLE READ). Fixes: SERIALIZABLE with retries, explicitly locking the rows the check depends on (`SELECT ... FOR UPDATE`), or modelling the rule so that both transactions write the same row or a constraint."
         difficulty: hard
@@ -120,7 +120,7 @@ lessons:
           - { id: d, text: "Keep the plain SELECT then UPDATE, just inside a transaction at the default READ COMMITTED level" }
           - { id: e, text: "Mark the Kotlin service method synchronized" }
         answers: [a, b, c]
-        explanation: "A lets the database do the read-modify-write atomically. B makes the second request wait for the first to commit before it reads. C detects the conflict and forces a retry. D still lets both read the same old balance. E only serialises calls inside one JVM, which fails the moment you run two instances."
+        explanation: "The single atomic UPDATE lets the database do the read-modify-write itself. SELECT ... FOR UPDATE makes the second request wait for the first to commit before it reads. The version column detects the conflict and forces a retry. A plain SELECT then UPDATE at READ COMMITTED still lets both read the same old balance. `synchronized` only serialises calls inside one JVM, which fails the moment you run two instances."
 
       - type: fill
         lang: sql
@@ -201,21 +201,21 @@ lessons:
                 customer.name = name
             }
         options:
-          - { id: a, text: "Yes; Hibernate notices the change to the managed entity when it flushes and issues an UPDATE, at the latest at commit" }
-          - { id: b, text: "No; nothing is written unless save() is called" }
-          - { id: c, text: "No; an exception is thrown because the entity is detached" }
-          - { id: d, text: "Yes; the UPDATE is sent immediately on the line that assigns the name" }
+          - { id: a, text: "Yes; Hibernate notices the change when it flushes and issues an UPDATE, at the latest at commit" }
+          - { id: b, text: "No; Hibernate writes entities that were explicitly passed to save() or persist() in this transaction" }
+          - { id: c, text: "No; an exception is thrown because the entity is detached outside a session" }
+          - { id: d, text: "Yes; the UPDATE is sent to the database immediately, on the line that assigns the name" }
         answer: a
         explanation: "Entities loaded inside a transaction are managed: Hibernate keeps a snapshot and compares it at flush time (dirty checking). Flush happens before a query that could be affected and at commit, not on assignment. `save()` on a managed entity adds nothing. Watch out for `@Transactional(readOnly = true)`: Spring then skips flushing, and the same code would silently lose the change."
 
       - type: multi
         prompt: "Select ALL true statements about keyset (seek) pagination compared with OFFSET pagination."
         options:
-          - { id: a, text: "The cost of a page stays about the same however deep you go, given an index on the sort columns" }
+          - { id: a, text: "Page cost stays about the same however deep you go, given an index on the sort columns" }
           - { id: b, text: "It does not skip or repeat rows when new rows are inserted between page requests" }
-          - { id: c, text: "The sort needs a unique tie-breaker, such as (created_at, id), for the cursor to be unambiguous" }
-          - { id: d, text: "It lets you jump straight to page 500 by number" }
-          - { id: e, text: "It stays fast even when the sort columns have no supporting index" }
+          - { id: c, text: "The sort needs a unique tie-breaker, such as (created_at, id), to make the cursor unambiguous" }
+          - { id: d, text: "It lets you jump straight to page 500 by number, just like OFFSET pagination does" }
+          - { id: e, text: "It stays fast even when the sort columns have no supporting index, because it only reads one page" }
         answers: [a, b, c]
         explanation: "OFFSET n makes the database read and discard n rows, so deep pages get slower, and an insert before the current page shifts everything by one. Keyset remembers the last row seen and asks for rows after it (`WHERE (created_at, id) > (?, ?) ORDER BY created_at, id LIMIT 20`), which an index can answer with a seek. The price: next/previous only, no random page numbers, and you do need the supporting index."
 
@@ -273,10 +273,10 @@ lessons:
       - type: single
         prompt: "A teammate fixes a typo inside `V12__add_invoice_status.sql`, which already ran in production, and deploys. With Flyway's default validation on, what happens at startup?"
         options:
-          - { id: a, text: "Validation fails with a checksum mismatch; the fix belongs in a new versioned migration (for example V13)" }
-          - { id: b, text: "Flyway re-runs V12 with the corrected text and replaces the old effect" }
-          - { id: c, text: "Flyway silently ignores the edit and keeps going" }
-          - { id: d, text: "Flyway drops the schema and rebuilds it from all migrations" }
+          - { id: a, text: "Validation fails with a checksum mismatch; the fix belongs in a new versioned migration (e.g. V13)" }
+          - { id: b, text: "Flyway re-runs V12 with the corrected text and replaces the effect of the old version in the schema history" }
+          - { id: c, text: "Flyway silently ignores the edit, because applied migrations are never looked at again" }
+          - { id: d, text: "Flyway drops the schema and rebuilds it from the migrations, including the corrected V12" }
         answer: a
         explanation: "Flyway stores a checksum for every applied versioned migration and compares it on startup; Liquibase does the same with changeset checksums. Applied migrations are history and must be immutable. Make corrections in a new migration. `repair` exists for deliberate, understood cases, not to paper over edits."
 
@@ -294,10 +294,10 @@ lessons:
       - type: single
         prompt: "Cache-aside: a reader misses and loads the OLD row from the database. Before it stores that value in the cache, a writer updates the row and deletes the cache key. Then the reader stores the old value. What is the state now, and what bounds the damage?"
         options:
-          - { id: a, text: "The cache holds a stale value until it expires or is evicted; a TTL (or versioned entries) bounds it, because 'update the database, then delete the key' narrows the window but does not close it" }
-          - { id: b, text: "Both are consistent, because the delete always wins" }
-          - { id: c, text: "The reader's store fails because the key was deleted" }
-          - { id: d, text: "The cache automatically detects the conflict and rolls back the database update" }
+          - { id: a, text: "The cache holds a stale value until it expires or is evicted; a TTL (or versioned entries) bounds it" }
+          - { id: b, text: "Both are consistent, because the delete happened last and wins over the reader's store, which is then rejected" }
+          - { id: c, text: "The reader's store fails because the key was deleted, so the next read reloads the row" }
+          - { id: d, text: "The cache automatically detects the conflicting store and rolls back the database update to stay consistent" }
         answer: a
         explanation: "Deleting after the database commit is the usual pattern, but a slow reader can still re-populate the key with data read earlier. Typical mitigations: a TTL as a safety net, writing versions and refusing older ones, a short delayed second delete, or accepting brief staleness for data where it is harmless. Caches never make things strictly consistent; they trade freshness for load."
         difficulty: hard
@@ -305,12 +305,12 @@ lessons:
       - type: single
         prompt: "40 service instances each run a connection pool of up to 25 connections against one PostgreSQL primary whose `max_connections` is 500. What is the problem, and the sensible direction?"
         options:
-          - { id: a, text: "At peak the fleet can ask for 1,000 connections, more than the server allows, and each connection costs the database memory and a backend process; size pools from the database's total budget or put a pooler such as PgBouncer in front" }
-          - { id: b, text: "There is no problem; pools open connections lazily so the server limit never matters" }
-          - { id: c, text: "Raise max_connections to 10,000 so requests never wait" }
-          - { id: d, text: "Raise every pool to 100 so that threads never wait for a connection" }
+          - { id: a, text: "At peak the fleet can ask for 1,000 connections (40 x 25), over the server's 500; budget pool sizes fleet-wide or use PgBouncer" }
+          - { id: b, text: "There is no problem; pools open connections lazily and instances rarely peak together, so the server limit does not matter in practice" }
+          - { id: c, text: "Raise max_connections to 10,000 so that every instance can always get its full pool" }
+          - { id: d, text: "Raise each pool to 100 so that threads wait less for a connection, and let the database queue the rest" }
         answer: a
-        explanation: "Pool size is a fleet-wide budget: instances x pool size (plus admin tools and migrations) must fit under the server's limit, and far fewer active connections than that is usually faster, since a database can only run about as many queries at once as it has cores and disks. Autoscaling multiplies the problem, so deploy-time pool sizes need to be thought through together with the instance maximum."
+        explanation: "Pool size is a fleet-wide budget: instances x pool size (plus admin tools and migrations) must fit under the server's limit, and each connection costs the database memory and a backend process, so simply raising limits makes it worse. Far fewer active connections than that is usually faster, since a database can only run about as many queries at once as it has cores and disks. Pools open connections as demand rises, so peaks (and deployments, where old and new instances overlap) do hit the limit. Autoscaling multiplies the problem, so deploy-time pool sizes need to be thought through together with the instance maximum."
 
       - type: open
         prompt: "Your team proposes moving order data from PostgreSQL to a document database 'because it scales better'. How do you evaluate that proposal?"

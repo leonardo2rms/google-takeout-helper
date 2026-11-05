@@ -18,12 +18,12 @@ lessons:
         hint: "CPU is idle, so what are the request threads waiting for?"
         prompt: "Latency climbs sharply under load, yet CPU on both the app and the database is nearly idle. The app has 200 request threads and a HikariCP pool of 10. What is the most likely cause?"
         options:
-          - { id: a, text: "Threads are queuing for a database connection (pool saturation)" }
-          - { id: b, text: "The JIT is recompiling constantly" }
-          - { id: c, text: "The GC is using all the CPU" }
-          - { id: d, text: "The database needs more CPU cores" }
+          - { id: a, text: "Request threads queue for a database connection (the pool is saturated)" }
+          - { id: b, text: "The JIT is recompiling hot methods in a loop, which stalls request threads" }
+          - { id: c, text: "Garbage collection is thrashing, so threads wait for the collector to finish" }
+          - { id: d, text: "The database is under-provisioned and needs more CPU cores to answer queries quicker" }
         answer: a
-        explanation: "Idle CPUs plus rising latency means waiting. Check pool metrics (active/pending/connection-acquire time) before touching anything else. Raising the pool blindly can overload the DB, so find out why connections are held so long first."
+        explanation: "Idle CPUs plus rising latency means waiting. JIT recompilation, GC thrashing and a starved database all burn CPU, which is exactly what the stem rules out. Check pool metrics (active/pending/connection-acquire time) before touching anything else. Raising the pool blindly can overload the DB, so find out why connections are held so long first."
 
       - type: multi
         prompt: Select ALL sensible ways to reduce read load on a hot database.
@@ -34,37 +34,37 @@ lessons:
           - { id: d, text: "Raise the connection pool size to 1,000" }
           - { id: e, text: "Retry timed-out queries immediately and indefinitely" }
         answers: [a, b, c]
-        explanation: "Option D makes the database spend more time context-switching, and E is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
+        explanation: "Raising the pool to 1,000 makes the database spend more time context-switching, and retrying timed-out queries immediately and indefinitely is a retry storm that turns a slowdown into an outage. Replicas need you to tolerate replication lag on those reads."
 
       - type: single
         hint: "Many callers reload the same value at once. How could one caller do the work for all of them?"
         prompt: A very popular cache key expires and 5,000 concurrent requests all miss and hit the database. What is this called, and what's a good mitigation?
         options:
-          - { id: a, text: "Cache stampede; coalesce loads (single-flight / lock per key), add TTL jitter or refresh ahead of expiry" }
-          - { id: b, text: "Cache poisoning; encrypt the keys" }
-          - { id: c, text: "Cache eviction; use a bigger cache" }
-          - { id: d, text: "Write-through; switch to write-behind" }
+          - { id: a, text: "Cache stampede; coalesce loads per key (single-flight) and add TTL jitter" }
+          - { id: b, text: "Cache poisoning; sign the cached values and validate each entry when it is read" }
+          - { id: c, text: "Cache eviction; use a bigger cache and a smarter eviction policy such as LFU" }
+          - { id: d, text: "Write-through; switch to write-behind so that the database sees fewer synchronous writes" }
         answer: a
-        explanation: "Also called thundering herd. Let one request recompute while others wait or serve slightly stale data, and spread expiry times so keys don't all expire together."
+        explanation: "Also called thundering herd. Let one request recompute while others wait or serve slightly stale data, and spread expiry times so keys don't all expire together. Poisoning, eviction policy and write strategy do not address many concurrent misses on one expired key."
 
       - type: single
         hint: "Think about what an average does to a rare, very slow response."
         prompt: Why do SREs track p99 latency instead of just the average?
         options:
-          - { id: a, text: "Averages hide the slow tail; with fan-out (one request calling many services) most users experience the tail" }
-          - { id: b, text: "p99 is cheaper to compute" }
-          - { id: c, text: "The average is always equal to the median" }
-          - { id: d, text: "p99 excludes network time" }
+          - { id: a, text: "Averages hide the slow tail; with fan-out (one request calling many services) most users hit the tail" }
+          - { id: b, text: "p99 is cheaper to compute than an average because it only needs the largest samples" }
+          - { id: c, text: "The average is hard to compute across several instances, while percentiles can be merged" }
+          - { id: d, text: "p99 excludes network time, so it shows what the service itself is doing" }
         answer: a
-        explanation: "If a page makes 20 backend calls, each with 1% slow outliers, ~18% of page loads hit at least one slow call (1 - 0.99^20). Tail latency amplifies with fan-out."
+        explanation: "If a page makes 20 backend calls, each with 1% slow outliers, ~18% of page loads hit at least one slow call (1 - 0.99^20). Tail latency amplifies with fan-out. It is the other way round for aggregation: averages combine easily, percentiles of separate instances cannot simply be merged. A percentile needs the whole distribution and includes network time like any other latency."
 
       - type: single
         prompt: "You want to add more instances of a service behind a load balancer, but users randomly get logged out. What is the likely blocker?"
         options:
-          - { id: a, text: "Session state kept in a single instance's memory; make it stateless or move it to a shared store" }
-          - { id: b, text: "Load balancers cannot route HTTP" }
-          - { id: c, text: "Spring Boot can't run more than one instance" }
-          - { id: d, text: "The JVM shares sessions across processes automatically" }
+          - { id: a, text: "Session state lives in one instance's memory; make it stateless or move it to a shared store" }
+          - { id: b, text: "Load balancers forward raw TCP and do not route HTTP requests to several instances at once" }
+          - { id: c, text: "Spring Boot applications are unable to run as more than one instance against the same database" }
+          - { id: d, text: "Cookies are bound to a single server, so each instance would need its own cookie domain" }
         answer: a
         explanation: "Stateless services scale horizontally. Put session/state in Redis, a database, or a signed token (e.g. JWT) so that any instance can serve any request."
 
@@ -84,10 +84,10 @@ lessons:
             HikariPool-1 - Connection is not available, request timed out after 30000ms
             (total=10, active=10, idle=0, waiting=187)
         options:
-          - { id: a, text: "The pool is exhausted: all 10 connections are busy and 187 requests are queued. Find out why connections are held so long before enlarging the pool" }
-          - { id: b, text: "The database is down and needs a restart" }
-          - { id: c, text: "A network partition between app and database" }
-          - { id: d, text: "The JDBC driver version is wrong" }
+          - { id: a, text: "The pool is exhausted: all 10 connections are busy, 187 requests wait. Find out why they are held so long" }
+          - { id: b, text: "The database is down: it refuses new connections, so restart it first and then raise the connection timeout" }
+          - { id: c, text: "A network partition between app and database, so reconnect and add a retry" }
+          - { id: d, text: "The JDBC driver version is wrong, so upgrade the driver and restart the service" }
         answer: a
         explanation: "`active=10, idle=0, waiting=187` is saturation, not an outage: the database answered, but every connection is in use. Look for slow queries, and for transactions that stay open across remote calls. A bigger pool only helps if the database has spare capacity."
 
@@ -140,10 +140,10 @@ lessons:
         hint: "After the wait it does not simply close again: it tests the water first."
         prompt: A circuit breaker has been OPEN and its wait time elapses. What does it do next?
         options:
-          - { id: a, text: "Moves to HALF-OPEN and lets a limited number of trial calls through to test whether the dependency recovered" }
-          - { id: b, text: "Closes immediately and lets all traffic through" }
-          - { id: c, text: "Stays open forever until restarted" }
-          - { id: d, text: "Retries every queued request at once" }
+          - { id: a, text: "Moves to HALF-OPEN and lets a few trial calls through to test the dependency" }
+          - { id: b, text: "Closes immediately and lets the full traffic through, because the wait time has elapsed and counters reset" }
+          - { id: c, text: "Stays open until the next deployment, because a restart is needed to reset the breaker" }
+          - { id: d, text: "Replays every request that was rejected while it was open, all at once" }
         answer: a
         explanation: "CLOSED (normal) → OPEN (fail fast) → HALF-OPEN (probe) → CLOSED if the probes succeed, else back to OPEN. Failing fast gives the struggling dependency room to recover."
 
@@ -151,12 +151,12 @@ lessons:
         hint: "The server needs a way to recognise the same request when it arrives twice."
         prompt: "A client retries `POST /payments` after a timeout and the customer is charged twice. What is the standard fix?"
         options:
-          - { id: a, text: "Require an idempotency key so the server returns the original result for a repeated request" }
-          - { id: b, text: "Never retry anything" }
-          - { id: c, text: "Use GET instead of POST" }
-          - { id: d, text: "Increase the timeout to 10 minutes" }
+          - { id: a, text: "Add an idempotency key so the server replays the original result for a repeated request" }
+          - { id: b, text: "Disable retries on the client, since the payment API should not be called twice" }
+          - { id: c, text: "Use GET instead of POST so that caches and proxies deduplicate any repeated request automatically" }
+          - { id: d, text: "Increase the timeout to 10 minutes so that the client does not have to retry" }
         answer: a
-        explanation: "The client can't know whether the first attempt succeeded. The server stores the key with the outcome (in the same transaction as the charge) and replays it on duplicates."
+        explanation: "The client can't know whether the first attempt succeeded, so never retrying loses payments and a longer timeout only delays the same problem. The server stores the idempotency key with the outcome (in the same transaction as the charge) and replays it on duplicates. Changing the verb does not help: a charge is not safe to repeat blindly."
 
       - type: multi
         prompt: Select ALL practices for safe retries.
@@ -173,10 +173,10 @@ lessons:
         hint: "What puts an upper bound on how much a queue can hold?"
         prompt: "A consumer is slower than the producer feeding it through an unbounded in-memory queue. What happens, and what's the right design?"
         options:
-          - { id: a, text: "Memory grows until OOM; use a bounded queue/backpressure so the producer slows down or work is rejected" }
-          - { id: b, text: "Nothing; queues self-balance" }
-          - { id: c, text: "The consumer speeds up automatically" }
-          - { id: d, text: "The queue deletes the oldest items safely" }
+          - { id: a, text: "Memory grows until OOM; use a bounded queue so the producer slows down or work is rejected" }
+          - { id: b, text: "Nothing happens; a queue self-balances once the consumer catches up on its own" }
+          - { id: c, text: "The consumer speeds up automatically as the backlog grows, because the runtime adds threads" }
+          - { id: d, text: "The queue silently drops the oldest items, which is safe because they are stale" }
         answer: a
         explanation: "Backpressure propagates 'slow down' upstream: bounded queues, `Flow` operators with buffers, reactive streams demand, or consumer lag-based autoscaling for Kafka."
 
@@ -184,21 +184,21 @@ lessons:
         hint: "Think about limiting how much of a shared resource any one dependency may use."
         prompt: "One slow dependency (e.g. a reports API) uses up all your servlet threads, so unrelated endpoints also time out. Which pattern prevents this?"
         options:
-          - { id: a, text: "Bulkhead: isolate resources (thread/semaphore pools) per dependency" }
-          - { id: b, text: "Sidecar" }
-          - { id: c, text: "Strangler fig" }
-          - { id: d, text: "Blue/green deployment" }
+          - { id: a, text: "Bulkhead: isolate thread or semaphore pools per dependency, so one cannot starve the rest" }
+          - { id: b, text: "Sidecar: run the reports client in a separate proxy container next to the service" }
+          - { id: c, text: "Strangler fig: route the reports calls through a new facade and retire the old one" }
+          - { id: d, text: "Blue/green deployment: keep a second environment ready and switch traffic over when one fails" }
         answer: a
-        explanation: "Named after ship compartments: a leak in one doesn't sink the vessel. Pair with timeouts, because without them even a bulkhead's pool eventually fills with stuck calls."
+        explanation: "Named after ship compartments: a leak in one doesn't sink the vessel. Pair with timeouts, because without them even a bulkhead's pool eventually fills with stuck calls. A sidecar moves cross-cutting code out of process, a strangler fig migrates a legacy system and blue/green is a release technique; none isolates resources per dependency."
 
       - type: single
         hint: "No distributed lock and no two-phase commit: what can you do about a failed step after earlier ones succeeded?"
         prompt: "An order spans three services, each with its own database. Which approach keeps data consistent without distributed locks?"
         options:
-          - { id: a, text: "A saga: local transactions chained by events/commands, with compensating actions on failure" }
-          - { id: b, text: "Two-phase commit across all databases as the default" }
-          - { id: c, text: "A shared database for all services" }
-          - { id: d, text: "Ignore failures; run a nightly job" }
+          - { id: a, text: "A saga: local transactions chained by events or commands, with compensating actions on failure" }
+          - { id: b, text: "Two-phase commit across all databases as the default, since it gives atomic commits" }
+          - { id: c, text: "A shared database for the three services, so that a single local transaction covers everything" }
+          - { id: d, text: "Retry each step forever without compensation and hope each service eventually succeeds" }
         answer: a
         explanation: "Sagas trade atomicity for availability and give eventual consistency. Design compensations (refund, release stock) and make every step idempotent."
 
@@ -366,21 +366,21 @@ lessons:
       - type: single
         prompt: "An overloaded service has a request queue that is 30 seconds deep, while its clients time out after 2 seconds. What is wrong with simply serving the queue in FIFO order, and what should you do?"
         options:
-          - { id: a, text: "Almost all queued work belongs to clients that already gave up, so capacity is burnt on useless answers; bound the queue, drop expired requests and reject excess load immediately (503 or 429)" }
-          - { id: b, text: "Nothing: FIFO is always the fairest and most efficient order" }
-          - { id: c, text: "Add client retries so that abandoned requests are repeated" }
-          - { id: d, text: "Make the queue unbounded so that no request is ever rejected" }
+          - { id: a, text: "Most queued work belongs to clients that already gave up, wasting capacity; bound the queue and shed excess load early (503 or 429)" }
+          - { id: b, text: "Nothing is wrong: FIFO is the fairest order, so the system should keep each request until it can serve it, however long that takes and whatever the client does" }
+          - { id: c, text: "Add client retries, so that requests which timed out are repeated and eventually served from the queue" }
+          - { id: d, text: "Make the queue unbounded and size the workers for peak load, so no request is ever rejected, however long it waits" }
         answer: a
         explanation: "Under sustained overload a long queue turns every request into one that is served too late: throughput of useful work (goodput) collapses even though the server is busy. Load shedding keeps latency bounded for the requests you accept: small queue, fail fast, drop work whose deadline has passed (some systems even serve newest-first under overload). Retries on top make the overload worse."
 
       - type: multi
         prompt: "One customer generates 40% of the traffic on a topic keyed by `customerId`, so one partition is overloaded while the others idle. Select ALL sound ways to deal with the hot key."
         options:
-          - { id: a, text: "Spread the hot key over several sub-keys (for example the key plus a random suffix or bucket number) and combine the parts when reading" }
-          - { id: b, text: "Simply add more partitions; the hot key will then be spread over them" }
-          - { id: c, text: "Choose a partition key with higher cardinality or a composite key, when ordering requirements allow it" }
-          - { id: d, text: "Absorb the hot key's load in front of the shard, for example by caching its reads or batching and coalescing its writes" }
-          - { id: e, text: "Replace the hash function with a faster one" }
+          - { id: a, text: "Spread the hot key over several sub-keys (key plus a random suffix) and combine the parts when reading" }
+          - { id: b, text: "Simply add more partitions; the hot key's records will then be spread across the new partitions" }
+          - { id: c, text: "Choose a partition key with higher cardinality or a composite key, if ordering allows it" }
+          - { id: d, text: "Absorb the hot key's load in front of the shard, by caching its reads or batching its writes" }
+          - { id: e, text: "Replace the hash function with a faster one, so that the hot key is hashed to several partitions" }
         answers: [a, c, d]
         explanation: "Hashing sends all records with the same key to the same partition, so adding partitions or changing the hash function cannot split one key. You must change what is keyed (sub-keys, composite key) or take load off the shard (caching, batching). Splitting a key costs you per-key ordering and makes reads fan out, so it is applied only to the keys that are actually hot."
 
@@ -401,30 +401,30 @@ lessons:
           source: |
             user (1 s) -> A (timeout 2 s) -> B (timeout 3 s) -> C
         options:
-          - { id: a, text: "After the user gives up at 1 s, A, B and C keep working on an answer nobody wants, and retries multiply the waste; propagate the remaining deadline so each hop's timeout is no longer than the time left" }
-          - { id: b, text: "Nothing: timeouts should grow along the call chain so deeper services have more time" }
-          - { id: c, text: "Timeouts only matter for the first service in the chain" }
-          - { id: d, text: "Adding retries at every hop will compensate for the mismatch" }
+          - { id: a, text: "After the user gives up at 1 s, A, B and C keep working for nobody; propagate the remaining deadline" }
+          - { id: b, text: "Nothing: timeouts should grow along the call chain so that deeper services get more time to finish their work" }
+          - { id: c, text: "Timeouts matter for the first service in the chain; the others simply follow its decision" }
+          - { id: d, text: "Adding retries at each hop will compensate for the mismatch between the user's limit and the timeouts" }
         answer: a
         explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC deadlines are designed for this: the client sets one, it travels with the call as the remaining time, and servers can propagate it to downstream calls, in some languages through the call context; with plain HTTP you pass the deadline or remaining budget in a header yourself). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
 
       - type: single
         prompt: "With cache-aside, a write must update the database and invalidate the cached entry. Which order is generally safer, and why?"
         options:
-          - { id: a, text: "Update the database first, then delete the cache entry: the stale window shrinks to the short gap between commit and delete, and a TTL bounds the rare leftover staleness" }
-          - { id: b, text: "Delete the cache entry first, then update the database: this guarantees that no stale value is ever read" }
-          - { id: c, text: "Write the new value into the cache first, then the database" }
-          - { id: d, text: "The order does not matter, both are equivalent" }
+          - { id: a, text: "Update the database first, then delete the cache entry: the stale window is only the gap" }
+          - { id: b, text: "Delete the cache entry first, then update the database: this ensures that no stale value is read" }
+          - { id: c, text: "Write the new value into the cache first, then the database, so that readers see it immediately" }
+          - { id: d, text: "The order does not matter, because the cache and the database converge after the TTL anyway" }
         answer: a
         explanation: "If you delete first, a concurrent reader can miss, read the old row (the write has not committed yet) and put the old value back into the cache after your delete, where it stays until the TTL. Updating the database first shrinks the window to the moment between commit and delete (readers still hit the old cached value in that gap). A rare race remains, where a reader that missed before the commit writes its old value into the cache after your delete. No ordering is perfect without extra mechanisms (versioned values, short TTLs, change-data-capture driven invalidation), so always keep a TTL as a safety net."
 
       - type: single
         prompt: "Two regions both accept writes to the same record (active-active). Which design decision can you not avoid?"
         options:
-          - { id: a, text: "How to resolve conflicting concurrent writes: for example last-writer-wins, CRDTs or merge functions, or routing each key to a single home region" }
-          - { id: b, text: "Choosing a bigger instance type in each region" }
-          - { id: c, text: "Switching the replication protocol from TCP to UDP" }
-          - { id: d, text: "Nothing: databases make concurrent writes in two regions appear sequential for free" }
+          - { id: a, text: "How to resolve conflicting concurrent writes: last-writer-wins, CRDTs and merges, or one home region per key" }
+          - { id: b, text: "Choosing a bigger instance type in each region so that both can absorb the write load" }
+          - { id: c, text: "Switching the replication protocol from TCP to UDP to cut the cross-region latency" }
+          - { id: d, text: "Nothing: modern databases make concurrent writes in two regions look sequential at no cost to latency" }
         answer: a
         explanation: "Cross-region latency (tens to hundreds of milliseconds) rules out synchronous coordination on every write, so two regions can accept conflicting updates. Last-writer-wins is simple but silently loses one update and depends on clocks; CRDTs and application merges preserve intent; a home region per key avoids conflicts at the price of cross-region latency for remote users. Strongly consistent multi-region databases exist, but they pay that latency on writes."
 
