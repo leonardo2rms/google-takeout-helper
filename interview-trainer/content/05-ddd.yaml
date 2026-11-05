@@ -210,7 +210,7 @@ lessons:
         options:
           - { id: a, text: "Align with bounded contexts and the business capabilities they serve" }
           - { id: b, text: "One service per database table: each service then owns exactly one set of rows" }
-          - { id: c, text: "One service per Java package, as packages already group code the way bounded contexts do" }
+          - { id: c, text: "One service per Java package, as packages already group related code" }
           - { id: d, text: "One service per developer, so each service has a clear owner" }
         answer: a
         explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is cheaper than merging prematurely split services."
