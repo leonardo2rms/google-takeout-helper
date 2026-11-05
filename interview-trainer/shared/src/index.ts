@@ -23,3 +23,4 @@ export * from './storage';
 export * from './explain';
 export * from './prefs';
 export * from './reminders';
+export * from './share';

@@ -149,6 +149,14 @@ Settings -> **Reminders**: pick a daily time, then either or both of:
 "Turn reminders off" clears the time and the choice. The hosted single-file build cannot download files from its frame, so it replaces the calendar button with a note.
 Stored under `progress.prefs.reminders` (`{ time, notify, lastNotified }`); like other settings it stays local on import/merge.
 
+### Share card
+
+Progress -> **Share my progress** (shown once you have answered something) draws a 1080x1350 PNG on a canvas (`web/src/lib/share-image.ts`) from `buildShareCard`
+(`shared/src/share.ts`): streak, rank, readiness with the share of the course seen, and your strongest and weakest started topic. It contains only what the Progress screen already shows:
+no dates, role, interview date or question content, and nothing is uploaded. The image has real alt text. Delivery uses what the browser has: `navigator.share` with the PNG
+(or text only when files cannot be shared), otherwise a download link, plus **Copy text** and a selectable text version. The hosted single-file build cannot download from its frame,
+so the download button is hidden there; a sheet with no working option says how to save the picture.
+
 ## End-to-end tests
 
 ```bash

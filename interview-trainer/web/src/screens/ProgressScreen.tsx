@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { READINESS_TEXT, readiness, topicStats, type Course, type Progress } from '@trainer/shared';
+import { ShareCardButton } from '../components/ShareCardButton';
 import { useToday } from '../lib/today';
 
 interface Props {
@@ -67,6 +68,8 @@ export function ProgressScreen({ course, progress }: Props) {
           </li>
         ))}
       </ul>
+
+      <ShareCardButton course={course} progress={progress} today={today} />
     </div>
   );
 }
