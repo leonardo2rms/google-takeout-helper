@@ -29,7 +29,7 @@ lessons:
       - type: single
         prompt: "What does `@WebMvcTest(OrderController::class)` set up?"
         options:
-          - { id: a, text: "Just the web layer, its controllers and JSON handling, with MockMvc and no service beans" }
+          - { id: a, text: "Just the web layer for that controller, with JSON handling, validation and MockMvc, but no service beans" }
           - { id: b, text: "The full application context with each bean, plus an embedded server on a random port, so real HTTP calls can be made" }
           - { id: c, text: "The JPA repositories alone, running against an embedded database with schema auto-creation switched on" }
           - { id: d, text: "Nothing from Spring: it is plain JUnit with no application context, and MockMvc has to be created by hand" }
