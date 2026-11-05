@@ -106,8 +106,8 @@ lessons:
             val common = a.filter { it in b }
         options:
           - { id: a, text: "O(n·m); convert `b` to a HashSet first, which brings it down to O(n + m) overall" }
-          - { id: b, text: "O(n + m); no improvement is possible, since both lists must be read once" }
-          - { id: c, text: "O(n); `in` on a list is O(1), so only the filter loop matters" }
+          - { id: b, text: "O(n + m); no improvement is possible, since both lists have to be read once" }
+          - { id: c, text: "O(n); `in` on a list is O(1), so the filter loop is what matters" }
           - { id: d, text: "O(n log m); sort `b` first and then each lookup costs O(1)" }
         answer: a
         explanation: "`in` on a List is a linear scan. `val set = b.toSet()` costs O(m) once, then each `in` is expected O(1). A hidden O(n²) like this is one of the most common production performance bugs."
@@ -122,7 +122,7 @@ lessons:
             }
         options:
           - { id: a, text: "Each `+=` copies the whole string so far; use StringBuilder (or buildString)" }
-          - { id: b, text: "Strings are stored as linked lists of characters, so every append walks the whole list" }
+          - { id: b, text: "Strings are stored as linked lists of characters, so each append walks the whole list" }
           - { id: c, text: "`toString` is O(n) in the number of digits, so each iteration is expensive; cache the results" }
           - { id: d, text: "It is O(n); there is no problem, because the JIT turns the loop into one StringBuilder" }
         answer: a
@@ -233,7 +233,7 @@ lessons:
           - { id: a, text: "O(log n), because buckets with many entries are converted to balanced trees" }
           - { id: b, text: "O(n), because a collided bucket is always a linked list that has to be scanned" }
           - { id: c, text: "O(1), because a hash lookup is constant time no matter how the keys collide" }
-          - { id: d, text: "O(n²), because every colliding entry has to be compared against every other" }
+          - { id: d, text: "O(n²), because each colliding entry has to be compared against each other" }
         answer: a
         explanation: "Since Java 8, a bucket with 8+ entries (and table size >= 64) becomes a red-black tree. It defends against hash-collision attacks and bad hashCode implementations, but a good hash function is still what makes lookups O(1)."
 
@@ -243,7 +243,7 @@ lessons:
         options:
           - { id: a, text: "Amortised O(1) at the end; O(n) at the front, as elements shift" }
           - { id: b, text: "O(1) for both, because the backing array is indexed directly" }
-          - { id: c, text: "O(n) for both, because every add may copy the whole array" }
+          - { id: c, text: "O(n) for both, because each add may copy the whole array" }
           - { id: d, text: "O(log n) for both, because the array is searched first" }
         answer: a
         explanation: "Appends occasionally trigger a resize-and-copy, but averaged over many appends each is O(1). Use ArrayDeque if you need cheap insertion at both ends."
@@ -269,7 +269,7 @@ lessons:
         options:
           - { id: a, text: "O(n²); use ArrayDeque (O(1) removeFirst) or iterate without removing" }
           - { id: b, text: "O(n), since each removal is a single operation; nothing to improve" }
-          - { id: c, text: "O(n log n), since removal shifts only log n elements; use a TreeSet" }
+          - { id: c, text: "O(n log n), since removal shifts log n elements; use a TreeSet" }
           - { id: d, text: "O(1) per iteration, because the list is accessed by index; fine as is" }
         answer: a
         explanation: "Each `removeAt(0)` shifts all remaining elements. If you just need to visit every element, `for (x in list)` is O(n). If it's a queue, use ArrayDeque."
