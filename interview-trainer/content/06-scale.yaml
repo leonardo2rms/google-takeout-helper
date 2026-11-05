@@ -303,3 +303,151 @@ lessons:
                 keywords: ["debezium", "log", "order"]
               - point: "Trade-off: operational complexity, so start simple"
                 keywords: ["infrastructure", "complexity", "simple", "operate"]
+
+  - id: scale-advanced
+    title: Limits, consistency & queues
+    questions:
+      - type: code
+        prompt: "Write `rateLimit(timestampsMs, capacity, refillPerSec)`, a token-bucket simulation. The bucket starts full with `capacity` tokens and refills continuously at `refillPerSec` tokens per second, never above `capacity`. For each request timestamp (ascending, in ms) return `true` and consume one token if at least one token is available, otherwise `false` (a denied request consumes nothing)."
+        starter: |
+          function rateLimit(timestampsMs, capacity, refillPerSec) {
+            // your code
+          }
+        entry: rateLimit
+        tests:
+          - { args: [[0, 0, 0, 1000, 1000, 2000], 2, 1], expect: [true, true, false, true, false, true] }
+          - { args: [[0, 500, 1000, 2000, 2500], 1, 0.5], expect: [true, false, false, true, false] }
+          - { args: [[], 3, 1], expect: [] }
+          - { args: [[0, 10000, 10000, 10000], 2, 1], expect: [true, true, true, false], hidden: true }
+          - { args: [[0, 0, 0, 0, 0], 3, 0], expect: [true, true, true, false, false], hidden: true }
+        solution: |
+          function rateLimit(timestampsMs, capacity, refillPerSec) {
+            let tokens = capacity;
+            let last = timestampsMs.length ? timestampsMs[0] : 0;
+            return timestampsMs.map((t) => {
+              tokens = Math.min(capacity, tokens + ((t - last) / 1000) * refillPerSec);
+              last = t;
+              if (tokens >= 1) {
+                tokens -= 1;
+                return true;
+              }
+              return false;
+            });
+          }
+        kotlin: |
+          fun rateLimit(timesMs: List<Long>, capacity: Int, refillPerSec: Double): List<Boolean> {
+              var tokens = capacity.toDouble()
+              var last = timesMs.firstOrNull() ?: 0L
+              return timesMs.map { t ->
+                  tokens = minOf(capacity.toDouble(), tokens + (t - last) / 1000.0 * refillPerSec)
+                  last = t
+                  if (tokens >= 1.0) { tokens -= 1.0; true } else false
+              }
+          }
+        explanation: "A token bucket lets a client burst up to `capacity` and then sustains `refillPerSec`. You don't need a timer: on each request compute how many tokens accrued since the last one, cap at `capacity`, then spend one. The cap is what the first hidden test checks (a long idle period must not bank unlimited tokens). In production the same logic runs atomically in a shared store, for example a Redis Lua script."
+
+      - type: single
+        prompt: "An overloaded service has a request queue that is 30 seconds deep, while its clients time out after 2 seconds. What is wrong with simply serving the queue in FIFO order, and what should you do?"
+        options:
+          - { id: a, text: "Almost all queued work belongs to clients that already gave up, so capacity is burnt on useless answers; bound the queue, drop expired requests and reject excess load immediately (503 or 429)" }
+          - { id: b, text: "Nothing: FIFO is always the fairest and most efficient order" }
+          - { id: c, text: "Add client retries so that abandoned requests are repeated" }
+          - { id: d, text: "Make the queue unbounded so that no request is ever rejected" }
+        answer: a
+        explanation: "Under sustained overload a long queue turns every request into one that is served too late: throughput of useful work (goodput) collapses even though the server is busy. Load shedding keeps latency bounded for the requests you accept: small queue, fail fast, drop work whose deadline has passed (some systems even serve newest-first under overload). Retries on top make the overload worse."
+
+      - type: multi
+        prompt: "One customer generates 40% of the traffic on a topic keyed by `customerId`, so one partition is overloaded while the others idle. Select ALL sound ways to deal with the hot key."
+        options:
+          - { id: a, text: "Spread the hot key over several sub-keys (for example the key plus a random suffix or bucket number) and combine the parts when reading" }
+          - { id: b, text: "Simply add more partitions; the hot key will then be spread over them" }
+          - { id: c, text: "Choose a partition key with higher cardinality or a composite key, when ordering requirements allow it" }
+          - { id: d, text: "Absorb the hot key's load in front of the shard, for example by caching its reads or batching and coalescing its writes" }
+          - { id: e, text: "Replace the hash function with a faster one" }
+        answers: [a, c, d]
+        explanation: "Hashing sends all records with the same key to the same partition, so adding partitions or changing the hash function cannot split one key. You must change what is keyed (sub-keys, composite key) or take load off the shard (caching, batching). Splitting a key costs you per-key ordering and makes reads fan out, so it is applied only to the keys that are actually hot."
+
+      - type: match
+        prompt: Match each consistency model to its guarantee.
+        pairs:
+          - { left: "Linearizability", right: "Every operation appears to take effect atomically at one point between its start and its end, in an order consistent with real time" }
+          - { left: "Sequential consistency", right: "All clients see the operations in one total order that respects each client's own order, but not necessarily real time" }
+          - { left: "Read-your-writes", right: "A client always sees its own earlier writes" }
+          - { left: "Monotonic reads", right: "A client never sees data move backwards in time across successive reads" }
+          - { left: "Eventual consistency", right: "If writes stop, all replicas eventually converge to the same value" }
+        explanation: "The first two are global orderings (the first adds real time and is the strongest and most expensive), the middle two are per-client session guarantees that fix most user-visible anomalies cheaply, and eventual consistency promises only convergence. Systems often let you choose per operation, for example reading from the leader after a write and from a replica otherwise."
+
+      - type: single
+        prompt: A user request has a 1 s limit. Service A calls B with a 2 s timeout and B calls C with a 3 s timeout. What is wrong with this setup?
+        code:
+          lang: text
+          source: |
+            user (1 s) -> A (timeout 2 s) -> B (timeout 3 s) -> C
+        options:
+          - { id: a, text: "After the user gives up at 1 s, A, B and C keep working on an answer nobody wants, and retries multiply the waste; propagate the remaining deadline so each hop's timeout is no longer than the time left" }
+          - { id: b, text: "Nothing: timeouts should grow along the call chain so deeper services have more time" }
+          - { id: c, text: "Timeouts only matter for the first service in the chain" }
+          - { id: d, text: "Adding retries at every hop will compensate for the mismatch" }
+        answer: a
+        explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC's deadlines are built for this; with plain HTTP you pass the deadline or remaining budget in a header). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
+
+      - type: single
+        prompt: "With cache-aside, a write must update the database and invalidate the cached entry. Which order is generally safer, and why?"
+        options:
+          - { id: a, text: "Update the database first, then delete the cache entry: a reader that repopulates the cache in between loads the new row, and a TTL bounds the rare leftover staleness" }
+          - { id: b, text: "Delete the cache entry first, then update the database: this guarantees that no stale value is ever read" }
+          - { id: c, text: "Write the new value into the cache first, then the database" }
+          - { id: d, text: "The order does not matter, both are equivalent" }
+        answer: a
+        explanation: "If you delete first, a concurrent reader can miss, read the old row (the write has not committed yet) and put the old value back into the cache after your delete, where it stays until the TTL. Updating the database first shrinks the window to the moment between commit and delete. No ordering is perfect without extra mechanisms (versioned values, short TTLs, change-data-capture driven invalidation), so always keep a TTL as a safety net."
+
+      - type: single
+        prompt: "Two regions both accept writes to the same record (active-active). Which design decision can you not avoid?"
+        options:
+          - { id: a, text: "How to resolve conflicting concurrent writes: for example last-writer-wins, CRDTs or merge functions, or routing each key to a single home region" }
+          - { id: b, text: "Choosing a bigger instance type in each region" }
+          - { id: c, text: "Switching the replication protocol from TCP to UDP" }
+          - { id: d, text: "Nothing: databases make concurrent writes in two regions appear sequential for free" }
+        answer: a
+        explanation: "Cross-region latency (tens to hundreds of milliseconds) rules out synchronous coordination on every write, so two regions can accept conflicting updates. Last-writer-wins is simple but silently loses one update and depends on clocks; CRDTs and application merges preserve intent; a home region per key avoids conflicts at the price of cross-region latency for remote users. Strongly consistent multi-region databases exist, but they pay that latency on writes."
+
+      - type: estimate
+        prompt: "A flash sale sends 1,000 requests per second for 60 seconds into a queue. The workers process 400 requests per second. After the spike, arrivals drop to 100 per second. How many seconds after the spike ends does the queue take to drain?"
+        answer: 120
+        tolerance: 0
+        unit: seconds
+        explanation: "During the spike the queue grows by 1,000 - 400 = 600 per second, so 60 s leaves a backlog of 36,000 requests. Afterwards it shrinks by 400 - 100 = 300 per second: 36,000 / 300 = 120 s. A queue turns a short spike into a longer, flatter load (queue-based load levelling), but the wait for the last queued request is two minutes, so it only suits work that can wait."
+
+      - type: open
+        prompt: Design a rate limiter for a public API that runs on 20 instances behind a load balancer.
+        modelAnswer: "First I decide the policy: what is limited (API key, user or IP), the rate and the allowed burst, possibly per pricing tier. A token bucket is a good default because it allows controlled bursts and is cheap to compute; a sliding-window counter enforces more smoothly, and a plain fixed window is the simplest but can let through twice the limit around a window boundary. With 20 instances the counters must be shared, otherwise each instance enforces its own limit: I keep them in a fast central store such as Redis and update them atomically (a Lua script or atomic increment), or accept an approximation where each instance gets a share of the limit. On rejection I return 429 with a Retry-After header and rate-limit headers so well-behaved clients back off. I also decide what happens when the limiter's store is down: usually fail open for availability, but fail closed for abuse-sensitive endpoints. Finally I monitor rejections per key and give expensive endpoints their own, stricter limits."
+        keyPoints:
+          - point: "Policy and algorithm: the key, rate and burst; token bucket or sliding window, and the fixed-window boundary flaw"
+            keywords: ["token bucket", "sliding window", "burst", "fixed window"]
+          - point: "Shared state across instances: a central store (Redis) with atomic updates, or approximate local shares"
+            keywords: ["redis", "atomic", "shared", "central"]
+          - point: "Clear client signalling: 429 with Retry-After"
+            keywords: ["429", "retry-after"]
+          - point: "Failure mode of the limiter itself (fail open or closed) and monitoring"
+            keywords: ["fail open", "fail closed", "monitor"]
+        followUps:
+          - when: missed
+            point: 2
+            prompt: "Why not simply let each of the 20 instances keep its own counter with a limit of one twentieth?"
+            modelAnswer: "Because the load balancer does not spread one client's requests evenly: a client may hit only a few instances, so it is throttled far below its quota. With autoscaling the number of instances also changes, so a fixed share is wrong. Per-instance counters are only an approximation, fine for coarse abuse protection, but not for exact quotas or billing."
+            keyPoints:
+              - point: "One client's traffic is not evenly balanced across instances"
+                keywords: ["evenly", "balanc", "uneven"]
+              - point: "Autoscaling changes the number of instances, so the share is wrong"
+                keywords: ["autoscal", "number of instances", "changes"]
+              - point: "It is only an approximation, fine for coarse protection"
+                keywords: ["approximat", "coarse"]
+          - when: covered
+            point: 1
+            prompt: "Why can a fixed-window counter let through twice the limit, and what do you use instead?"
+            modelAnswer: "With a limit of 100 per minute, a client can send 100 requests in the last second of one window and another 100 in the first second of the next, so 200 requests pass within two seconds while every window looks legal. A sliding-window log or counter, or a token bucket, measures over a moving period or refills smoothly, so the burst is bounded."
+            keyPoints:
+              - point: "Requests at both sides of a window boundary add up to about twice the limit"
+                keywords: ["boundary", "twice", "200"]
+              - point: "Use a sliding window or a token bucket"
+                keywords: ["sliding", "token bucket"]
