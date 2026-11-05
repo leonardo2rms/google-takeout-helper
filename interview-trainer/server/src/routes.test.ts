@@ -273,6 +273,21 @@ describe('static serving', () => {
     }
   });
 
+  it('regression: the SPA fallback also works when the app lives under a dot-directory (e.g. /srv/.apps/trainer)', async () => {
+    const hiddenParent = mkdtempSync(join(tmpdir(), 'trainer-hidden-'));
+    const hidden = join(hiddenParent, '.app', 'web', 'dist');
+    mkdirSync(hidden, { recursive: true });
+    writeFileSync(join(hidden, 'index.html'), '<title>hidden spa</title>');
+    try {
+      const h = serve({ staticDir: hidden });
+      const res = await h.raw('/lesson/kotlin-basics/3');
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('hidden spa');
+    } finally {
+      rmSync(hiddenParent, { recursive: true, force: true });
+    }
+  });
+
   it('API routes still win over the SPA fallback', async () => {
     expect(((await (await s.raw('/api/health')).json()) as { ok: boolean }).ok).toBe(true);
   });
