@@ -70,9 +70,7 @@
 .badge-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .badge { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border: 1px dashed var(--edge); border-radius: var(--r2); min-width: 0; background: none; }
 .badge.got { border-style: solid; border-color: var(--edge); border-left: 4px solid var(--ochre); background: var(--sheet); }
-.badge.locked @keyframes badge-in { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .badge-toast { animation: none; } }
-.badge-icon { border-style: dashed; border-color: var(--edge); color: var(--graphite); }
+.badge.locked .badge-icon { border-style: dashed; border-color: var(--edge); color: var(--graphite); }
 .badge-text { display: grid; min-width: 0; overflow-wrap: anywhere; }
 .badge-text small { font-size: var(--fs-13); color: var(--graphite); }
 .badge-text .badge-state { font: 600 var(--fs-11) var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink); margin-top: 2px; }

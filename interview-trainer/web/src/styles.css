@@ -192,7 +192,7 @@ button.stat:active { background: var(--hairline); }
 
 .progress-line { display: grid; gap: 8px; margin: var(--s5) 0 var(--s2); }
 .progress-line .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.progress-line a { font-weight: 600; }
+.progress-line a { font-weight: 600; display: inline-flex; align-items: center; min-height: 44px; }
 .segs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; height: 6px; }
 .segs i { background: var(--hairline); border-radius: 1px; }
 .segs i.on { background: var(--ink); }

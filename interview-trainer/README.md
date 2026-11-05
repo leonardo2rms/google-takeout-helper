@@ -80,7 +80,7 @@ On the feedback card, **Ask why** opens a short chat about *that* question ("why
 ### Single-file build (no server, no install)
 
 ```bash
-npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, @@SIZE@@ kB)
+npm run build:standalone    # -> dist/interview-trainer.html (one self-contained page, ~935 kB, of which the embedded font is about 31 kB)
 ```
 
 Everything (course, logic, styles) is inlined, with no service worker and no API server. Hosts that provide
