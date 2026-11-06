@@ -74,7 +74,7 @@ export const SpotQuestion = z.object({
 export const EstimateQuestion = z.object({
   type: z.literal('estimate'),
   ...common,
-  answer: z.number().finite(),
+  answer: z.number(), // zod 4 numbers reject Infinity and NaN
   /** Relative tolerance as a fraction (0.05 = within 5%). Use 0 for an exact answer. */
   tolerance: z.number().min(0).max(0.5).default(0.05),
   /** Shown next to the input (e.g. "requests", "%", "MiB"). */
