@@ -38,7 +38,21 @@ describe('AnthropicGrader request and response handling', () => {
     expect(out).toEqual({ score: 0, covered: [false, false], feedback: 'Neither rubric point is addressed here.', graded_by: 'ai' });
     expect(g.model).toBe('m1');
     expect(seen[0]).toMatchObject({ model: 'm1', system: SYSTEM_PROMPT, output_config: { effort: 'high' } });
-    expect(seen[0].output_config.format).toBeTruthy();
+    // The structured-output format is derived from the zod schema: a strict JSON schema the API enforces, and a parser.
+    const format = seen[0].output_config.format;
+    expect(format).toMatchObject({
+      type: 'json_schema',
+      schema: {
+        type: 'object',
+        required: ['points', 'feedback'],
+        additionalProperties: false,
+        properties: {
+          points: { type: 'array', items: { type: 'object', required: ['covered'], additionalProperties: false, properties: { covered: { type: 'boolean' } } } },
+          feedback: { type: 'string' },
+        },
+      },
+    });
+    expect(format.parse('{"points":[{"covered":true}],"feedback":"ok"}')).toEqual({ points: [{ covered: true }], feedback: 'ok' });
     expect(seen[0].messages).toHaveLength(1);
     expect(seen[0].messages[0].content).toContain('<candidate_answer>\nmy [tag removed] answer\n</candidate_answer>');
   });

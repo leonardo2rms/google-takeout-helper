@@ -122,6 +122,8 @@ describe('field limits per question type', () => {
     ['spot with a fractional line', withQ('spot', { answers: [1.5] })],
     ['estimate with a string answer', withQ('estimate', { answer: '50' })],
     ['estimate with infinite answer', withQ('estimate', { answer: Infinity })],
+    ['estimate with negative infinite answer', withQ('estimate', { answer: -Infinity })],
+    ['estimate with NaN answer', withQ('estimate', { answer: NaN })],
     ['estimate tolerance below 0', withQ('estimate', { tolerance: -0.1 })],
     ['estimate tolerance above 0.5', withQ('estimate', { tolerance: 0.6 })],
     ['match with 2 pairs', withQ('match', { pairs: [{ left: 'a', right: '1' }, { left: 'b', right: '2' }] })],

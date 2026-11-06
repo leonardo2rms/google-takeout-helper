@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import { ImplausibleVerdictError, SYSTEM_PROMPT, buildUserPrompt, checkVerdict, type GradeResponse, type OpenQ } from '@trainer/shared';
 
 export { SYSTEM_PROMPT, buildUserPrompt, sanitizeAnswer } from '@trainer/shared';

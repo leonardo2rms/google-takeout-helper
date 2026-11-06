@@ -27,7 +27,7 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,507 unit/content/docs tests (vitest) |
+| `npm test` | 1,509 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
 | `npm run e2e` | 302 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,507 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
+1,509 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -235,11 +235,16 @@ Ids are stable so commits and sessions can refer to them. Audit ids in brackets 
 - The phone OS keyboard with the code editor (only emulated so far).
 - *Size:* S-M.
 
-**P1-4 Upgrade zod (security advisory)**
-- `npm audit` reports one high-severity advisory: zod below 4.6.6 (memory exhaustion validating oversized constrained
-  collections). The shared schema uses zod 3 (`shared/src/schema.ts`); the server grader already imports `zod/v4` for
-  the Anthropic SDK helper. Exposure is limited (32 kB body limit, schemas bounded) but it should be fixed: migrate to
-  zod 4 (watch `.default()` and transform typing, `z.number().finite()`), keep all tests green. *Size:* M.
+**P1-4 Upgrade zod (security advisory)**: **done** (2026-11-06).
+- zod 3.25 → 4.6.7 in `shared` and `server` (one copy, also used by the Anthropic SDK, whose peer range allows 4);
+  `npm audit` reports 0 vulnerabilities. The grader now imports plain `zod` instead of `zod/v4`; `.finite()` is gone
+  (zod 4 numbers reject `Infinity` and `NaN`, pinned in `shared/src/schema.test.ts`); no other code change was needed.
+- A server test now pins the structured-output JSON schema the grader sends (`server/src/clients.test.ts`), the one path
+  the fakes did not cover.
+- Cost: the web bundle grew about 70 kB (929 → 999 kB of JavaScript; single-file build 1.02 → 1.09 MB), because the
+  browser bundle includes the zod schemas although it only uses them as types. Marking the schemas pure did not remove
+  them (zod 4's core has module-level side effects); the fix is to keep schema modules out of the web's import graph,
+  folded into P3-5.
 
 **P1-5 Resume a lesson after quitting or pressing Back** [S2-15, N-18]
 - Quitting (confirmed) or the browser Back button discards an in-progress lesson; lessons are 7-10 questions, long on
@@ -317,7 +322,9 @@ unverified.
 - **P3-4 CSS layout**: styles are split across `web/src/styles.css`, `web/src/features-a.css`, `web/src/safety.css` and
   `web/src/ux2.css` (one file per work batch). Reorganise by design-system layer and component.
 - **P3-5 Bundle size**: the single-file build is about 1 MB (course, font and app inline). Consider splitting content
-  per unit (lazy import) or compressing the course payload.
+  per unit (lazy import) or compressing the course payload. The web bundle also carries the zod schemas (about 70 kB since zod 4) although it uses
+  them only as types: move `z.*` definitions out of the modules the web imports (e.g. a schema module imported only by
+  the server, the content loader and tests), then check the bundle no longer contains zod.
 - **P3-6 Flakes seen once**: e2e timeouts under heavy parallel load (several suites on one machine) and one unit failure
   during a coverage run that did not reproduce in 7+ runs and was not captured. If either reappears, record it (see the
   flaky-test policy in [testing.md](testing.md)).
@@ -343,7 +350,7 @@ unverified.
   a fixture test (see the `Progress` section of [architecture.md](architecture.md)).
 - **Release**: bump the service-worker cache version (`web/vite-sw-plugin.ts`) so clients pick up the new shell, then
   rebuild and republish the hosted page as in section 1.
-- **zod versions**: the schema is zod 3, the grader's structured-output helper uses `zod/v4` (P1-4).
+- **zod**: version 4 everywhere (shared schema, server, the SDK's structured-output helper). Import from `zod`.
 - **AI calls cost money**; tests always use fakes. The e2e server is started with AI off.
 
 ## 6. Definition of done for any change
