@@ -34,3 +34,8 @@
 .more-mocks { margin: 4px 0 0; }
 .more-mocks > summary { color: var(--graphite); font-weight: 500; }
 .tip .tip-note { display: block; margin-top: 6px; font-size: var(--fs-13); }
+
+/* The unfinished-session card at the top of Home: one tap resumes, a quiet link discards. */
+.card.resume { flex-wrap: wrap; row-gap: 0; border-color: var(--cobalt); background: var(--cobalt-tint); margin: 0 0 var(--s2); padding-bottom: 2px; }
+.card.resume .resume-link { display: flex; flex: 1 1 100%; gap: var(--s3); align-items: center; min-height: 44px; color: inherit; text-decoration: none; }
+.card.resume .link { margin-left: auto; padding-block: 0; }

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import {
-  buildDailySession, dueOverview, goalDisplay, goalToday, planFor, rankFor, readiness, streakStatus,
+  buildDailySession, dueOverview, goalDisplay, goalToday, planFor, rankFor, readiness, resumeProgress, streakStatus,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { ChallengeCard } from '../components/ChallengeCard';
+import { useConfirm } from '../components/ConfirmDialog';
 import { Icon } from '../components/icons';
 import { OnboardingCard } from '../components/OnboardingCard';
 import { Ring } from '../components/Ring';
@@ -11,6 +12,7 @@ import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
 import { formatCount, plural } from '../lib/format';
 import { dueInToday, dueLine, goalMetHero, homeTier, readinessLine, reinforceText } from '../lib/home-copy';
+import { clearResume, useResume } from '../lib/resume';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
 import { unitStyle } from '../lib/unit-style';
@@ -31,6 +33,8 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const today = useToday();
   const [sheet, setSheet] = useState<SheetName>(null);
   const [iosTip, setIosTip] = useState(shouldShowIosTip);
+  const resume = useResume();
+  const confirm = useConfirm();
 
   const overview = useMemo(() => dueOverview(course, progress, today), [course, progress, today]);
   const daily = useMemo(() => buildDailySession(course, progress, today), [course, progress, today]);
@@ -227,11 +231,45 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       {/* Editing the plan from Settings (a learner who has already started) puts the open form first; on first run it is one quiet line under the lesson. */}
       {!progress.profile.onboarded && tier > 0 && <OnboardingCard today={today} progress={progress} update={update} startOpen />}
 
-      <a className={`card hero ${tier === 0 ? 'first' : ''} ${hero.done ? 'done' : ''}`} href={hero.href} data-testid="daily-card" data-state={hero.done ? 'done' : 'open'}>
-        <span className={`tile-i ${hero.done ? '' : 'solid'}`} aria-hidden="true"><Icon name={hero.done ? 'circle-check' : 'target'} size={22} /></span>
-        <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
-        <span className={`cta ${hero.done ? 'quiet' : ''}`} aria-hidden="true">{hero.cta}</span>
-      </a>
+      {resume && (() => {
+        const { done: answered, total: of } = resumeProgress(resume.record);
+        return (
+          <section className="card resume" aria-label="Unfinished session" data-testid="resume-card">
+            <a className="resume-link" href={`#${resume.record.route}`} data-testid="resume-link">
+              <span className="tile-i solid" aria-hidden="true"><Icon name="arrow-right" size={22} /></span>
+              <span className="hero-text"><b>{resume.record.title}</b><small>Carry on · {answered} of {of} done</small></span>
+              <span className="cta" aria-hidden="true">Resume</span>
+            </a>
+            <button
+              type="button"
+              className="link"
+              data-testid="resume-discard"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Discard this session?',
+                  body: `Nothing from "${resume.record.title}" has been counted yet. Discarding drops the ${plural(answered, 'question')} you have done, and opening it again starts from the first question.`,
+                  confirmLabel: 'Discard',
+                  cancelLabel: 'Keep it',
+                  tone: 'danger',
+                  testId: 'resume-discard-confirm',
+                });
+                if (ok) clearResume(resume.record.route);
+              }}
+            >
+              Discard
+            </button>
+          </section>
+        );
+      })()}
+
+      {/* When the main card would open the very session that can be resumed (the same lesson, or Today), the Resume card above is the better one. */}
+      {!(resume && hero.href === `#${resume.record.route}`) && (
+        <a className={`card hero ${tier === 0 ? 'first' : ''} ${hero.done ? 'done' : ''}`} href={hero.href} data-testid="daily-card" data-state={hero.done ? 'done' : 'open'}>
+          <span className={`tile-i ${hero.done ? '' : 'solid'}`} aria-hidden="true"><Icon name={hero.done ? 'circle-check' : 'target'} size={22} /></span>
+          <span className="hero-text"><b>{hero.title}</b><small>{hero.sub}</small></span>
+          <span className={`cta ${hero.done ? 'quiet' : ''}`} aria-hidden="true">{hero.cta}</span>
+        </a>
+      )}
 
       {upNext}
 

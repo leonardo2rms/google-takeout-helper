@@ -102,6 +102,7 @@ rules we hold ourselves to are in [`docs/engagement.md`](docs/engagement.md).
 
 - **Today**: one tap to a session of 8 questions, interleaved across topics: up to 5 due reviews, 2 weak spots, the rest new. A brand-new learner is simply invited to start the first lesson.
 - **Review due**: questions whose review date has come, plus anything you missed. Shown as "N due" (the real number; a session takes 10 at a time).
+- **Resume**: leave a lesson or practice session half way (the X, or the browser's Back button) and Home offers to carry on from the next question, with your XP so far. Opening the same lesson again does too; nothing is counted until the session is finished.
 - **Daily goal ring** (default 8 questions, presets 8 / 16 / 24): tap for a 14-day chart. After a week away the next day's goal is halved once ("Easy restart").
 - **Streak chip**: practising any day keeps it alive. Every 7 days in a row earns a **freeze** (hold up to 2) that covers a missed day automatically; **rest days** you choose (up to 3 weekdays) are covered for free. A freeze is only spent when it covers the whole gap; otherwise you get a fresh start and keep the freeze. Longest streak and total days practised never reset.
 - **Rank** under the title (XP only goes up, so a rank is never lost), and **Progress**: readiness (an estimate of how much of this course you would recall today, with coverage shown, never a prediction of a result), a bar per topic and one tap to practise the weakest.
@@ -376,8 +377,8 @@ The look is documented in [`docs/design-system.md`](docs/design-system.md). In s
 ## Roadmap
 
 The complete list of what is built and what is pending (prioritised, with context, files and acceptance criteria for each
-item) is in the [handoff](docs/HANDOFF.md). Headlines: verify real AI grading and the hosted page outside the sandbox, upgrade zod, resume a quit lesson, the architecture
-board question type, a sandboxed Kotlin runner, and monetization.
+item) is in the [handoff](docs/HANDOFF.md). Headlines: verify real AI grading and the hosted page outside the sandbox, decide the XP rule for repeated questions, a
+better Home for returning learners, the architecture board question type, a sandboxed Kotlin runner, and monetization.
 
 ## Documentation
 

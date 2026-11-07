@@ -240,6 +240,40 @@ describe('several tabs', () => {
   });
 });
 
+describe('an unfinished session belongs to the profile', () => {
+  const unfinished = async () => {
+    const resume = await import('./resume');
+    const { allQuestions, createSession, submit } = await import('@trainer/shared');
+    const course = (await import('virtual:course')).default;
+    const questions = allQuestions(course).slice(0, 4);
+    resume.saveResume(submit(createSession(questions), true), { route: '/mix', title: 'Mixed practice', kind: 'mix', servedOn: '2026-06-15' });
+    expect(resume.loadResume()).not.toBeNull();
+    return resume;
+  };
+
+  it('is forgotten when the progress is reset', async () => {
+    const { store } = await load();
+    const resume = await unfinished();
+    store.updateProgress(withXp(20));
+    store.useProgress().reset();
+    expect(resume.loadResume()).toBeNull();
+  });
+
+  it('is forgotten when the progress is replaced by an import', async () => {
+    const { store } = await load();
+    const resume = await unfinished();
+    store.replaceProgress({ ...emptyProgress(), xp: 5 });
+    expect(resume.loadResume()).toBeNull();
+  });
+
+  it('is kept when progress is merged in: the profile it belongs to is still there', async () => {
+    const { store } = await load();
+    const resume = await unfinished();
+    store.mergeIntoProgress({ ...emptyProgress(), xp: 500 });
+    expect(resume.loadResume()).not.toBeNull();
+  });
+});
+
 describe('badges', () => {
   const finishedLesson = (p: Progress): Progress => ({ ...p, lessons: { x: { bestAccuracy: 1, completions: 1, lastDay: '2026-06-15' } } });
 

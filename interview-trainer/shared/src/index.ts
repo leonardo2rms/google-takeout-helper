@@ -32,3 +32,4 @@ export * from './explain';
 export * from './prefs';
 export * from './reminders';
 export * from './share';
+export * from './resume';

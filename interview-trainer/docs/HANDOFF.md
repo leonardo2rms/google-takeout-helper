@@ -27,10 +27,10 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,509 unit/content/docs tests (vitest) |
+| `npm test` | 1,575 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 302 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 315 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,509 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 302
+1,575 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 315
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -246,11 +246,22 @@ Ids are stable so commits and sessions can refer to them. Audit ids in brackets 
   them (zod 4's core has module-level side effects); the fix is to keep schema modules out of the web's import graph,
   folded into P3-5.
 
-**P1-5 Resume a lesson after quitting or pressing Back** [S2-15, N-18]
-- Quitting (confirmed) or the browser Back button discards an in-progress lesson; lessons are 7-10 questions, long on
-  a phone. Persist the in-progress session (questions, answers, attempts, XP so far) in `Progress` or a separate key,
-  offer "Resume" on Home, and intercept Back inside a lesson (history state) to ask before leaving.
-  Files: `web/src/screens/Lesson.tsx`, `shared/src/session.ts`, `web/src/lib/store.ts`. *Size:* M.
+**P1-5 Resume a lesson after quitting or pressing Back** [S2-15, N-18]: **done** (2026-11-07).
+- The session is saved after every question that was answered and continued from, in its own storage key
+  (`interview-trainer.resume.v1`), apart from `Progress`. Home shows a Resume card (with a Discard that asks first);
+  opening the same route (`#/lesson/<id>`, `#/daily`, `#/mix`, `#/review`, `#/warmup`, `#/topic/<id>`) carries on from
+  it. It is forgotten on finish, discard, reset or import-replace, after 48 hours, and when the course changed under it
+  (every saved question carries the hash of what it asks). Details: "Resuming an unfinished session" in
+  [learning-features.md](learning-features.md) and the architecture notes.
+- **Deviation from the plan:** the browser's Back button is not intercepted with a "really leave?" question. Everything is
+  saved, so leaving costs nothing, and the X no longer asks either (the old "Quit and lose progress" dialog would now be
+  untrue). Only the question on screen is asked again. The dialog tests moved to the Reset-progress dialog.
+- Known limits, deliberate: one saved session at a time (starting something else and answering a question replaces it);
+  a half-done interviewer follow-up is not kept (the main question is asked again); a hint revealed on the question on
+  screen is not kept; one-question sessions and the mock interview are never saved.
+- Quality: 14 mutants of `shared/src/resume.ts` and 8 of the wiring were killed by the new unit and e2e tests (one
+  equivalent mutant remains: with a saved session `LessonScreen` takes its queue from `initial`, so the picked
+  `questions` are unused).
 
 **P1-6 Decide and enforce the XP / goal farming rule** [S2-11]
 - Repeating one question (Library "practise this one", challenge) earns XP and goal credit each time: 8 repeats give 80
