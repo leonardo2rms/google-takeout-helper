@@ -26,7 +26,7 @@ lessons:
           - { id: c, text: "The thread stacks" }
           - { id: d, text: "The JIT code cache, in native memory" }
         answer: a
-        explanation: "Metaspace lives outside the Java heap and grows up to the available native memory unless capped with `-XX:MaxMetaspaceSize`. Classloader leaks (e.g. repeated redeploys) are the classic way to exhaust it."
+        explanation: "Metaspace lives outside the Java heap and grows up to the available native memory unless capped with `-XX:MaxMetaspaceSize` (the default is no cap, apart from a 1 GB compressed class space). Classloader leaks (e.g. repeated redeploys) are the classic way to exhaust it."
 
       - type: multi
         prompt: Select all statements that are true for generational garbage collection on the JVM.
@@ -48,7 +48,7 @@ lessons:
           - { id: c, text: "ParallelGC" }
           - { id: d, text: "CMS" }
         answer: a
-        explanation: "ZGC does marking, relocation and reference processing concurrently, with pauses that don't grow with heap size. Parallel favours throughput; Serial is for tiny heaps; CMS was removed in Java 14. G1 (the default) targets pause *goals* in the tens to hundreds of ms."
+        explanation: "ZGC does marking, relocation and reference processing concurrently, with pauses that don't grow with heap size. Parallel favours throughput; Serial is for tiny heaps; CMS was removed in Java 14. G1 (the default since Java 9) targets pause *goals* in the tens to hundreds of ms. ZGC has been generational by default since JDK 23, and the non-generational mode was removed in JDK 24."
 
       - type: single
         hint: "Who still holds a reference to those listeners?"
@@ -95,7 +95,7 @@ lessons:
           - { left: "ParallelGC", right: "Multi-threaded stop-the-world; favours throughput" }
           - { left: "G1", right: "Region-based default; aims for a pause-time goal" }
           - { left: "ZGC", right: "Mostly concurrent; pauses stay short as the heap grows" }
-        explanation: "Pick by what you optimise: throughput (Parallel), a balanced default (G1), or consistently low pauses on big heaps (ZGC). Serial is mainly for very small or single-core environments."
+        explanation: "Pick by what you optimise: throughput (Parallel), a balanced default (G1), or consistently low pauses on big heaps (ZGC). Serial is mainly for very small or single-core environments, and the JVM picks it on its own on a machine or container with fewer than 2 processors or under roughly 1.8 GB of memory, unless you choose a collector."
 
       - type: single
         prompt: What does this GC log tell you?
@@ -198,17 +198,17 @@ lessons:
           - { id: c, text: "A single long-running batch job that reads one big file sequentially" }
           - { id: d, text: "Code that holds `synchronized` blocks around slow network calls (on JDK 21)" }
         answer: a
-        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and holding a `synchronized` block around network calls is a pinning hazard (next question)."
+        explanation: "A virtual thread unmounts from its carrier while blocked, so you can have millions of cheap threads. CPU-bound work is limited by cores either way, and holding a `synchronized` block around network calls pinned the carrier on JDK 21 to 23 (next question; JEP 491 removed that in JDK 24)."
 
       - type: single
-        prompt: "In JDK 21, a virtual thread blocks on I/O while inside a `synchronized` block. What is the effect, and the usual remedy?"
+        prompt: "On JDK 21 (before JEP 491 arrived in JDK 24), a virtual thread blocks on I/O while inside a `synchronized` block. What is the effect, and the usual remedy?"
         options:
           - { id: a, text: "The carrier thread is pinned and cannot be reused; use a `ReentrantLock` around blocking code" }
           - { id: b, text: "The JVM throws IllegalMonitorStateException on blocking I/O; wrap the call in a try/catch" }
           - { id: c, text: "The virtual thread is converted into a platform thread permanently; nothing can be done" }
           - { id: d, text: "No effect at all; monitors are fully supported by virtual threads and never pin a carrier" }
         answer: a
-        explanation: "Pinning limits scalability because the carrier is stuck. It's been largely addressed in later JDKs for `synchronized`, but on 21 it is a real tuning concern (`-Djdk.tracePinnedThreads`)."
+        explanation: "On JDK 21 to 23 a virtual thread that blocks while holding a monitor stays mounted and pins its carrier, which cannot run other virtual threads; enough pinned carriers starve the scheduler. The remedy was a `ReentrantLock` around blocking code, and `-Djdk.tracePinnedThreads` found the culprits. JEP 491 (JDK 24, hence also in the JDK 25 LTS) lets virtual threads block in `synchronized` and `Object.wait()` without pinning, and that property is gone. Pinning still happens while a native frame is on the stack (a native method or foreign call that calls back into blocking Java code) or a class initialiser runs; the JFR event `jdk.VirtualThreadPinned` reports it."
 
       - type: single
         hint: "Compile time and run time can see different classpaths."
@@ -315,7 +315,7 @@ lessons:
           - { id: d, text: "All classes that the main class references are loaded and initialised eagerly at JVM startup, before `main` runs" }
           - { id: e, text: "Metaspace is limited by default by `-Xmx`: raising the heap limit also raises the Metaspace limit" }
         answers: [a, b, c]
-        explanation: "Loading is lazy (on first use), and Metaspace is a separate native-memory area that is unbounded unless `-XX:MaxMetaspaceSize` is set. Because classes live as long as their loader, a leaked reference to a webapp's class loader (a ThreadLocal, a static in a shared library, a registered JDBC driver, a live thread) keeps every class of the old deployment alive: the classic Metaspace leak on redeploys. The same class name loaded by two loaders is also the reason for puzzling `ClassCastException: X cannot be cast to X`."
+        explanation: "Loading is lazy (on first use), and Metaspace is a separate native-memory area with no default limit (`-XX:MaxMetaspaceSize` is unset, apart from a 1 GB compressed class space). Because classes live as long as their loader, a leaked reference to a webapp's class loader (a ThreadLocal, a static in a shared library, a registered JDBC driver, a live thread) keeps every class of the old deployment alive: the classic Metaspace leak on redeploys. The same class name loaded by two loaders is also the reason for puzzling `ClassCastException: X cannot be cast to X`."
 
       - type: single
         prompt: "What does this safepoint log line tell you? (Simplified: the exact set of fields varies by JDK version, and some releases add extra ones such as Cleanup.)"
@@ -329,7 +329,7 @@ lessons:
           - { id: c, text: "The JVM spent 1.8 s resizing Metaspace while holding each application thread stopped" }
           - { id: d, text: "This is normal: the 'Reaching safepoint' phase is the longest part of a pause, so ignore it" }
         answer: a
-        explanation: "A safepoint pause has two parts: time to safepoint (waiting until every Java thread has stopped at a poll) and the work done while stopped. All threads that already stopped sit idle during the first part, so the application sees the whole 1.8 s. GC logs that report only the collection time hide this; `-Xlog:safepoint` shows it. Tools that sample stacks or async-profiler help find the thread that was slow to arrive."
+        explanation: "A safepoint pause has two parts: time to safepoint (waiting until every Java thread has stopped at a poll) and the work done while stopped. All threads that already stopped sit idle during the first part, so the application sees the whole 1.8 s. GC logs that report only the collection time hide this; `-Xlog:safepoint` shows it. Tools that sample stacks or async-profiler help find the thread that was slow to arrive. The field set of the log line differs by release: the sample matches JDK 24, JDK 21 also prints a `Cleanup` time and JDK 25 adds `Leaving safepoint` and thread counts, but `Reaching safepoint` and `At safepoint` are in all of them."
 
       - type: spot
         prompt: "Another thread sometimes calls `onPrice` and prints \"null\" as the currency. Tap the line that lets the object be seen too early."
@@ -372,7 +372,7 @@ lessons:
           - { id: d, text: "To limit use of a scarce resource such as a database, use a `Semaphore`, not the thread count" }
           - { id: e, text: "They let CPU-bound code use more cores than there are carrier threads, because there are millions of them" }
         answers: [a, c, d]
-        explanation: "Virtual threads are cheap, so you create one per task (`Executors.newVirtualThreadPerTaskExecutor()`) and never pool them; pooling was a way to ration expensive platform threads. Rationing moves to the resource that is actually scarce, which a semaphore expresses directly. Parallelism for CPU-bound work is still limited by the carrier threads, hence by the cores."
+        explanation: "Virtual threads are cheap, so you create one per task (`Executors.newVirtualThreadPerTaskExecutor()`) and never pool them; pooling was a way to ration expensive platform threads. Rationing moves to the resource that is actually scarce, which a semaphore expresses directly. Parallelism for CPU-bound work is still limited by the carrier threads, hence by the cores. The scheduler is tuned with `jdk.virtualThreadScheduler.parallelism` (default: the number of available processors) and `jdk.virtualThreadScheduler.maxPoolSize` (default 256, an upper bound on the pool)."
 
       - type: open
         prompt: "You benchmark two implementations with a simple loop and `System.nanoTime()`, and one looks 10x faster. Why might the result be misleading, and how do you measure properly?"

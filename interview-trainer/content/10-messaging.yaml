@@ -11,7 +11,7 @@ lessons:
         answer: 20
         tolerance: 0
         unit: partitions
-        explanation: "Take the larger of the two requirements: the producers need 120 / 10 = 12 partitions, the consumers need 120 / 6 = 20 (a partition is read by at most one consumer in a group, so the slow consumer side sets the limit). In practice add headroom and remember that partitions can be added later but not removed, and adding them changes which partition a key maps to."
+        explanation: "Take the larger of the two requirements: the producers need 120 / 10 = 12 partitions, the consumers need 120 / 6 = 20 (a partition is read by at most one consumer in a consumer group, so the slow consumer side sets the limit). In practice add headroom and remember that partitions can be added later but not removed, and adding them changes which partition a key maps to."
 
       - type: single
         prompt: "What ordering does Kafka guarantee?"
@@ -52,23 +52,23 @@ lessons:
         kotlin: |
           fun partitionFor(key: String, numPartitions: Int): Int =
               (key.hashCode() and 0x7fffffff) % numPartitions
-        explanation: "Two classic traps: the hash is often negative, and in most languages a negative number gives a negative remainder, so you must make it non-negative first. Masking the sign bit is safe; `abs(hash) % n` is not, because `abs(Int.MIN_VALUE)` is still negative on the JVM (the hidden test uses a string whose hash is exactly Int.MIN_VALUE). Kafka's default partitioner uses murmur2 rather than this hash, and it also changes behaviour for keyless records, but the principle (deterministic hash, made positive, modulo partition count) is the same."
+        explanation: "Two classic traps: the hash is often negative, and in most languages a negative number gives a negative remainder, so you must make it non-negative first. Masking the sign bit is safe; `abs(hash) % n` is not, because `abs(Int.MIN_VALUE)` is still negative on the JVM (the hidden test uses a string whose hash is exactly Int.MIN_VALUE). Kafka's producer hashes keys with murmur2 rather than this hash, and spreads keyless records in sticky batches (KIP-794) instead of by hash, but the principle (deterministic hash, made positive, modulo partition count) is the same."
 
       - type: single
         prompt: "One consumer keeps dropping out of its group under load and records get processed twice. What does this log show, and what do you do?"
         code:
           lang: text
           source: |
-            WARN  [Consumer clientId=billing-3, groupId=billing] Leaving the group: time between two poll() calls (412 s) exceeded max.poll.interval.ms (300000 ms)
-            INFO  [Consumer clientId=billing-3, groupId=billing] Revoking previously assigned partitions [payments-4]
-            ERROR [Consumer clientId=billing-3, groupId=billing] Offset commit failed: the group has already rebalanced and the partitions belong to another member
+            WARN  [Consumer clientId=billing-3, groupId=billing] consumer poll timeout has expired. This means the time between subsequent calls to poll() was longer than the configured max.poll.interval.ms, which typically implies that the poll loop is spending too much time processing messages. You can address this either by increasing max.poll.interval.ms or by reducing the maximum size of batches returned in poll() with max.poll.records.
+            INFO  [Consumer clientId=billing-3, groupId=billing] Member billing-3-5c1e9a62-0f7d-4b8e-9d1c-3a6f2e8b4c10 sending LeaveGroup request to coordinator kafka-2:9092 (id: 2147483645 rack: null) due to consumer poll timeout has expired.
+            ERROR [Consumer clientId=billing-3, groupId=billing] Offset commit failed on partition payments-4 at offset 8812: Specified group generation id is not valid.
         options:
           - { id: a, text: "Processing between polls exceeded max.poll.interval.ms, so the member was removed; take fewer records per poll" }
           - { id: b, text: "The broker ran out of disk space and fenced the consumer, so free disk space and restart the broker" }
           - { id: c, text: "The topic has too many partitions for one group, so merge or delete partitions to stop the rebalances" }
           - { id: d, text: "Network loss delayed the heartbeats; raise session.timeout.ms so the coordinator waits longer" }
         answer: a
-        explanation: "The log names the cause: 412 s between poll() calls against a 300 s limit. The consumer was declared failed, a rebalance gave payments-4 to someone else, and its late offset commit was rejected, so the new owner re-reads records the old one had already processed (hence duplicates, and the need for idempotent handling). Lower `max.poll.records` so each batch finishes in time, or make the processing faster. Heartbeats run on a separate thread and are governed by `session.timeout.ms`; this is the poll-interval limit."
+        explanation: "The log names the cause: the time between poll() calls exceeded `max.poll.interval.ms` (5 minutes by default). The consumer left the group, a rebalance gave payments-4 to someone else, and its late offset commit was rejected, so the new owner re-reads records the old one had already processed (hence duplicates, and the need for idempotent handling). Lower `max.poll.records` (500 by default) so each batch finishes in time, or make the processing faster. Heartbeats run on a separate thread and are governed by `session.timeout.ms` (45 seconds by default); this is the poll-interval limit."
 
       - type: order
         kind: steps
@@ -79,7 +79,7 @@ lessons:
           - "The members re-join the group and the group leader computes a new partition assignment"
           - "The coordinator hands the new assignment to every member"
           - "Each consumer resumes its partitions from the last committed offsets"
-        explanation: "In the eager protocol the whole group stops consuming for a while: that pause is why large or flapping groups hurt. The cooperative (incremental) protocol only moves the partitions that have to move. Resuming from the last committed offset is what makes duplicates possible: records processed after the last commit are read again."
+        explanation: "In the eager protocol the whole group stops consuming for a while: that pause is why large or flapping groups hurt. The cooperative (incremental) protocol only moves the partitions that have to move, and the newer consumer protocol (KIP-848, generally available since Kafka 4.0 and opted into with `group.protocol=consumer`) has the broker's group coordinator compute the assignment instead of a client-side group leader. Resuming from the last committed offset is what makes duplicates possible: records processed after the last commit are read again."
 
       - type: spot
         prompt: "Every record must be processed at least once, even across crashes. Tap the line that breaks this guarantee."
@@ -113,7 +113,7 @@ lessons:
           - { id: c, text: "Adding partitions and consumers, accepting that keys map to different partitions afterwards" }
           - { id: d, text: "Handing records from each poll to a worker pool and committing only offsets of finished records" }
         answer: a
-        explanation: "Within one group the partition count caps useful parallelism, so extra instances beyond the partition count sit idle. The other three add capacity per partition or add partitions, each with a cost: adding partitions breaks key-to-partition stability, and a worker pool needs careful offset handling and loses strict per-partition ordering of side effects unless you hash by key to workers. This is also why you size partitions with the peak consumer count in mind."
+        explanation: "Within one consumer group the partition count caps useful parallelism, so extra instances beyond the partition count sit idle (Kafka's share groups, KIP-932, production-ready since 4.2, are a different mechanism that lets several consumers read the same partition, at the cost of ordering). The other three add capacity per partition or add partitions, each with a cost: adding partitions breaks key-to-partition stability, and a worker pool needs careful offset handling and loses strict per-partition ordering of side effects unless you hash by key to workers. This is also why you size partitions with the peak consumer count in mind."
 
       - type: open
         prompt: "Explain how partitions, keys and consumer groups work together in Kafka, and how you would choose the key for an order-events topic."
@@ -196,7 +196,7 @@ lessons:
           - { id: c, text: "Setting enable.idempotence=true on the producer makes the consumers safe from duplicates, including external side effects" }
           - { id: d, text: "That is correct for a consumer once `acks=all` and `min.insync.replicas` are set, because no record is delivered twice then" }
         answer: a
-        explanation: "Kafka's exactly-once semantics are real but scoped: the idempotent producer removes duplicates caused by producer retries, and transactions make a consume-transform-produce step atomic, with consumers reading only committed data. The moment the consumer touches a system outside Kafka, a crash after the side effect but before the offset commit replays the record. Idempotent handlers (inbox table, unique constraint, natural idempotency) are still required. acks=all is about durability, not duplicates."
+        explanation: "Kafka's exactly-once semantics are real but scoped: the idempotent producer (on by default since Kafka 3.0) removes duplicates caused by producer retries, and transactions make a consume-transform-produce step atomic, with consumers reading only committed data once they set `isolation.level=read_committed` (the default is `read_uncommitted`). The moment the consumer touches a system outside Kafka, a crash after the side effect but before the offset commit replays the record. Idempotent handlers (inbox table, unique constraint, natural idempotency) are still required. acks=all is about durability, not duplicates."
 
       - type: match
         prompt: "Match each reliability concept to what it does."
@@ -216,7 +216,7 @@ lessons:
           - { id: c, text: "A log delivers each record to one consumer overall and then deletes it, while a queue retains each message and broadcasts it to the consumers" }
           - { id: d, text: "A queue is always faster than a log: a log writes every record to disk and keeps it for days" }
         answer: a
-        explanation: "Queue: work distribution, with per-message acks, requeueing and routing through exchanges. Log: an append-only history that consumers read at their own pace and can rewind, which suits event streaming, reprocessing and many independent readers. Neither is simply better: pick the queue for task distribution with rich routing, the log for event streams, replay and high throughput. (RabbitMQ also offers stream-style queues, so the distinction is about the model, not the product name.)"
+        explanation: "Queue: work distribution, with per-message acks, requeueing and routing through exchanges. Log: an append-only history that consumers read at their own pace and can rewind, which suits event streaming, reprocessing and many independent readers. Neither is simply better: pick the queue for task distribution with rich routing, the log for event streams, replay and high throughput. (RabbitMQ also offers streams, an append-only log type, and Kafka 4.2 added production-ready share groups with queue-style consumption, so the distinction is about the model, not the product name.)"
 
       - type: single
         prompt: "You add an optional field to an event that producers publish and several teams consume, using a schema registry with compatibility checks. Which kind of change is generally safe?"

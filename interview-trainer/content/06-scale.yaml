@@ -89,7 +89,7 @@ lessons:
           - { id: c, text: "A network partition between app and database, so reconnect and add a retry" }
           - { id: d, text: "The JDBC driver is incompatible with this database, so upgrade the driver and redeploy" }
         answer: a
-        explanation: "`active=10, idle=0, waiting=187` is saturation, not an outage: the database answered, but every connection is in use. Look for slow queries, and for transactions that stay open across remote calls. A bigger pool only helps if the database has spare capacity."
+        explanation: "`active=10, idle=0, waiting=187` is saturation, not an outage: the database answered, but every connection is in use. The 30,000 ms is HikariCP's default `connectionTimeout`, and its default `maximumPoolSize` is 10. Look for slow queries, and for transactions that stay open across remote calls. A bigger pool only helps if the database has spare capacity."
 
       - type: code
         hint: "Compute the rank first, convert it to a 0-based index, and do not mutate the input."
@@ -145,7 +145,7 @@ lessons:
           - { id: c, text: "Stays open until the next deployment, since only a restart resets the breaker" }
           - { id: d, text: "Replays every request that was rejected while it was open, all at once" }
         answer: a
-        explanation: "CLOSED (normal) → OPEN (fail fast) → HALF-OPEN (probe) → CLOSED if the probes succeed, else back to OPEN. Failing fast gives the struggling dependency room to recover."
+        explanation: "CLOSED (normal) → OPEN (fail fast) → HALF-OPEN (probe) → CLOSED if the probes succeed, else back to OPEN. Failing fast gives the struggling dependency room to recover. In Resilience4j the defaults are a 60-second wait in OPEN and 10 permitted trial calls in HALF-OPEN, and the switch to HALF-OPEN happens on the first call after the wait unless `automaticTransitionFromOpenToHalfOpenEnabled` is set (it is off by default)."
 
       - type: single
         hint: "The server needs a way to recognise the same request when it arrives twice."
@@ -406,7 +406,7 @@ lessons:
           - { id: c, text: "Only the first service in the chain needs a timeout, and the others follow its decision" }
           - { id: d, text: "Adding retries at each hop will compensate for the mismatch between the user's limit and the timeouts" }
         answer: a
-        explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC deadlines are designed for this: the client sets one, it travels with the call as the remaining time, and servers can propagate it to downstream calls, in some languages through the call context; with plain HTTP you pass the deadline or remaining budget in a header yourself). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
+        explanation: "Timeouts should shrink along the chain, ideally computed from a propagated deadline (gRPC deadlines are designed for this: the client sets one, it travels with the call as the remaining time, and servers can propagate it to downstream calls, which some implementations do by default (Java and Go) and others only when enabled (C++); with plain HTTP you pass the deadline or remaining budget in a header yourself). Then work is abandoned everywhere as soon as the caller has given up, and a service can refuse a request whose remaining budget is already too small to be useful."
 
       - type: single
         prompt: "With cache-aside, a write must update the database and invalidate the cached entry. Which order is generally safer, and why?"
