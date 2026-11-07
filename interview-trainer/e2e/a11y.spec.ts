@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { defaultPrefs, questionHash, type Lesson, type Question } from '../shared/src';
-import { KEY_V2, TODAY, course, day, dueCards, lessons, playLesson, questions, seed, useClock, v2 } from './engage';
+import { KEY_V2, TODAY, course, day, dueCards, forgetSavedSession, lessons, playLesson, questions, seed, useClock, v2 } from './engage';
 import { answerCorrectly, answerWrongly, check, next, solveAndContinue } from './solve';
 
 /**
@@ -30,6 +30,7 @@ function firstOf(type: Question['type']): { lesson: Lesson; index: number } {
 
 async function gotoQuestion(page: Page, type: Question['type']): Promise<Question> {
   const { lesson, index } = firstOf(type);
+  await forgetSavedSession(page); // a lesson left half way earlier in this test would otherwise resume
   await page.goto(`/#/lesson/${lesson.id}`);
   await page.locator('.prompt').waitFor();
   for (const earlier of lesson.questions.slice(0, index)) await solveAndContinue(page, earlier);
@@ -43,6 +44,18 @@ for (const scheme of SCHEMES) test.describe(`axe: home and sheets (${scheme})`, 
     await page.goto('/');
     await page.locator('.home').waitFor();
     await scan(page, 'home (new learner, onboarding card)');
+  });
+
+  test('home with an unfinished session (the Resume card)', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2({ xp: 40 }) });
+    const lesson = lessons[0]!;
+    await page.goto(`/#/lesson/${lesson.id}`);
+    await page.locator('.prompt').waitFor();
+    for (const q of lesson.questions.slice(0, 2)) await solveAndContinue(page, q);
+    await page.getByRole('button', { name: 'Leave lesson' }).click();
+    await expect(page.getByTestId('resume-card')).toBeVisible();
+    await scan(page, 'home (unfinished session)');
   });
 
   test('active learner: home, streak, goal, settings, reminders, backup sheets', async ({ page }) => {

@@ -2,10 +2,9 @@ import { SafetyMark } from '../components/DataSafety';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   PASS_SCORE, createSession, currentQuestion, followUpAsOpen, pickFollowUp, progress as sessionProgress, submit, summarize, xpFor,
-  type Confidence, type OpenQ, type Question, type SessionSummary,
+  type Confidence, type OpenQ, type Question, type ResumeMeta, type Session, type SessionSummary,
 } from '@trainer/shared';
 import { AskWhy } from '../components/AskWhy';
-import { useConfirm } from '../components/ConfirmDialog';
 import { isModalOpen } from '../components/useModal';
 import { ChoiceQuestion } from '../components/ChoiceQuestion';
 import { CodeBlock } from '../components/CodeBlock';
@@ -26,6 +25,7 @@ import type { ExplainFn } from '../lib/explain';
 import { describeLearnerAnswer } from '../lib/explain';
 import { scrollIntoViewGently } from '../lib/a11y';
 import { evaluate, isPass, outcomeScore, skipOutcome, type Answer, type GradeFn, type Outcome } from '../lib/evaluate';
+import { clearResume, saveResume } from '../lib/resume';
 import { runCodeInWorker } from '../lib/run-code';
 import { useProgress } from '../lib/store';
 
@@ -40,6 +40,14 @@ interface Props {
   reviewHint?: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   /** Short vibration on a correct answer (where supported). */
   haptics?: boolean;
+  /**
+   * Where this session came from. When given, it is saved after every question that was answered and Continue was
+   * pressed, so leaving (the X, or the browser's Back) loses nothing but the question on screen. Omit for sessions of
+   * one question.
+   */
+  save?: Omit<ResumeMeta, 'title'>;
+  /** A saved session to carry on with, instead of starting at the first question. */
+  initial?: Session;
   onExit: () => void;
   onFinish: (summary: SessionSummary) => void;
 }
@@ -70,16 +78,15 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, onExit, onFinish }: Props) {
+export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, save, initial, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
-  const confirm = useConfirm();
-  const [session, setSession] = useState(() => createSession(questions));
+  const [session, setSession] = useState(() => initial ?? createSession(questions));
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [phase, setPhase] = useState<Phase>('answer');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [followUp, setFollowUp] = useState<FollowUpStage | null>(null);
   /** Questions whose hint was revealed (kept across retries; one reveal per question). */
-  const [hinted, setHinted] = useState<ReadonlySet<string>>(() => new Set());
+  const [hinted, setHinted] = useState<ReadonlySet<string>>(() => new Set(initial?.hinted));
   /** Optional "How sure are you?" for the question on screen (off unless switched on in Settings). */
   const confidenceOn = useProgress().progress.settings.confidence;
   const [sure, setSure] = useState<Confidence | null>(null);
@@ -130,9 +137,14 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
     setFollowUp(null);
     const s = submit(session, pass, { hinted: hinted.has(q.id), confidence: sure ?? undefined });
     setSure(null);
-    if (currentQuestion(s) === undefined) onFinish(summarize(s));
-    else setSession(s);
-  }, [outcome, q, phase, pending, followUp, session, hinted, sure, onFinish]);
+    if (currentQuestion(s) === undefined) {
+      if (save) clearResume(save.route); // finished: the results are recorded by onFinish, there is nothing left to resume
+      onFinish(summarize(s));
+    } else {
+      setSession(s);
+      if (save) saveResume(s, { ...save, title });
+    }
+  }, [outcome, q, phase, pending, followUp, session, hinted, sure, onFinish, save, title]);
 
   // A tiny tick on a correct answer, if the learner allows it and the device can.
   useEffect(() => {
@@ -183,21 +195,10 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
         <button
           type="button"
           className="icon-btn"
-          aria-label="Quit lesson"
-          onClick={async () => {
-            // Nothing answered and nothing checked yet means nothing to lose: leave without asking. A checked answer already
-            // shows its XP in the header, and only Continue records it, so leaving then would silently drop it.
-            if (Object.keys(session.attempts).length === 0 && phase === 'answer') return onExit();
-            const ok = await confirm({
-              title: 'Quit this lesson?',
-              body: 'Your answers in it are not saved. You would start again from the first question.',
-              confirmLabel: 'Quit and lose progress',
-              cancelLabel: 'Keep going',
-              tone: 'danger',
-              testId: 'quit-confirm',
-            });
-            if (ok) onExit();
-          }}
+          aria-label="Leave lesson"
+          // Everything up to the last Continue is already saved (see `save`), so leaving needs no confirmation. The browser's
+          // Back button does the same. Only the question on screen, if it was already checked, is asked again.
+          onClick={onExit}
         >
           <Icon name="x" />
         </button>

@@ -81,6 +81,17 @@ Rewards are capped so a mock cannot inflate the daily goal: only the first **2 m
 the day's goal credit is at most **half of the daily goal**. A mock is a practice day for the streak, never a "perfect lesson", never shows a tip.
 Quitting mid-run asks first and saves nothing; a reload mid-run discards it.
 
+## Resuming an unfinished session
+
+Leaving a lesson or a practice session half way (the X in the header, or the browser's Back button) saves it. Home then shows a **Resume** card ("Carry on · 2 of 8 done") with a **Discard** link that asks first. Opening the same lesson or practice again also carries on from where the learner was, with the same questions even when what the app would pick today has changed.
+
+- **What is kept:** the questions still to ask, XP so far, misses (a missed question still waits at the end), hints and "How sure are you?" ratings. **What is not:** the question on screen (it is asked again, also when it was already checked but Continue was not pressed) and a half-done interviewer follow-up.
+- **When it is forgotten:** when the lesson is finished, discarded, or the progress is reset or replaced by an import; after 48 hours; or when the course changed under it (a question gone, moved or reworded).
+- **One at a time.** Starting something else and answering a question replaces the saved session. One-question sessions (Library practice, the daily challenge) and the mock interview are never saved.
+- **Nothing is counted early.** XP, review cards, the streak and badges are settled only when a session finishes, exactly as before.
+
+Code: `shared/src/resume.ts` (record, validation against the course), `web/src/lib/resume.ts` (storage key, `useResume`), the save in `screens/Lesson.tsx`, `SessionScreen` in `App.tsx`, the card in `screens/Home.tsx`. Tests: `shared/src/resume.test.ts`, `web/src/lib/resume.test.ts`, `e2e/resume.spec.ts`.
+
 ## Where things are
 
 | Concern | Files |
@@ -91,4 +102,5 @@ Quitting mid-run asks first and saves nothing; a reload mid-run discards it.
 | Challenge | `challenge.ts`, `ChallengeCard.tsx`, route `#/challenge` in `App.tsx` |
 | Badges | `achievements.ts`, `lib/store.ts` (evaluation), `lib/toasts.ts`, `AchievementToasts.tsx`, `TrophyCase.tsx` |
 | Mock | `mock.ts`, `lib/mock-marking.ts`, `screens/Mock.tsx`, `MockRun.tsx`, `MockResults.tsx`, `MockHistory.tsx` |
+| Resume | `resume.ts`, `lib/resume.ts`, `screens/Lesson.tsx` (save), `App.tsx` (`SessionScreen`), `screens/Home.tsx` (card) |
 | Styles | `web/src/features-a.css` (structure only; the colour and type pass comes later) |

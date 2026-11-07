@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { type Question } from '../shared/src';
-import { KEY_V2, SHOTS, TODAY, course, dueCards, expectNoOverflow, lessons, seed, stored, useClock, v2 } from './engage';
+import { KEY_V2, SHOTS, TODAY, course, dueCards, expectNoOverflow, forgetSavedSession, lessons, seed, stored, useClock, v2 } from './engage';
 import { answerCorrectly, check, solveAndContinue, visible } from './solve';
 
 /** Walks the keyboard Tab order of the current screen and reports every stop that has no visible focus ring. */
@@ -49,6 +49,7 @@ const firstOf = (type: Question['type']) => {
 
 async function gotoQuestion(page: Page, type: Question['type']): Promise<Question> {
   const { lesson, index } = firstOf(type);
+  await forgetSavedSession(page); // a lesson left half way earlier in this test would otherwise resume
   await page.goto(`/#/lesson/${lesson.id}`);
   await page.locator('.prompt').waitFor();
   for (const earlier of lesson.questions.slice(0, index)) await solveAndContinue(page, earlier);

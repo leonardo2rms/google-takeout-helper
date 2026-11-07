@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
   ACHIEVEMENTS, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
-  reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
+  isResumeKind, reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
@@ -12,6 +12,7 @@ import { type SessionKind } from './lib/summary-copy';
 import { createSampleExplainer, explainOnline, type ExplainFn } from './lib/explain';
 import type { GradeFn } from './lib/evaluate';
 import { inDays, plural } from './lib/format';
+import { resumeFor } from './lib/resume';
 import { createSampleGrader, isStandalone, loadSample } from './lib/sample-grader';
 import { AchievementToasts } from './components/AchievementToasts';
 import { ConfirmProvider } from './components/ConfirmDialog';
@@ -192,22 +193,25 @@ function Screens() {
     const ui = course.units.indexOf(found.unit);
     const num = `${ui + 1}.${found.unit.lessons.indexOf(found.lesson) + 1}`;
     return (
-      <LessonScreen
-        key={found.lesson.id}
+      <SessionScreen
+        key={route}
+        route={route}
+        kind="lesson"
         title={`${num} ${found.lesson.title}`}
+        finishTitle={found.lesson.title}
+        lessonId={found.lesson.id}
         questions={found.lesson.questions}
+        progress={progress}
         grade={grade}
         explain={explain}
         reviewHint={reviewHint}
-        haptics={progress.settings.haptics}
-        onExit={() => go('/')}
-        onFinish={(s) => finish(found.lesson.title, s, 'lesson', found.lesson.id)}
+        onFinish={finish}
       />
     );
   }
 
   const practice = (kind: PracticeKind, title: string, unitId?: string) => (
-    <Practice key={`${kind}${unitId ?? ''}`} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} explain={explain} reviewHint={reviewHint} onFinish={finish} />
+    <SessionScreen key={`${kind}${unitId ?? ''}`} route={practiceRoute(kind, unitId)} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} explain={explain} reviewHint={reviewHint} onFinish={finish} />
   );
   if (route === '/library') return <Library course={course} progress={progress} />;
   if (route === '/mock') return <MockScreen course={course} progress={progress} grade={grade} />;
@@ -277,18 +281,43 @@ function pickQuestions(kind: PracticeKind, progress: Progress, unitId?: string):
   }
 }
 
-function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, onFinish }: {
-  kind: PracticeKind;
+/** The route that opens a practice session: opening it again carries on from a saved one. */
+function practiceRoute(kind: PracticeKind, unitId?: string): string {
+  switch (kind) {
+    case 'topic':
+      return `/topic/${unitId}`;
+    case 'one':
+      return `/q/${unitId}`;
+    default:
+      return `/${kind}`;
+  }
+}
+
+/**
+ * A lesson or a practice session. The questions are fixed when it opens (a lesson's own, or a pick for the day), unless
+ * the learner left this same session half way: then it carries on from the saved one, with the same questions.
+ * One-question sessions (Library practice, the daily challenge) are never saved.
+ */
+function SessionScreen({ route, kind, title, finishTitle = title, unitId, lessonId, questions: fixed, progress, grade, explain, reviewHint, onFinish }: {
+  route: string;
+  kind: SessionKind;
   title: string;
+  /** The title the summary shows, when it differs from the one in the lesson header. */
+  finishTitle?: string;
   unitId?: string;
+  lessonId?: string;
+  /** A lesson brings its questions; a practice session picks them. */
+  questions?: Question[];
   progress: Progress;
   grade?: GradeFn;
   explain?: ExplainFn;
   reviewHint: (q: Question, outcome: 'first' | 'retry' | 'failed') => string | null;
   onFinish: (title: string, s: SessionSummary, kind: SessionKind, lessonId?: string, servedOn?: string) => void;
 }) {
-  const [questions] = useState<Question[]>(() => pickQuestions(kind, progress, unitId));
-  const [servedOn] = useState(() => dayKey(new Date())); // same moment the questions were picked
+  const resumable = isResumeKind(kind);
+  const [saved] = useState(() => (resumable ? resumeFor(route) : null));
+  const [questions] = useState<Question[]>(() => (saved ? saved.session.queue : (fixed ?? pickQuestions(kind as PracticeKind, progress, unitId))));
+  const [servedOn] = useState(() => saved?.record.servedOn ?? dayKey(new Date())); // the day the session was opened
 
   if (questions.length === 0) {
     return (
@@ -308,8 +337,10 @@ function Practice({ kind, title, unitId, progress, grade, explain, reviewHint, o
       explain={explain}
       reviewHint={reviewHint}
       haptics={progress.settings.haptics}
+      save={resumable ? { route, kind, lessonId, servedOn } : undefined}
+      initial={saved?.session}
       onExit={() => go('/')}
-      onFinish={(s) => onFinish(title, s, kind, undefined, servedOn)}
+      onFinish={(s) => onFinish(finishTitle, s, kind, lessonId, servedOn)}
     />
   );
 }

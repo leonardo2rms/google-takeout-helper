@@ -16,6 +16,8 @@ export const SHOTS = resolve(here, 'screenshots');
 
 export const KEY_V1 = 'interview-trainer.progress.v1';
 export const KEY_V2 = 'interview-trainer.progress.v2';
+/** The unfinished session (see resume.spec.ts). Opening a lesson that was left half way carries on from it. */
+export const RESUME_KEY = 'interview-trainer.resume.v1';
 
 /** The pretend "now" for deterministic tests: Wednesday 2026-11-04, 10:00 local time. */
 export const NOW = new Date(2026, 10, 4, 10, 0, 0);
@@ -110,6 +112,20 @@ export async function expectNoOverflow(page: Page): Promise<void> {
     clientWidth: document.documentElement.clientWidth,
   }));
   expect(scrollWidth, 'page is wider than the viewport').toBeLessThanOrEqual(clientWidth);
+}
+
+/**
+ * Forgets a lesson left half way, so the next visit to that lesson starts at its first question. Helpers that open
+ * several lessons in one page (and leave them unfinished) call this first. Safe before the first page has loaded.
+ */
+export async function forgetSavedSession(page: Page): Promise<void> {
+  await page.evaluate((k) => {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      /* no storage yet */
+    }
+  }, RESUME_KEY);
 }
 
 export const dueCount = (page: Page) => page.getByTestId('due-count');

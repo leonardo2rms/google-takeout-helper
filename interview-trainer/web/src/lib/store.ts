@@ -4,6 +4,7 @@ import {
   KEY_V2, allQuestions, backfillAchievements, dayKey, emptyProgress, exportProgress, listParked, loadProgress, mergeProgress, parkRaw, saveProgress,
   silentUnlock, unlockAchievements, type ParkedCopy, type Progress, type StorageLike,
 } from '@trainer/shared';
+import { clearResume } from './resume';
 import { pushBadgeToast } from './toasts';
 
 /**
@@ -263,6 +264,7 @@ function keepSafetyCopy(): void {
 function resetProgress(): void {
   keepSafetyCopy();
   updateProgress(() => emptyProgress());
+  clearResume(); // an unfinished session belongs to the profile that was just wiped
 }
 
 export function useProgress() {
@@ -286,6 +288,7 @@ export const exportText = (): string => exportProgress(ensure(), new Date());
 export function replaceProgress(p: Progress): void {
   keepSafetyCopy();
   updateProgress((cur) => ({ ...p, prefs: cur.prefs }), { silent: true });
+  clearResume(); // as for a reset: the unfinished session was part of the profile that was replaced
 }
 export const mergeIntoProgress = (incoming: Progress): void => updateProgress((cur) => mergeProgress(cur, incoming, migrationCtx()), { silent: true });
 export const importContext = migrationCtx;
