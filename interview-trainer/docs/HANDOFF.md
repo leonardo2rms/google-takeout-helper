@@ -280,13 +280,26 @@ reduced XP; I also made the goal count distinct questions, as proposed.
   repeating (lifetime counters count real practice); it only fools the learner. Say if you want those to count distinct
   questions too.
 
-**P1-7 Re-check version-sensitive facts against official docs**
-- Checked from knowledge only during the fact-check passes: `@MockBean` vs `@MockitoBean` (Spring Boot 3.4+),
-  `flatMapLatest` still `@ExperimentalCoroutinesApi`, `NESTED` propagation with JPA, the `@DslMarker` semantics wording,
-  the `@ConfigurationProperties` relaxed-binding example (`APP_MAXRETRIES`), the Kotlin 1.7 exhaustive-`when` change,
-  `spring.threads.virtual.enabled`, JDK 21 virtual-thread pinning, Flyway checksum validation, Micrometer tag rules, the
-  `-Xlog:safepoint` sample line, Loom carrier-pool sizing. Grep the content for each and confirm or soften.
-  *Size:* S.
+**P1-7 Re-check version-sensitive facts against official docs**: **done** (2026-11-07).
+- Four agents with web access checked 262 claims in all 13 units against official sources (Kotlin 2.4.21 and
+  kotlinx.coroutines 1.11.0; JDK 25 LTS, Kafka 4.2, Hibernate 7.4, Flyway 13; Spring Boot 4.1.2, Framework 7.0.10,
+  Micrometer 1.17; OWASP, the MCP and provider docs). Result: 210 confirmed, 38 softened or qualified with a version,
+  12 fixed, **no answer key changed**. Every claim, verdict and source is in the four records listed in
+  [research/README.md](research/README.md) (`p1-7-*.md`).
+- The changes that matter: virtual-thread pinning on `synchronized` is now stated as JDK 21 to 23 (JEP 491 removed it in
+  JDK 24, so `jvm-runtime/5` now says "On JDK 21"; its review cards restart); `NESTED` propagation does not work with
+  `JpaTransactionManager`; `@MockBean` was removed in Boot 4.0; Testcontainers no longer needs `replace = NONE` since
+  Boot 3.4; the Kafka consumer log in `msg-kafka/4` was invented and is now the real client wording; `read_committed` is
+  not Kafka's default; HashMap treeification wording; Kotlin's own `ArrayDeque` does support index access.
+- Not verified, because the source was unreachable or only a secondary summary was found (none changes an answer):
+  the default of `spring.jpa.open-in-view` in Boot 4.x, the Hibernate 7 wording on EAGER and N+1 in JPQL, the
+  "propagate trace context even for unsampled requests" point in `observability-incidents/9`, RFC 8725 and the SRE
+  burn-rate figures (arithmetic checked), and whether `suspend` functions returning `Result` were legal at exactly Kotlin
+  1.5.0. docs.spring.io, docs.micrometer.io, owasp.org, docs.junit.org and several others were blocked in the sandbox
+  (the agents used source code on GitHub, Maven Central and domain-limited search instead): re-check those few with
+  direct access.
+- This is a snapshot: Spring, Kotlin, the JDK and above all the AI content move. Re-run the check (the method is in the
+  records) before a release, and prefer wording that names a version over wording that says "currently".
 
 ### P2: product improvements
 

@@ -17,6 +17,10 @@ the app at the time they were written and are not updated. For what was built af
 | [audit-qa-round1.md](audit-qa-round1.md) | Adversarial QA/security audit, findings S0-1..S2-27 with reproduction scripts (scripts not in repo). | After the redesign | S0/S1 fixed (content tells: handoff P1-1, done); leftovers in the handoff. |
 | [audit-ux-round2.md](audit-ux-round2.md) | UX re-audit: round-1 verification and new findings N-1..N-18. | After round-1 fixes | P1s fixed; leftovers in the handoff. |
 | [audit-qa-round2.md](audit-qa-round2.md) | QA re-audit: round-1 status, new findings N-S1-1..N-S2-13, hand-mutation results. | After round-1 fixes | Code findings and the content tells (P1-1) fixed; a few S2s open (handoff). |
+| [p1-7-kotlin-coroutines.md](p1-7-kotlin-coroutines.md) | Claim-by-claim check of `01-kotlin` and `02-coroutines` against the Kotlin and kotlinx.coroutines docs and source (43 claims). | 2026-11-07 | Done; fixes merged. |
+| [p1-7-spring-testing-security.md](p1-7-spring-testing-security.md) | The same for `03-spring`, `12-testing`, `13-security-observability` (48 claims). | 2026-11-07 | Done; fixes merged. |
+| [p1-7-jvm-data-messaging-scale.md](p1-7-jvm-data-messaging-scale.md) | The same for `04-jvm`, `09-data`, `10-messaging`, `06-scale` (52 claims; JEP 491 and the Kafka log). | 2026-11-07 | Done; fixes merged. |
+| [p1-7-ai-ddd-design-complexity.md](p1-7-ai-ddd-design-complexity.md) | The same for `08-ai`, `05-ddd`, `11-system-design`, `07-complexity` (119 claims). | 2026-11-07 | Done; fixes merged. |
 
 The finding ids (UX-nn, N-nn, S1-n, S2-nn, N-S1-n, N-S2-nn) are referenced from the handoff and from commit messages, so
 `git log --grep=N-S2-6` finds the fix for a given finding.
