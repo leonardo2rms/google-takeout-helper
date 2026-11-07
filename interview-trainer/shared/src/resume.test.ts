@@ -8,7 +8,7 @@ import {
   type ResumeMeta, type ResumeRecord,
 } from './resume';
 import { allQuestions, type Question } from './schema';
-import { createSession, submit } from './session';
+import { XP_REPEAT, createSession, submit } from './session';
 
 const course = loadCourse(resolve(dirname(fileURLToPath(import.meta.url)), '../../content'));
 const all = allQuestions(course);
@@ -68,6 +68,25 @@ describe('readResume: a saved session comes back exactly', () => {
     expect(back.missed).toEqual(s.missed);
     expect(back.hinted).toEqual(s.hinted);
     expect(back.confidence).toEqual(s.confidence);
+  });
+
+  it('keeps which questions were already done today, so the XP of the rest of the session stays what it was', () => {
+    let s = createSession(lesson.questions, { repeats: [lesson.questions[0]!.id, lesson.questions[3]!.id] });
+    s = submit(submit(s, true), true);
+    expect(s.repeats).toHaveLength(2);
+    const back = roundTrip(toResume(s, meta, NOW))!.session;
+    expect(back.repeats).toEqual(s.repeats);
+    expect(back.xp).toBe(s.xp);
+    // answering the next repeated question on the resumed session pays the reduced amount, as it would have
+    let next = back;
+    while (next.queue[0]!.id !== lesson.questions[3]!.id) next = submit(next, true);
+    expect(submit(next, true).xp - next.xp).toBe(XP_REPEAT);
+  });
+
+  it('a session saved before repeats existed resumes with none', () => {
+    const old = JSON.parse(serializeResume(toResume(played(2), meta, NOW)!));
+    delete old.state.repeats;
+    expect(readResume(JSON.stringify(old), byId, NOW)!.session.repeats).toEqual([]);
   });
 
   it('works for every kind of session', () => {
@@ -137,6 +156,7 @@ describe('readResume: a record that is not valid for this course or this moment 
     ['no attempts', { attempts: {} }], ['attempt count 0', { attempts: { 'x/1': 0 } }], ['attempt count beyond the retries', { attempts: { 'x/1': 9 } }],
     ['attempts is a list', { attempts: [] }], ['missed is not ids', { missed: [1] }], ['hinted is a string', { hinted: 'a' }],
     ['correct too long', { correct: Array.from({ length: 61 }, (_, i) => `q/${i}`) }],
+    ['repeats is not ids', { repeats: [1] }], ['repeats is a string', { repeats: 'a' }], ['repeats too long', { repeats: Array.from({ length: 61 }, (_, i) => `q/${i}`) }],
     ['bad rating', { confidence: { 'x/1': 7 } }], ['ratings as a list', { confidence: [] }],
   ])('a state with %s', (_what, patch) => {
     const g = good();

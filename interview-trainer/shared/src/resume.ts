@@ -121,7 +121,8 @@ export function readResume(text: string | null, questions: ReadonlyMap<string, Q
   const recovered = idList(st.recovered, MAX_TOTAL);
   const correct = idList(st.correct, MAX_TOTAL);
   const hinted = idList(st.hinted, MAX_TOTAL);
-  if (!missed || !recovered || !correct || !hinted) return null;
+  const repeats = st.repeats === undefined ? [] : idList(st.repeats, MAX_TOTAL); // saved before repeats existed: none
+  if (!missed || !recovered || !correct || !hinted || !repeats) return null;
   if (!isObj(confidence)) return null;
   const confidenceOk: Record<string, Confidence> = {};
   for (const [id, c] of Object.entries(confidence)) {
@@ -129,7 +130,7 @@ export function readResume(text: string | null, questions: ReadonlyMap<string, Q
     confidenceOk[id] = c;
   }
 
-  const state = { total, resolved, firstTryCorrect, xp, attempts: attemptsOk, missed, recovered, correct, hinted, confidence: confidenceOk };
+  const state = { total, resolved, firstTryCorrect, xp, attempts: attemptsOk, missed, recovered, correct, hinted, confidence: confidenceOk, repeats };
   const record: ResumeRecord = {
     v: RESUME_VERSION, route, title, kind, ...(lessonId === undefined ? {} : { lessonId }), servedOn, savedAt,
     queue: queue.map((q) => ({ id: q.id, h: questionHash(q) })),

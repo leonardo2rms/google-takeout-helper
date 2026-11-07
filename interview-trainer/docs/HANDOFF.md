@@ -27,10 +27,10 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,575 unit/content/docs tests (vitest) |
+| `npm test` | 1,604 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 315 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 322 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,575 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 315
+1,604 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 322
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -263,10 +263,22 @@ Ids are stable so commits and sessions can refer to them. Audit ids in brackets 
   equivalent mutant remains: with a saved session `LessonScreen` takes its queue from `initial`, so the picked
   `questions` are unused).
 
-**P1-6 Decide and enforce the XP / goal farming rule** [S2-11]
-- Repeating one question (Library "practise this one", challenge) earns XP and goal credit each time: 8 repeats give 80
-  XP and a full goal. Product decision needed (e.g. a question counts once per day toward the goal and earns reduced XP
-  after the first correct answer of the day). Logic in `shared/src/goal.ts` / `shared/src/session.ts`. *Size:* S.
+**P1-6 Decide and enforce the XP / goal farming rule** [S2-11]: **done** (2026-11-07). Decision (yours): repeats earn
+reduced XP; I also made the goal count distinct questions, as proposed.
+- A question already answered earlier today (its review card was updated today and matches the wording,
+  `alreadyDoneToday` in `shared/src/goal.ts`; no new stored data) pays at most `XP_REPEAT = 2` for a correct answer, does
+  not count for the daily goal again, and scales the perfect-lesson bonus by the share of new questions. The next day it
+  pays in full. Lifetime counters still count it as practice. The mock interview keeps its own credit and is untouched.
+- The app says so: a note on the repeated question and a line on the summary. Eight rounds of one Library question now
+  give 10 + 7 x 2 = 24 XP and a goal credit of 1 (was 80 XP and 8/8). Details: "Doing the same question again" in
+  [learning-features.md](learning-features.md).
+- Side fix found by a flaky test: finishing a session and re-entering the same route before React rendered the summary
+  reused the finished screen (the hash handler re-reads `location.hash`, so a visit to `/done` and a return looked like
+  "no change"). Session screens are now keyed by a navigation counter (`useVisit` in `web/src/App.tsx`); a deterministic
+  e2e test covers it, and the old flake (about 1 in 60) is gone in 240 runs.
+- Not changed, deliberately: badges such as "N perfect lessons" and "N questions answered" can still be advanced by
+  repeating (lifetime counters count real practice); it only fools the learner. Say if you want those to count distinct
+  questions too.
 
 **P1-7 Re-check version-sensitive facts against official docs**
 - Checked from knowledge only during the fact-check passes: `@MockBean` vs `@MockitoBean` (Spring Boot 3.4+),

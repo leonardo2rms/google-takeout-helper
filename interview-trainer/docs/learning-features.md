@@ -39,6 +39,19 @@ It is asked **before** the answer is checked, because after the feedback a ratin
 - Right while *guessing*: graded `hard`, so the interval stays short. Right and *sure*: `easy`.
 - Progress shows "When you said Sure you were right 86% of the time (44 ratings)" once there are 10+ ratings at that level.
 
+## Doing the same question again
+
+Repeating one easy question must not fill the daily goal or pile up XP (audit finding S2-11: eight rounds of one Library question used to give 80 XP and a full 8/8 goal). The rule, for everything except the mock interview:
+
+- A question counts as **already done today** when its review card was updated today and still belongs to this wording of the question (`alreadyDoneToday`, `shared/src/goal.ts`). No extra data is stored: the card's `last` day is the record.
+- **XP:** a correct answer to such a question pays `XP_REPEAT = 2` at most (never above the usual 10 / 4, a hint still takes 3 off, never below 1). The perfect-lesson bonus is scaled by the share of questions that were new today, so replaying a whole lesson earns no bonus. `Session.repeats` carries the ids so the XP shown in the lesson header is the XP that will be credited.
+- **Daily goal:** only questions not yet counted today add to it (`applySession`: the day log gets the *credited* number). A session that repeats everything leaves the ring where it was and cannot fire "goal met" again. The lifetime counters still move, because it was real practice, and the review card is updated as for any answer (an early review of a card that is not due yet only changes its bookkeeping, never its interval).
+- **Told, not hidden:** a repeated question shows "You did this one earlier today: it earns less XP and does not count again towards today's goal", and the summary says how many questions were repeats.
+- **The next day** the same question pays in full again. A saved (resumed) session keeps its `repeats`, so leaving and coming back does not change the XP of its questions.
+- The mock interview keeps its own capped credit (`mockCredit`) and ignores this rule.
+
+Result for the old farming case: 8 rounds of one question now give 10 + 7 × 2 = 24 XP and a goal credit of 1.
+
 ## Bookmarks, notes and the Library
 
 Under every lesson feedback: **Save** (star) and **Add note**. `#/library` lists every question with full-text search (all words must
@@ -96,7 +109,7 @@ Code: `shared/src/resume.ts` (record, validation against the course), `web/src/l
 
 | Concern | Files |
 |---|---|
-| Hints, XP | `session.ts` (`HINT_COST`, `xpFor`), `srs.ts` (`gradeFor`), `web/src/components/Hint.tsx` |
+| Hints, XP, repeats | `session.ts` (`HINT_COST`, `xpFor`, `XP_REPEAT`), `goal.ts` (`alreadyDoneToday`), `events.ts` (goal credit), `srs.ts` (`gradeFor`), `web/src/components/Hint.tsx` |
 | Confidence | `srs.ts` (`isHypercorrection`, `hc`), `calibration.ts`, `ConfidenceRow.tsx`, `Calibration.tsx` |
 | Library | `library.ts`, `screens/Library.tsx`, `QuestionTools.tsx` |
 | Challenge | `challenge.ts`, `ChallengeCard.tsx`, route `#/challenge` in `App.tsx` |

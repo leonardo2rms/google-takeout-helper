@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
-  ACHIEVEMENTS, XP_PERFECT_BONUS, allQuestions, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
+  ACHIEVEMENTS, XP_REPEAT, allQuestions, alreadyDoneToday, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
   isResumeKind, reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
@@ -35,6 +35,21 @@ function useHashRoute(): string {
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
   return route;
+}
+
+/**
+ * Counts every navigation, even one that ends on the route it started from (the hash handler reads the hash when it runs,
+ * so a visit to /done and a return to /q/x queued together look like "no change"). A session screen is keyed by it, so
+ * every visit to a lesson or practice route starts or resumes a session and never reuses a finished one's state.
+ */
+function useVisit(): number {
+  const [visit, setVisit] = useState(0);
+  useEffect(() => {
+    const bump = () => setVisit((v) => v + 1);
+    window.addEventListener('hashchange', bump);
+    return () => window.removeEventListener('hashchange', bump);
+  }, []);
+  return visit;
 }
 
 const go = (route: string) => {
@@ -94,6 +109,7 @@ function Shell() {
 
 function Screens() {
   const route = useHashRoute();
+  const visit = useVisit();
   const { progress, update, reset } = useProgress();
   const [health, setHealth] = useState<HealthResponse | null>(null);
   const [finished, setFinished] = useState<Finished | null>(null);
@@ -128,7 +144,7 @@ function Screens() {
     let before: Progress = getProgress();
     let events: SessionEvent[] = [];
     // A session of one question (Library practice, the daily challenge) earns no "perfect lesson" bonus.
-    const baseXp = kind && summary.perfect ? summary.xp - XP_PERFECT_BONUS : summary.xp;
+    const baseXp = kind ? summary.xp - summary.bonus : summary.xp;
     const badgesBefore = getProgress().achievements;
     const pass = summary.accuracy >= 1;
     let challengeBonus = 0;
@@ -165,10 +181,10 @@ function Screens() {
       goalAfter: goalToday(after, today),
       forecast: reviewForecast(after.cards, Object.keys(outcomes), today),
       tip: tipEvent && tipQuestion ? { text: explanationOf(tipQuestion), bonusXp: tipEvent.bonusXp } : null,
-      extraNotes:
-        kind === 'challenge'
-          ? [`Daily challenge ${pass ? `passed (+${challengeBonus} XP)` : 'done'}. Challenge streak: ${plural(challengeStreak(after, today).current, 'day')}.`]
-          : [],
+      extraNotes: [
+        ...(kind === 'challenge' ? [`Daily challenge ${pass ? `passed (+${challengeBonus} XP)` : 'done'}. Challenge streak: ${plural(challengeStreak(after, today).current, 'day')}.`] : []),
+        ...(summary.repeats > 0 ? [`${plural(summary.repeats, 'question')} you had already done today earned at most ${XP_REPEAT} XP each and did not count again towards today's goal.`] : []),
+      ],
     });
     go('/done');
   }, []);
@@ -194,7 +210,7 @@ function Screens() {
     const num = `${ui + 1}.${found.unit.lessons.indexOf(found.lesson) + 1}`;
     return (
       <SessionScreen
-        key={route}
+        key={`${route}#${visit}`}
         route={route}
         kind="lesson"
         title={`${num} ${found.lesson.title}`}
@@ -211,7 +227,7 @@ function Screens() {
   }
 
   const practice = (kind: PracticeKind, title: string, unitId?: string) => (
-    <SessionScreen key={`${kind}${unitId ?? ''}`} route={practiceRoute(kind, unitId)} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} explain={explain} reviewHint={reviewHint} onFinish={finish} />
+    <SessionScreen key={`${kind}${unitId ?? ''}#${visit}`} route={practiceRoute(kind, unitId)} kind={kind} title={title} unitId={unitId} progress={progress} grade={grade} explain={explain} reviewHint={reviewHint} onFinish={finish} />
   );
   if (route === '/library') return <Library course={course} progress={progress} />;
   if (route === '/mock') return <MockScreen course={course} progress={progress} grade={grade} />;
@@ -318,6 +334,8 @@ function SessionScreen({ route, kind, title, finishTitle = title, unitId, lesson
   const [saved] = useState(() => (resumable ? resumeFor(route) : null));
   const [questions] = useState<Question[]>(() => (saved ? saved.session.queue : (fixed ?? pickQuestions(kind as PracticeKind, progress, unitId))));
   const [servedOn] = useState(() => saved?.record.servedOn ?? dayKey(new Date())); // the day the session was opened
+  // Questions already answered today pay reduced XP and do not count again for the goal. Fixed when the session opens.
+  const [repeats] = useState(() => alreadyDoneToday(progress, questions, dayKey(new Date())));
 
   if (questions.length === 0) {
     return (
@@ -339,6 +357,7 @@ function SessionScreen({ route, kind, title, finishTitle = title, unitId, lesson
       haptics={progress.settings.haptics}
       save={resumable ? { route, kind, lessonId, servedOn } : undefined}
       initial={saved?.session}
+      repeats={repeats}
       onExit={() => go('/')}
       onFinish={(s) => onFinish(finishTitle, s, kind, lessonId, servedOn)}
     />

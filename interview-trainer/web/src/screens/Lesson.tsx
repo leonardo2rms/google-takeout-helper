@@ -48,6 +48,8 @@ interface Props {
   save?: Omit<ResumeMeta, 'title'>;
   /** A saved session to carry on with, instead of starting at the first question. */
   initial?: Session;
+  /** Ids of these questions that were already answered earlier today: they earn reduced XP and do not count again for the daily goal. */
+  repeats?: readonly string[];
   onExit: () => void;
   onFinish: (summary: SessionSummary) => void;
 }
@@ -78,9 +80,9 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
-export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, save, initial, onExit, onFinish }: Props) {
+export function LessonScreen({ title, questions, grade, explain, reviewHint, haptics, save, initial, repeats, onExit, onFinish }: Props) {
   const aiAvailable = Boolean(grade);
-  const [session, setSession] = useState(() => initial ?? createSession(questions));
+  const [session, setSession] = useState(() => initial ?? createSession(questions, { repeats }));
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [phase, setPhase] = useState<Phase>('answer');
   const [outcome, setOutcome] = useState<Outcome | null>(null);
@@ -107,7 +109,7 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
   const passed = outcome ? (overallScore !== null ? overallScore >= PASS_SCORE : isPass(outcome)) : false;
 
   // The reward is shown the moment the answer is checked, not one tap later: the bar's XP already includes it.
-  const gain = phase === 'feedback' && q && passed && !pending ? xpFor(attempt + 1, hinted.has(q.id)) : 0;
+  const gain = phase === 'feedback' && q && passed && !pending ? xpFor(attempt + 1, hinted.has(q.id), session.repeats.includes(q.id)) : 0;
 
   const check = useCallback(async () => {
     if (!view || !answer || phase !== 'answer') return;
@@ -230,6 +232,9 @@ export function LessonScreen({ title, questions, grade, explain, reviewHint, hap
             {followUp ? 'Interviewer follow-up' : LABEL[view.type]}
           </span>
         </p>
+        {!followUp && session.repeats.includes(q.id) && (
+          <p className="muted repeat-note" data-testid="repeat-note">You did this one earlier today: it earns less XP and does not count again towards today's goal.</p>
+        )}
         <h1 className="prompt" ref={promptRef} tabIndex={-1}><Inline text={view.prompt} /></h1>
         {view.code && <CodeBlock source={view.code.source} lang={view.code.lang} />}
         {!followUp && view.hint && (

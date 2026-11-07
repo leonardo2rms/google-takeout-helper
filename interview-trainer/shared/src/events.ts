@@ -1,5 +1,5 @@
 import type { Day } from './day';
-import { goalToday, recordDay } from './goal';
+import { alreadyDoneToday, goalToday, recordDay } from './goal';
 import { fnv1a } from './hash';
 import { readiness, topicStats, type ReadinessLabel } from './mastery';
 import type { Confidence, Progress, QuestionId } from './progress';
@@ -118,6 +118,12 @@ export function applySession(
   const answered = r.answered ?? Object.keys(outcomes).length;
   // `answered` can be lower than the number of outcomes (a mock credits the goal only partly): first tries never exceed it.
   const firstTry = Math.min(answered, Object.values(outcomes).filter((o) => o === 'first').length);
+  // The daily goal counts distinct questions: one already answered earlier today does not count again (it still counts as
+  // practice in the lifetime stats). A mock has its own capped credit and is left as it is.
+  const repeated = new Set(r.kind === 'mock' ? [] : alreadyDoneToday(p, questions.filter((q) => q.id in outcomes), today));
+  const fresh = Object.keys(outcomes).filter((id) => !repeated.has(id));
+  const credited = Math.min(answered, fresh.length);
+  const firstTryCredited = Math.min(credited, fresh.filter((id) => outcomes[id] === 'first').length);
 
   const beforeRank = rankFor(p.xp);
   const beforeGoal = goalToday(p, today);
@@ -141,7 +147,7 @@ export function applySession(
     freezes: streak.freezes,
     lastDay: streak.lastDay,
     cards: applyToCards(p.cards, outcomes, questions, today, { deadline: p.profile.interviewDate, confidence: r.confidence, hinted: r.hinted }),
-    days: recordDay(p, today, { xp: r.xp + bonus, answered, firstTry }),
+    days: recordDay(p, today, { xp: r.xp + bonus, answered: credited, firstTry: firstTryCredited }),
     stats: {
       sessions: p.stats.sessions + 1,
       answered: p.stats.answered + answered,

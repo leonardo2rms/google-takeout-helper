@@ -1,5 +1,7 @@
 import { addDays, daysBetween, type Day } from './day';
+import { questionHash } from './hash';
 import { DAYS_KEPT, DEFAULT_GOAL, MAX_GOAL, type DayLog, type Progress } from './progress';
+import type { Question } from './schema';
 
 /** Questions per day. A default Daily Practice is 8, which is "light" and takes about five minutes. */
 export const GOAL_PRESETS = { light: 8, regular: 16, serious: 24 } as const;
@@ -38,6 +40,17 @@ export function goalDisplay(g: Pick<GoalToday, 'done' | 'target'>): GoalDisplay 
   const shown = Math.min(g.done, g.target);
   const bonus = Math.max(0, g.done - g.target);
   return { shown, target: g.target, bonus, ratio: `${shown}/${g.target}`, sentence: `${shown} of ${g.target} questions today` };
+}
+
+/**
+ * The ids among `questions` that were already answered earlier today: their review card was updated today and still
+ * belongs to this wording of the question. Such a question pays reduced XP and does not count for the goal again.
+ */
+export function alreadyDoneToday(p: Progress, questions: readonly Question[], today: Day): string[] {
+  return questions.filter((q) => {
+    const card = p.cards[q.id];
+    return card !== undefined && card.last === today && card.h === questionHash(q);
+  }).map((q) => q.id);
 }
 
 /** The target that applies on `today` and whether it is the halved comeback goal. */
