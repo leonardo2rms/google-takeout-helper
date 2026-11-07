@@ -116,7 +116,7 @@ lessons:
           - { id: d, text: "Validate model output against a schema/allow-list before acting on it" }
           - { id: e, text: "Give the agent admin credentials so it can fix its own mistakes" }
         answers: [a, b, d]
-        explanation: "You cannot reliably prompt your way out of injection, so limit the blast radius: minimal permissions, server-side authorisation checks, and deterministic validation between the model and anything with side effects."
+        explanation: "You cannot reliably prompt your way out of injection (OWASP lists it as LLM01 in its 2025 Top 10 for LLM applications and says it is unclear whether any prevention is fool-proof), so limit the blast radius: minimal permissions, server-side authorisation checks, and deterministic validation between the model and anything with side effects."
 
       - type: single
         hint: "How would you tell luck from a real improvement?"
@@ -138,7 +138,7 @@ lessons:
           - { id: c, text: "Send the document with each tenth request and rely on the model's memory in between" }
           - { id: d, text: "Split the document across several parallel requests and merge the answers, which cuts latency" }
         answer: a
-        explanation: "Caching works on identical prefixes, so put stable content first and per-request content last, and avoid changing it (timestamps in the prefix break it). The document, not the short question, is the cost; the model is stateless, so a request without the document simply lacks it; and splitting multiplies the tokens you pay for. Also consider a smaller model for simple steps."
+        explanation: "Caching works on identical prefixes, so put stable content first and per-request content last, and avoid changing it (timestamps in the prefix break it). Entries also expire after a provider-specific time (minutes by default) unless traffic keeps using them. The document, not the short question, is the cost; the model is stateless, so a request without the document simply lacks it; and splitting multiplies the tokens you pay for. Also consider a smaller model for simple steps."
 
       - type: single
         prompt: Your Spring service needs to consume the model's answer as data (an object with typed fields). What is the most reliable approach?
@@ -148,7 +148,7 @@ lessons:
           - { id: c, text: "Let the model answer in prose and extract the fields with string splitting on keywords" }
           - { id: d, text: "Trust the model to follow the format and cast the output straight to your data class" }
         answer: a
-        explanation: "Schema-constrained output removes most format errors, but you still validate semantically (ranges, enums, business rules) because valid JSON can still be wrong."
+        explanation: "Schema-constrained output removes most format errors, but you still validate semantically (ranges, enums, business rules) because valid JSON can still be wrong. A refusal or a response cut off at the token limit can also fail to match the schema, hence the fallback."
 
       - type: single
         prompt: "Unit tests that call a live LLM are flaky and slow. What's the better testing strategy?"
@@ -290,14 +290,14 @@ lessons:
           - { id: d, text: "Use the same model that wrote the answers as the only judge, because it understands its own output best" }
           - { id: e, text: "Prefer a deterministic check, such as a schema or an exact match, where one is available" }
         answers: [a, b, c, e]
-        explanation: "LLM judges are useful but biased: they tend to prefer the first (or last) option, longer answers, and output from their own model family. Counter this with swapped orders, specific rubrics, a different or stronger judge model, and regular spot checks against human labels. Where a deterministic check exists (a schema, a unit test, an exact match), use that instead: it is cheaper and does not drift."
+        explanation: "LLM judges are useful but biased: studies report position bias (favouring an option because of where it appears), verbosity bias (longer answers) and self-enhancement bias (output from the judge's own model family). Counter this with swapped orders, specific rubrics, a different or stronger judge model, and regular spot checks against human labels. Where a deterministic check exists (a schema, a unit test, an exact match), use that instead: it is cheaper and does not drift."
 
       - type: estimate
         prompt: "Made-up prices: $1 per million input tokens and $5 per million output tokens. A feature handles 1,000,000 requests per day, each with 3,000 input tokens and 500 output tokens. A response cache answers 30% of the requests without calling the model (ignore the cost of the cache). What is the daily model cost, in dollars?"
         answer: 3850
         tolerance: 0
         unit: dollars
-        explanation: "Per request: 3,000 x $1/1M = $0.003 for input and 500 x $5/1M = $0.0025 for output, so $0.0055. For 1,000,000 requests that is $5,500 per day. Only 70% reach the model: 0.7 x $5,500 = $3,850. Output tokens are priced several times higher than input tokens, so long answers dominate the bill even when prompts are longer. Caching, routing simple requests to a smaller model and trimming the output are the usual levers."
+        explanation: "Per request: 3,000 x $1/1M = $0.003 for input and 500 x $5/1M = $0.0025 for output, so $0.0055. For 1,000,000 requests that is $5,500 per day. Only 70% reach the model: 0.7 x $5,500 = $3,850. Providers typically price output tokens several times higher than input tokens (check the current price list), so long answers can dominate the bill even when prompts are longer. Caching, routing simple requests to a smaller model and trimming the output are the usual levers."
 
       - type: single
         prompt: "A unit test calls a model with temperature 0 and asserts that the answer is exactly the same string every time. Why is this test fragile?"
@@ -307,7 +307,7 @@ lessons:
           - { id: c, text: "Models randomise the first token of an answer, so the start of the string differs between runs of the same prompt" }
           - { id: d, text: "Strings returned by an API arrive in streamed chunks, so `equals` compares the first chunk" }
         answer: a
-        explanation: "Low temperature makes output more repeatable, not guaranteed identical, and providers update models over time. Design for it: put the model behind an interface and use fakes in unit tests, request structured output and assert on its fields or invariants (valid enum, value within range), and track statistical quality with an eval suite instead of single-run string equality."
+        explanation: "Low temperature makes output more repeatable, not guaranteed identical (provider documentation says so), and providers update models over time. Some current models do not even accept a temperature setting and reject the request. Design for it: put the model behind an interface and use fakes in unit tests, request structured output and assert on its fields or invariants (valid enum, value within range), and track statistical quality with an eval suite instead of single-run string equality."
 
       - type: order
         kind: steps

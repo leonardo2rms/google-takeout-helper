@@ -11,7 +11,7 @@ lessons:
         answer: 11574
         tolerance: 0.03
         unit: "req/s"
-        explanation: "1,000,000,000 / 86,400 is about 11,600 req/s. A handy rule: one million requests per day is roughly 12 req/s. That is the average; traffic is never flat, so size for the peak (often 2 to 5 times the average, more for spiky products)."
+        explanation: "1,000,000,000 / 86,400 is about 11,600 req/s. A handy rule: one million requests per day is roughly 12 req/s. That is the average; traffic is never flat, so size for the peak (often several times the average, more for spiky products; measure your own ratio)."
 
       - type: estimate
         prompt: "Peak traffic is 6,000 req/s. One instance sustains 500 req/s when saturated, but you plan to run instances at 60% of that. How many instances do you need to carry the peak (before adding spares for failures)?"
@@ -161,7 +161,7 @@ lessons:
       - type: single
         prompt: "What does PACELC add to the CAP theorem?"
         options:
-          - { id: a, text: "Even with no partition, replicated writes trade latency against consistency on every request" }
+          - { id: a, text: "Even with no partition, replicated systems trade latency against consistency in normal operation" }
           - { id: b, text: "Partitions can be avoided with enough redundant network links, so CAP's trade-off disappears" }
           - { id: c, text: "Consistency and availability can both be kept during a partition, since synchronous replicas never diverge" }
           - { id: d, text: "A fourth guarantee (durability) that has to be traded off against partition tolerance and latency" }

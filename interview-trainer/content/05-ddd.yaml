@@ -27,7 +27,7 @@ lessons:
           - { id: d, text: "Repositories exist per aggregate root, not for each entity inside it" }
           - { id: e, text: "Make aggregates as large as possible: everything inside one stays consistent" }
         answers: [a, b, c, d]
-        explanation: "An aggregate is a consistency boundary that is loaded and saved as a whole, so repositories exist per aggregate root, not per entity. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events."
+        explanation: "An aggregate is a consistency boundary that is loaded and saved as a whole, so repositories exist per aggregate root, not per entity. Referencing other aggregates by identity and modifying one aggregate per transaction are Vernon's rules of thumb: he treats the second as the goal in most cases and documents reasons to break it. Big aggregates cause contention and slow loads. Cross-aggregate consistency is eventual, usually via domain events."
 
       - type: single
         hint: "Where do the business rules live, and what do the entities themselves do?"
@@ -132,7 +132,7 @@ lessons:
                   return Money(cents + other.cents, currency)
               }
           }
-        explanation: "A value object is immutable, compares by value and protects its own invariant (you can't add euros to dollars). Returning a new object instead of mutating `a` is what makes it safe to share; the hidden test passes frozen inputs to catch mutation. Keep money in integer cents to avoid floating-point drift."
+        explanation: "A value object is immutable, compares by value and protects its own invariant (you can't add euros to dollars). Returning a new object instead of mutating `a` is what makes it safe to share; the hidden test passes frozen inputs to catch mutation. Keep money in integer minor units (cents here) to avoid floating-point drift; the number of minor-unit digits depends on the currency."
 
       - type: open
         hint: "Think about identity versus equality by value, and what validating at construction buys you."
@@ -213,7 +213,7 @@ lessons:
           - { id: c, text: "One service per Java package, as packages already group related code" }
           - { id: d, text: "One service per developer, so each service has a clear owner" }
         answer: a
-        explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is cheaper than merging prematurely split services."
+        explanation: "Boundaries drawn around business capabilities keep most changes and transactions inside one service. Starting coarser and splitting later is usually cheaper than merging prematurely split services."
 
       - type: match
         prompt: Match each context-mapping pattern to what it means.
@@ -354,7 +354,7 @@ lessons:
 
       - type: open
         prompt: "A team wants to use event sourcing for the whole system, \"because we need an audit log\". What is your take?"
-        modelAnswer: "Event sourcing stores the sequence of domain events as the source of truth and derives the current state by replaying them. It fits where the history itself is valuable: audit, temporal queries (what did we know last Tuesday), complex workflows, and building new projections from past events. It also has real costs: events are immutable, so evolving their schema needs versioning and upcasting; long streams need snapshots; read models are eventually consistent, which affects the UI; the complexity and learning curve are significant; and erasing personal data (GDPR) conflicts with immutability, usually solved by keeping personal data out of the events or encrypting it per subject and deleting the key (crypto-shredding). Needing an audit log alone is not a reason: an append-only audit table or change-data-capture gives that far more cheaply. I would apply event sourcing selectively, to the aggregates or bounded contexts where history drives the business, and use plain state-based persistence elsewhere."
+        modelAnswer: "Event sourcing stores the sequence of domain events as the source of truth and derives the current state by replaying them. It fits where the history itself is valuable: audit, temporal queries (what did we know last Tuesday), complex workflows, and building new projections from past events. It also has real costs: events are immutable, so evolving their schema needs versioning and upcasting; long streams need snapshots; read models are eventually consistent, which affects the UI; the complexity and learning curve are significant; and erasing personal data (GDPR) conflicts with immutability, usually solved by keeping personal data out of the events or encrypting it per subject and deleting the key (crypto-shredding). Needing an audit log alone is not a reason: an append-only audit table or change-data-capture usually gives that more cheaply. I would apply event sourcing selectively, to the aggregates or bounded contexts where history drives the business, and use plain state-based persistence elsewhere."
         keyPoints:
           - point: "Fits where history matters: audit, temporal queries, rebuilding projections, complex workflows"
             keywords: ["audit", "temporal", "history", "projection"]
