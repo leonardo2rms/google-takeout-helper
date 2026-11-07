@@ -58,7 +58,7 @@ lessons:
           - { id: c, text: "Dispatchers.Unconfined" }
           - { id: d, text: "Dispatchers.Main" }
         answer: a
-        explanation: "`Dispatchers.Default` is sized to CPU cores and is for CPU-bound work: blocking it starves other coroutines. `Dispatchers.IO` uses an elastic pool (64 threads by default) made for blocking calls."
+        explanation: "`Dispatchers.Default` is sized to CPU cores and is for CPU-bound work: blocking it starves other coroutines. `Dispatchers.IO` shares threads with it but allows many more parallel blocking calls (by default at least 64, or the core count if larger)."
 
       - type: single
         hint: "What else does `catch (e: Exception)` catch, and how is cancellation signalled inside a coroutine?"
@@ -114,7 +114,7 @@ lessons:
           - { left: "`Dispatchers.IO`", right: "Blocking calls such as JDBC or file I/O" }
           - { left: "`Dispatchers.Main`", right: "The UI thread in Android and desktop apps" }
           - { left: "`Dispatchers.Unconfined`", right: "Starts in the caller's thread; rarely what you want" }
-        explanation: "Default and IO share one thread pool but have separate limits, so blocking on IO doesn't starve CPU work. Unconfined is mostly for tests and special cases because the resumption thread is unpredictable."
+        explanation: "Default and IO share one thread pool but have separate limits, so blocking on IO doesn't starve CPU work. Unconfined is for special cases only, because the thread on which a coroutine resumes is unpredictable."
 
       - type: open
         hint: "Think about lifetime: who cancels it, and who ever sees its exceptions?"
@@ -253,7 +253,7 @@ lessons:
           - { left: "`flatMapLatest`", right: "Cancels the previous inner flow as soon as a new upstream value arrives" }
           - { left: "`conflate()`", right: "Drops intermediate values so a slow collector only sees the most recent one" }
           - { left: "`buffer()`", right: "Runs the producer in its own coroutine, connected by a channel, so producer and collector overlap" }
-        explanation: "The three `flatMap` variants differ only in how they treat overlapping inner flows: queue them, run them together, or cancel the stale one. `flatMapLatest` is the search-as-you-type operator. `buffer` and `conflate` are about speed mismatch between producer and collector: buffer keeps everything (up to its capacity), conflate keeps only the latest."
+        explanation: "The three `flatMap` variants differ only in how they treat overlapping inner flows: queue them, run them together, or cancel the stale one. `flatMapLatest` is the search-as-you-type operator. In kotlinx.coroutines 1.11 all three `flatMap` variants still need an opt-in (`@ExperimentalCoroutinesApi`), so the compiler warns until you opt in. `buffer` and `conflate` are about speed mismatch between producer and collector: buffer keeps everything (up to its capacity), conflate keeps only the latest."
 
       - type: estimate
         prompt: "Ignoring overhead, how long does this take in total? (Without `buffer()` it would take 1,200 ms.)"
@@ -281,7 +281,7 @@ lessons:
               .[[2]](viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
         bank: ["flatMapLatest", "flatMapConcat", "stateIn", "shareIn", "collect", "conflate"]
         answers: ["flatMapLatest", "stateIn"]
-        explanation: "`flatMapLatest` cancels the running search when a new query arrives, whereas `flatMapConcat` would queue the stale searches. `stateIn` turns the cold flow into a hot `StateFlow` with an initial value; `WhileSubscribed(5_000)` keeps the upstream alive for 5 seconds after the last collector leaves, so a quick re-subscription (for example a screen rotation) does not restart it. `shareIn` would give a `SharedFlow` and needs a replay count instead of an initial value."
+        explanation: "`flatMapLatest` cancels the running search when a new query arrives, whereas `flatMapConcat` would queue the stale searches. `stateIn` turns the cold flow into a hot `StateFlow` with an initial value; `WhileSubscribed(5_000)` keeps the upstream alive for 5 seconds after the last collector leaves, so a quick re-subscription (for example a screen rotation) does not restart it. `shareIn` would give a `SharedFlow` and takes a replay count instead of an initial value. In kotlinx.coroutines 1.11, `flatMapLatest` needs an opt-in for `@ExperimentalCoroutinesApi` and `debounce` one for `@FlowPreview`, so production code adds `@OptIn`."
 
       - type: multi
         prompt: Select all true statements about Channels and Flows.
@@ -320,7 +320,7 @@ lessons:
           - { id: c, text: "Virtual time only works for delays shorter than a few seconds, since longer ones fall back to real time" }
           - { id: d, text: "`delay` is only skipped after an explicit `advanceUntilIdle()` call, so without it `runTest` waits in real time" }
         answer: a
-        explanation: "`runTest` runs the test body on a `TestScheduler` that advances virtual time whenever all coroutines are idle, so `delay(10_000)` costs nothing. A dispatcher the code creates or hard-codes bypasses that scheduler. Inject the `CoroutineDispatcher` (production: `Dispatchers.IO`; test: `StandardTestDispatcher(testScheduler)`) so the test controls time."
+        explanation: "`runTest` runs the test body on a `TestCoroutineScheduler` that advances virtual time whenever all coroutines are idle, so `delay(10_000)` costs nothing. A dispatcher the code creates or hard-codes bypasses that scheduler. Inject the `CoroutineDispatcher` (production: `Dispatchers.IO`; test: `StandardTestDispatcher(testScheduler)`) so the test controls time."
 
       - type: single
         prompt: What happens when `load()` is called?
@@ -354,11 +354,11 @@ lessons:
               }
           }
         answers: [3]
-        explanation: "A `Job` passed to a coroutine builder becomes the parent of the new coroutine, replacing the scope's own job. The launched coroutines are no longer children of `coroutineScope`: it returns without waiting for them, cancelling the scope does not cancel them, and their failures do not reach the caller. To get 'siblings fail independently' use `supervisorScope { launch { } }` instead of passing a job."
+        explanation: "A `Job` passed to a coroutine builder becomes the parent of the new coroutine, replacing the scope's own job. The launched coroutines are no longer children of `coroutineScope`: it returns without waiting for them, cancelling the scope does not cancel them, and their failures do not reach the caller. To get 'siblings fail independently' use `supervisorScope { launch { } }` instead of passing a job. Current kotlinx.coroutines versions warn about passing a `Job` to a builder for this reason."
 
       - type: open
         prompt: "A service consumes events from a stream as a `Flow` and enriches each one with a 50 ms remote call. It falls behind. How do you raise throughput without losing control of memory or ordering?"
-        modelAnswer: "By default a Flow is sequential: each element finishes the whole pipeline before the next starts, so a 50 ms call caps one collector at roughly 20 events per second. To go faster, process several elements at once, for example with `flatMapMerge(concurrency = N)` or by launching the calls from a `channelFlow` with a limited number of workers, and use `buffer()` so the producer is not blocked while the collector is busy. Keep everything bounded: choose a buffer capacity and an overflow policy (suspend for backpressure, or drop if losing items is acceptable) instead of letting a queue grow without limit, and cap concurrency so the downstream service is not flooded. Concurrency changes ordering: `flatMapMerge` emits results as they finish, so if order matters you must partition by key, or start each call as a `Deferred`, buffer them and await them in order. Finally handle errors with retries and backoff, and make the processing idempotent, because failures and restarts cause redelivery."
+        modelAnswer: "By default a Flow is sequential: each element finishes the whole pipeline before the next starts, so a 50 ms call caps one collector at roughly 20 events per second. To go faster, process several elements at once, for example with `flatMapMerge(concurrency = N)` (put the remote call inside the inner flow, because `flatMapMerge` itself calls its transform sequentially) or by launching the calls from a `channelFlow` with a limited number of workers, and use `buffer()` so the producer is not blocked while the collector is busy. Keep everything bounded: choose a buffer capacity and an overflow policy (suspend for backpressure, or drop if losing items is acceptable) instead of letting a queue grow without limit, and cap concurrency so the downstream service is not flooded. Concurrency changes ordering: `flatMapMerge` emits results as they finish, so if order matters you must partition by key, or start each call as a `Deferred`, buffer them and await them in order. Finally handle errors with retries and backoff, and make the processing idempotent, because failures and restarts cause redelivery."
         keyPoints:
           - point: "Flow is sequential by default, so latency caps throughput; add bounded concurrency (flatMapMerge with a limit, channelFlow with workers)"
             keywords: ["sequential", "flatMapMerge", "channelFlow", "concurren"]

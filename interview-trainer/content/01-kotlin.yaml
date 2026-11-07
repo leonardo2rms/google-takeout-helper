@@ -76,7 +76,7 @@ lessons:
           - { id: c, text: "Smart casts only work inside `when` expressions, never after an `if` check" }
           - { id: d, text: "`Box` must be declared `open` or `data` before its properties can be smart cast" }
         answer: a
-        explanation: "Smart casts only work when the value can't change between the check and the use: local `val`s, local `var`s not captured in a modifying lambda, and `val` properties without custom getters in the same module. Copy it to a local `val` (`val v = b.value`) first."
+        explanation: "Smart casts only work when the value can't change between the check and the use: local `val`s, local `var`s not captured in a modifying lambda, and `val` properties that are not `open`, have no custom getter and are private, internal or in the same module. Copy it to a local `val` (`val v = b.value`) first."
 
       - type: order
         prompt: Arrange the lines to form an extension function returning the second element, or null.
@@ -113,7 +113,7 @@ lessons:
           - when: covered
             point: 1
             prompt: "What happens if the `lazy` initializer throws an exception?"
-            modelAnswer: "The exception propagates to the caller and the value is not marked as initialised, so the next access runs the initializer again (for the default and publication modes). Nothing is cached for a failure, so a transient error can succeed on retry, but the initializer must be safe to run more than once."
+            modelAnswer: "The exception propagates to the caller and the value is not marked as initialised, so the next access runs the initializer again. In the current standard-library implementation this holds for all three modes, although the API documentation does not promise it. Nothing is cached for a failure, so a transient error can succeed on retry, but the initializer must be safe to run more than once."
             keyPoints:
               - point: "The exception propagates to the caller"
                 keywords: ["propagat", "thrown", "rethrow", "caller"]
@@ -351,7 +351,7 @@ lessons:
           - { id: c, text: "`getOrNull` parks the calling thread until the `Result` is ready, which defeats the point of a suspend function" }
           - { id: d, text: "Kotlin forbids `Result` as the return type of a `suspend` function and accepts it only as a parameter" }
         answer: a
-        explanation: "`runCatching` is `try { Result.success(block()) } catch (e: Throwable) { Result.failure(e) }`; since the lambda is inline it may call suspend functions, but it also catches the CancellationException that a cancelled coroutine uses to unwind. Catch specific exceptions, or rethrow cancellation (`.onFailure { if (it is CancellationException) throw it }`), and model expected failures explicitly (a sealed result type) instead of collapsing them all into null. `getOrNull` just unwraps the already-computed `Result` (it never blocks), and `Result` is a legal return type since Kotlin 1.5."
+        explanation: "`runCatching` is `try { Result.success(block()) } catch (e: Throwable) { Result.failure(e) }`; since the lambda is inline it may call suspend functions, but it also catches the CancellationException that a cancelled coroutine uses to unwind. Catch specific exceptions, or rethrow cancellation (`.onFailure { if (it is CancellationException) throw it }`), and model expected failures explicitly (a sealed result type) instead of collapsing them all into null. `getOrNull` just unwraps the already-computed `Result` (it never blocks), and `Result` has been allowed as a function return type since Kotlin 1.5 (a suspend function returning it compiles on current compilers)."
 
       - type: single
         prompt: "With a current Kotlin compiler (1.7 or newer), what happens to this code?"
@@ -374,11 +374,11 @@ lessons:
           - { id: c, text: "It compiles with a warning only; at runtime `Clear` falls through to a `NoWhenBranchMatchedException`" }
           - { id: d, text: "It compiles if `Clear` becomes a `data class`, because objects cannot be matched with `is`" }
         answer: a
-        explanation: "Since Kotlin 1.7, non-exhaustive `when` statements over sealed, enum and Boolean subjects are errors rather than warnings. That is what makes sealed hierarchies a safety net: adding `Clear` breaks every handler that forgot it. Adding an `else` branch silences the compiler and throws that safety away, so avoid `else` on sealed `when`s."
+        explanation: "Since Kotlin 1.7 (warnings in 1.6), non-exhaustive `when` statements over sealed, enum and Boolean subjects are errors rather than warnings; a `when` on another subject, such as an `Int`, may still be a non-exhaustive statement. That is what makes sealed hierarchies a safety net: adding `Clear` breaks every handler that forgot it. Adding an `else` branch silences the compiler and throws that safety away, so avoid `else` on sealed `when`s."
 
       - type: open
         prompt: "Explain how a type-safe builder DSL (like `html { body { p { +\"hi\" } } }` or Gradle's Kotlin DSL) works in Kotlin, and what `@DslMarker` is for."
-        modelAnswer: "A builder DSL is built from higher-order functions whose last parameter is a lambda with receiver, such as `fun table(init: Table.() -> Unit): Table`. Inside the lambda `this` is the builder, so you call its members without qualification; the function creates the builder, runs the block on it (typically with `apply`) and returns the result, and nested blocks create nested builders. The catch is scope leakage: in a nested lambda the outer receivers are still implicitly available, so you could call `row` inside `row` by mistake and it would silently resolve to the outer builder. Annotating the builder classes with an annotation marked `@DslMarker` makes such implicit access to an outer receiver a compile error (you can still write `this@table` explicitly). Keep the DSL small and let the builders produce immutable results; the cost is harder debugging and weaker tooling than plain constructors."
+        modelAnswer: "A builder DSL is built from higher-order functions whose last parameter is a lambda with receiver, such as `fun table(init: Table.() -> Unit): Table`. Inside the lambda `this` is the builder, so you call its members without qualification; the function creates the builder, runs the block on it (typically with `apply`) and returns the result, and nested blocks create nested builders. The catch is scope leakage: in a nested lambda the outer receivers are still implicitly available, so you could call `row` inside `row` by mistake and it would silently resolve to the outer builder. Annotating the builder classes with an annotation marked `@DslMarker` makes such implicit access to an outer receiver that carries the same marker a compile error (you can still write `this@table` explicitly). Keep the DSL small and let the builders produce immutable results; the cost is harder debugging and weaker tooling than plain constructors."
         keyPoints:
           - point: "Lambda with receiver (`T.() -> Unit`): the block runs with the builder as `this`; the builder function creates it, applies the block and returns it"
             keywords: ["lambda with receiver", "receiver", "apply"]
@@ -390,7 +390,7 @@ lessons:
           - when: missed
             point: 2
             prompt: "Without `@DslMarker`, what goes wrong in `table { row { row { cell(\"x\") } } }`, and how does the annotation change it?"
-            modelAnswer: "Without the marker, the innermost lambda has two receivers in scope, the Row and the outer Table, and `row` is not a member of Row, so the call silently resolves to the outer Table. The row ends up as a sibling in the table instead of inside the first row, and the compiler says nothing. With `@DslMarker` on both classes, the compiler rejects implicit calls to a member of an outer receiver from inside the nested lambda. If you really want the outer builder you must say so explicitly, for example `this@table.row { }`."
+            modelAnswer: "Without the marker, the innermost lambda has two receivers in scope, the Row and the outer Table, and `row` is not a member of Row, so the call silently resolves to the outer Table. The row ends up as a sibling in the table instead of inside the first row, and the compiler says nothing. With `@DslMarker` on both classes, the compiler rejects implicit calls to a member (or extension) of an outer receiver from inside the nested lambda. If you really want the outer builder you must say so explicitly, for example `this@table.row { }`."
             keyPoints:
               - point: "Both receivers are in scope, so the call silently resolves to the outer builder"
                 keywords: ["outer", "both receivers", "silently"]
