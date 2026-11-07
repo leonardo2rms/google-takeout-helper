@@ -52,7 +52,7 @@ lessons:
           - { id: d, text: "An object can never exist in a partially-initialised state" }
           - { id: e, text: "Every dependency is visible in the constructor signature, so too many of them stand out" }
         answers: [a, b, d, e]
-        explanation: "Constructor injection makes dependencies explicit and mandatory: they show up in the signature, where a long parameter list is a design smell nobody can miss, and circular dependencies fail fast instead of being silently tolerated. With a single constructor `@Autowired` isn't even needed."
+        explanation: "Constructor injection makes dependencies explicit and mandatory: they show up in the signature, where a long parameter list is a design smell nobody can miss, and a circular dependency cannot be resolved at all, so it fails at startup (field injection used to tolerate cycles silently; Spring Boot has prohibited circular references by default since 2.6). With a single constructor `@Autowired` isn't even needed."
 
       - type: single
         hint: "When does the constructor injection of the prototype happen, and how many times is the singleton constructed?"
@@ -81,7 +81,7 @@ lessons:
           - { id: c, text: "The code does not compile, because Kotlin has no checked exceptions to throw" }
           - { id: d, text: "The record is saved in a separate transaction and survives only if REQUIRES_NEW is set" }
         answer: a
-        explanation: "By default Spring rolls back only on unchecked exceptions (`RuntimeException` and `Error`). Kotlin has no checked exceptions, but `IOException` is still a checked type from Spring's point of view. Use `@Transactional(rollbackFor = [Exception::class])` or throw an unchecked exception."
+        explanation: "By default Spring rolls back only on unchecked exceptions (`RuntimeException` and `Error`). Kotlin has no checked exceptions, but `IOException` is still a checked type from Spring's point of view. Use `@Transactional(rollbackFor = [Exception::class])` or throw an unchecked exception. Since Spring Framework 6.2, `@EnableTransactionManagement(rollbackOn = RollbackOn.ALL_EXCEPTIONS)` changes the default for the whole application, and its Javadoc recommends that for Kotlin code."
 
       - type: fill
         hint: "Each annotation maps to a part of the HTTP request: the verb, a URL segment, the body."
@@ -108,7 +108,7 @@ lessons:
           - { left: "`@Configuration`", right: "Declares `@Bean` methods; the class itself is proxied" }
           - { left: "`@RestController`", right: "`@Controller` plus `@ResponseBody` on every handler" }
           - { left: "`@ControllerAdvice`", right: "Shared exception handling across controllers" }
-        explanation: "`@Repository`'s exception translation turns vendor errors into Spring's `DataAccessException` hierarchy. `@Configuration` classes are CGLIB-proxied so calling one `@Bean` method from another returns the singleton instead of creating a second instance."
+        explanation: "`@Repository`'s exception translation turns vendor errors into Spring's `DataAccessException` hierarchy. `@Configuration` classes are CGLIB-proxied by default (`proxyBeanMethods = true`), so calling one `@Bean` method from another returns the singleton instead of creating a second instance."
 
       - type: order
         kind: steps
@@ -195,7 +195,7 @@ lessons:
           - { id: c, text: "It makes each transaction read-only unless the service explicitly marks it otherwise" }
           - { id: d, text: "It opens a separate transaction for each repository call (more commits, more locks)" }
         answer: a
-        explanation: "Many teams set it to false and fetch what they need explicitly (projections or fetch joins) inside the service layer. The setting only keeps the persistence session (and with it the connection) open for the whole request; it does not touch caching, read-only mode or how many transactions run."
+        explanation: "Many teams set it to false and fetch what they need explicitly (projections or fetch joins) inside the service layer. The setting only keeps the persistence session (and with it, once the first query has run, the connection) open for the whole request; it does not touch caching, read-only mode or how many transactions run."
 
       - type: single
         prompt: "A service is CPU-bound, uses blocking JDBC and a small team. Which stack is the best default?"
@@ -216,7 +216,7 @@ lessons:
           - { id: c, text: "spring.mvc.async.virtual=true" }
           - { id: d, text: "spring.task.execution.virtual=true" }
         answer: a
-        explanation: "It needs Java 21+. Virtual threads help with blocking I/O concurrency; they don't make CPU-bound work faster, and a bounded resource (like the DB pool) is still your real limit."
+        explanation: "It needs Java 21+ (Spring Boot's reference recommends Java 24 or later). With the property on, Tomcat and Jetty handle requests on virtual threads, and the auto-configured `applicationTaskExecutor` (`@Async`, MVC async requests) and `taskScheduler` (`@Scheduled`) switch to virtual threads too, so their thread-pool properties no longer apply. Virtual threads help with blocking I/O concurrency; they don't make CPU-bound work faster, and a bounded resource (like the DB pool) is still your real limit."
 
       - type: fill
         hint: "One annotation fills the cache on a read; the other empties it."
@@ -255,7 +255,7 @@ lessons:
         answer: 11
         tolerance: 0
         unit: queries
-        explanation: "One query loads the orders, then Hibernate initialises the collections in batches of 10 using `IN (...)`: 100 / 10 = 10 more. 1 + 10 = 11, instead of 101 without batching."
+        explanation: "One query loads the orders, then Hibernate initialises the collections 10 parents per query: 100 / 10 = 10 more. 1 + 10 = 11, instead of 101 without batching."
 
       - type: single
         prompt: What does this log tell you?
@@ -322,7 +322,7 @@ lessons:
           - { left: "`NESTED`", right: "Runs inside the current transaction using a savepoint, when the transaction manager supports it" }
           - { left: "`MANDATORY`", right: "Throws an exception if there is no existing transaction" }
           - { left: "`NEVER`", right: "Throws an exception if a transaction exists" }
-        explanation: "`REQUIRED` is what you want most of the time. `REQUIRES_NEW` suits work that must survive an outer rollback (an audit record), at the price of a second database connection. `NESTED` lets an inner failure roll back to the savepoint without aborting the outer transaction, but not every transaction manager supports it. `MANDATORY` and `NEVER` are assertions about the caller."
+        explanation: "`REQUIRED` is what you want most of the time. `REQUIRES_NEW` suits work that must survive an outer rollback (an audit record), at the price of a second database connection. `NESTED` lets an inner failure roll back to the savepoint without aborting the outer transaction, but out of the box only the JDBC `DataSourceTransactionManager` supports it. `JpaTransactionManager` (the usual choice with Hibernate) rejects it with `NestedTransactionNotSupportedException`: its `nestedTransactionAllowed` flag is off by default and `HibernateJpaDialect` offers no savepoint support. `MANDATORY` and `NEVER` are assertions about the caller."
 
       - type: single
         prompt: A row fails inside `importRow` and the exception is caught as shown. What happens when `importAll` returns?
@@ -349,7 +349,7 @@ lessons:
           - { id: c, text: "The failing row's changes are rolled back alone, because the inner call used a savepoint" }
           - { id: d, text: "The outer commit succeeds: the exception was caught inside the loop and did not reach the caller" }
         answer: a
-        explanation: "With `REQUIRED` the inner call joins the outer transaction. When the exception leaves the inner proxy, Spring marks the whole transaction rollback-only, and catching it in the caller does not clear that mark. To skip bad rows independently use `REQUIRES_NEW` (or `NESTED`) on `importRow`, or validate before writing."
+        explanation: "With `REQUIRED` the inner call joins the outer transaction. When the exception leaves the inner proxy, Spring marks the whole transaction rollback-only, and catching it in the caller does not clear that mark. To skip bad rows independently use `REQUIRES_NEW` on `importRow` (`NESTED` only works with a JDBC `DataSourceTransactionManager`, not with JPA/Hibernate), or validate before writing."
 
       - type: multi
         prompt: "The JPA entity `Account` has a `@Version` field, and `AccountService.debit` is `@Transactional`. Under load some debits fail with `ObjectOptimisticLockingFailureException`. Select all true statements."
@@ -397,7 +397,7 @@ lessons:
           - { id: d, text: "The class must also be registered as a bean, for example via `@EnableConfigurationProperties`" }
           - { id: e, text: "Values can only come from `application.properties` or YAML files, never from environment variables or command-line arguments" }
         answers: [a, b, d]
-        explanation: "Typed, validated configuration fails fast at startup instead of with a `NullPointerException` hours later, and the same class is easy to construct in a unit test. Binding handles conversion (durations, lists, enums, nested objects) and reads from every property source, including environment variables and command-line arguments."
+        explanation: "Typed, validated configuration fails fast at startup instead of with a `NullPointerException` hours later, and the same class is easy to construct in a unit test. Binding handles conversion (durations, lists, enums, nested objects) and reads from every property source, including environment variables and command-line arguments. For an environment variable, Spring Boot replaces the dots of the canonical name with underscores, removes the dashes and upper-cases it: `app.max-retries` becomes `APP_MAXRETRIES`."
 
       - type: single
         prompt: What is the main problem with this metric?
@@ -412,7 +412,7 @@ lessons:
           - { id: c, text: "Counters of one name must always be registered with identical tag values, so a second registration with other values fails at runtime" }
           - { id: d, text: "Counters cannot carry tags; Micrometer drops `path` and `user` from the output" }
         answer: a
-        explanation: "Each unique tag combination is its own series. Keep tag values low-cardinality and bounded: the route template (`/orders/{id}`), the status class, the outcome. Spring's own `http.server.requests` metric tags the URI template, not the raw URI, for exactly this reason. Put per-user detail into logs and traces instead. Counters can carry tags, are thread-safe, and the same name may be registered with many different tag values."
+        explanation: "Each unique tag combination is its own series. Keep tag values low-cardinality and bounded: the route template (`/orders/{id}`), the status class, the outcome. Spring's own `http.server.requests` metric tags the URI template, not the raw URI, for exactly this reason. Put per-user detail into logs and traces instead. Counters can carry tags, are thread-safe, and the same name may be registered with many different tag values (what a registry such as Prometheus does require is the same set of tag keys for one name)."
 
       - type: single
         prompt: "`@WebMvcTest(OrderController::class)` fails with `NoSuchBeanDefinitionException: OrderService`. What is the idiomatic fix?"
@@ -422,7 +422,7 @@ lessons:
           - { id: c, text: "Annotate `OrderService` with `@Controller`; the web slice then scans it as a web-layer bean" }
           - { id: d, text: "Disable component scanning in the test, so that bean definitions are looked up nowhere" }
         answer: a
-        explanation: "Test slices (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`, ...) start only the part of the context they are about: for MVC that is controllers, advice, converters and filters, but no `@Service` or `@Repository`. That keeps them fast and focused, and the missing collaborators become explicit test doubles (`@MockitoBean`, or `@MockBean` before Spring Boot 3.4). With `controllers` set, the slice loads only the listed controllers, so annotating the service with `@Controller` would not even bring it in. Use `@SpringBootTest` for the few tests that need the whole wiring."
+        explanation: "Test slices (`@WebMvcTest`, `@DataJpaTest`, `@JsonTest`, ...) start only the part of the context they are about: for MVC that is controllers, advice, converters and filters, but no `@Service` or `@Repository`. That keeps them fast and focused, and the missing collaborators become explicit test doubles (`@MockitoBean` from Spring Framework 6.2; Spring Boot's `@MockBean` was deprecated in Boot 3.4 and removed in Boot 4.0). With `controllers` set, the slice loads only the listed controllers, so annotating the service with `@Controller` would not even bring it in. Use `@SpringBootTest` for the few tests that need the whole wiring."
 
       - type: open
         prompt: "A colleague says: \"I put `@Transactional` on every service method, so we are safe.\" How do you respond, and how do you design transaction boundaries?"

@@ -117,7 +117,7 @@ lessons:
           - { id: a, text: "A single statement: UPDATE account SET balance = balance - :amt WHERE id = :id AND balance >= :amt" }
           - { id: b, text: "SELECT ... FOR UPDATE on the row inside the transaction, then update" }
           - { id: c, text: "A version column checked in the UPDATE's WHERE clause, with a retry when zero rows are updated" }
-          - { id: d, text: "Keep the plain SELECT then UPDATE inside a transaction at the default level (READ COMMITTED)" }
+          - { id: d, text: "Keep the plain SELECT then UPDATE inside a transaction at the default level (READ COMMITTED in PostgreSQL)" }
           - { id: e, text: "Mark the Kotlin service method synchronized" }
         answers: [a, b, c]
         explanation: "The single atomic UPDATE lets the database do the read-modify-write itself. SELECT ... FOR UPDATE makes the second request wait for the first to commit before it reads. The version column detects the conflict and forces a retry. A plain SELECT then UPDATE at READ COMMITTED still lets both read the same old balance. `synchronized` only serialises calls inside one JVM, which fails the moment you run two instances."
@@ -133,7 +133,7 @@ lessons:
            FOR UPDATE [[1]] [[2]]
         bank: ["SKIP", "LOCKED", "NOWAIT", "SHARE", "WAIT"]
         answers: ["SKIP", "LOCKED"]
-        explanation: "`FOR UPDATE SKIP LOCKED` (PostgreSQL, MySQL 8 and others) silently leaves out rows that other transactions hold locked, which turns a table into a safe work queue for many workers. `NOWAIT` would raise an error instead of skipping. Keep the claiming transaction short and mark rows as taken in the same transaction."
+        explanation: "`FOR UPDATE SKIP LOCKED` (PostgreSQL 9.5 or later, MySQL 8.0.1 or later, and others) silently leaves out rows that other transactions hold locked, which turns a table into a safe work queue for many workers. `NOWAIT` would raise an error instead of skipping. Keep the claiming transaction short and mark rows as taken in the same transaction."
 
       - type: open
         prompt: "Two users edit the same record at the same time. Explain pessimistic versus optimistic locking, and when you would choose each."
@@ -278,7 +278,7 @@ lessons:
           - { id: c, text: "Flyway skips the edit: applied migrations are never read again after they run" }
           - { id: d, text: "Flyway drops the schema and rebuilds it from the migrations, including the corrected V12" }
         answer: a
-        explanation: "Flyway stores a checksum for every applied versioned migration and compares it on startup; Liquibase does the same with changeset checksums. Applied migrations are history and must be immutable. Make corrections in a new migration. `repair` exists for deliberate, understood cases, not to paper over edits."
+        explanation: "Flyway stores a checksum for every applied versioned migration in its schema history table and compares it with the file on disk; `validateOnMigrate` is on by default, so `migrate` runs that validation first and stops with a checksum-mismatch error. Liquibase does the same with changeset checksums. Applied migrations are history and must be immutable, so make corrections in a new migration. `repair` rewrites the checksums in the schema history to match the files and runs no SQL; use it for deliberate, understood cases such as a comment-only edit, not to paper over a change in behaviour. Repeatable migrations differ: a changed checksum makes `migrate` apply them again."
 
       - type: order
         kind: steps

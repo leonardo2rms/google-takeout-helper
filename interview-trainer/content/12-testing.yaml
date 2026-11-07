@@ -34,7 +34,7 @@ lessons:
           - { id: c, text: "A plain mapper with Jackson's own defaults, so the `spring.jackson.*` properties of the app are ignored" }
           - { id: d, text: "The full application context and an embedded server on a random port, so that the JSON makes a real HTTP round trip" }
         answer: a
-        explanation: "`@JsonTest` is the JSON slice: it applies only the JSON auto-configuration, so the mapper is configured the way Spring Boot configures it for the application (the `spring.jackson.*` properties and the serialisers and modules the slice picks up, such as JSON components; customisations in ordinary `@Configuration` classes are not loaded), and `JacksonTester` fields can be injected to assert on the written JSON or to parse JSON back. No controllers, MockMvc, services or repositories are loaded and no server starts, which makes it the cheap way to pin down a serialisation contract such as a date format or a `Money` field. `@WebMvcTest` checks JSON too, but through a controller, and a full `@SpringBootTest` with a server is the real HTTP round trip."
+        explanation: "`@JsonTest` is the JSON slice: it applies only the JSON auto-configuration, so the mapper is configured the way Spring Boot configures it for the application (the `spring.jackson.*` properties and the serialisers and modules the slice picks up, such as JSON components (`@JsonComponent`, renamed `@JacksonComponent` in Spring Boot 4); customisations in ordinary `@Configuration` classes are not loaded), and `JacksonTester` fields can be injected to assert on the written JSON or to parse JSON back. No controllers, MockMvc, services or repositories are loaded and no server starts, which makes it the cheap way to pin down a serialisation contract such as a date format or a `Money` field. `@WebMvcTest` checks JSON too, but through a controller, and a full `@SpringBootTest` with a server is the real HTTP round trip."
         tags: [spring, testing, json, test-slices]
 
       - type: single
@@ -45,7 +45,7 @@ lessons:
           - { id: c, text: "It starts a web server and uses the production database: queries then run against real data" }
           - { id: d, text: "It commits at the end of each test, so that later tests can reuse the data that was created by earlier tests" }
         answer: a
-        explanation: "The default rollback keeps tests isolated, but because the transaction never commits, Hibernate may not even send the SQL, so constraint violations can stay hidden unless you flush explicitly. Also by default `@DataJpaTest` replaces the configured DataSource with an embedded database (when one is on the classpath); for production-faithful tests use `@AutoConfigureTestDatabase(replace = NONE)` with a real engine via Testcontainers."
+        explanation: "The default rollback keeps tests isolated, but because the transaction never commits, Hibernate may not even send the SQL, so constraint violations can stay hidden unless you flush explicitly. Also by default `@DataJpaTest` replaces the configured DataSource with an embedded database (when one is on the classpath). Since Spring Boot 3.4 the default `Replace.NON_TEST` leaves a DataSource that points at a test database alone (a Testcontainers container with `@ServiceConnection`, or a `spring.datasource.url` set in a `@DynamicPropertySource`); for a real engine configured any other way, and on older Boot versions, use `@AutoConfigureTestDatabase(replace = NONE)`."
 
       - type: multi
         prompt: Select all of these that are common mocking pitfalls.
@@ -73,7 +73,7 @@ lessons:
           }
         bank: ["DynamicPropertySource", "getJdbcUrl", "TestPropertySource", "getHost", "Bean", "getDatabaseName"]
         answers: ["DynamicPropertySource", "getJdbcUrl"]
-        explanation: "`@DynamicPropertySource` registers properties as suppliers evaluated after the container has started, so the random host port is known. `@TestPropertySource` only takes static values. Since Spring Boot 3.1, `@ServiceConnection` can do this wiring for you."
+        explanation: "`@DynamicPropertySource` registers properties as suppliers that are only invoked when the property is resolved, by which time the container is running and the random host port is known (the method must be `static`). `@TestPropertySource` only takes static values. Since Spring Boot 3.1, `@ServiceConnection` can do this wiring for you."
 
       - type: spot
         prompt: "The second test passes or fails depending on test order. Tap the line that causes this."

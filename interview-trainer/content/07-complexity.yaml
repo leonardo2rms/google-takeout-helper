@@ -43,7 +43,7 @@ lessons:
           - { id: c, text: "`O(n²)` time, `O(n)` space" }
           - { id: d, text: "`O(n log n)` time, `O(1)` space" }
         answer: a
-        explanation: "One pass with expected O(1) hash operations, but the set can grow to n elements. You've traded memory for time. Sorting first gives O(n log n) time with O(1) extra space if you may mutate the input."
+        explanation: "One pass with expected O(1) hash operations, but the set can grow to n elements. You've traded memory for time. Sorting first gives O(n log n) time, and O(1) extra space with an in-place sort such as heapsort, if you may mutate the input (library sorts may use more auxiliary memory)."
 
       - type: single
         prompt: What is the time complexity as a function of n?
@@ -222,9 +222,9 @@ lessons:
           - { id: a, text: "ArrayList" }
           - { id: b, text: "LinkedList" }
           - { id: c, text: "TreeSet" }
-          - { id: d, text: "ArrayDeque, by index" }
+          - { id: d, text: "java.util.ArrayDeque, by index" }
         answer: a
-        explanation: "ArrayList is backed by an array. LinkedList.get(i) walks the nodes: O(n), and it is slower than ArrayList in practice for nearly everything because of pointer chasing. ArrayDeque has no index access."
+        explanation: "ArrayList is backed by an array. LinkedList.get(i) walks the nodes: O(n), and it is slower than ArrayList in practice for most workloads because of pointer chasing. java.util.ArrayDeque has no index access at all. (Kotlin's own kotlin.collections.ArrayDeque, the class a bare `ArrayDeque` means in Kotlin code, is a MutableList and does support efficient get by index.)"
 
       - type: single
         hint: "What does Java 8 do when a bucket's chain grows long?"
@@ -235,7 +235,7 @@ lessons:
           - { id: c, text: "`O(1)`, because a hash lookup is constant time no matter how the keys collide" }
           - { id: d, text: "`O(n²)`, because each colliding entry has to be compared against each other" }
         answer: a
-        explanation: "Since Java 8, a bucket with 8+ entries (and table size >= 64) becomes a red-black tree. It defends against hash-collision attacks and bad hashCode implementations, but a good hash function is still what makes lookups O(1)."
+        explanation: "Since Java 8 (JEP 180), a bucket that already holds 8 entries and receives another becomes a red-black tree, provided the table has at least 64 slots (otherwise the table is resized instead). It defends against hash-collision attacks and bad hashCode implementations, but a good hash function is still what makes lookups O(1)."
 
       - type: single
         hint: "Where do the other elements have to go when you insert at the front?"
