@@ -35,6 +35,7 @@ All of it is pure: `today` is always passed in, there is no `Date.now()` in `sha
   decided by `fnv1a(date|sessions) % 6`, so a reload cannot re-roll it. It never gates anything.
 - Readiness means "how much of this course you would recall today", with coverage shown. It never claims a chance of passing.
 - No accounts, no analytics, no fake users or leaderboards. The learner owns the data: export and import it.
+- Repeating is welcome but it is not a shortcut: no number can be pushed up by doing one easy question over and over (the goal counts distinct questions per day, and a repeat earns little XP). The app says so when it happens, in the lesson and on the summary, instead of quietly paying less.
 - Celebrations are scaled (at most one big one per session, at most one burst per two minutes), respect `prefers-reduced-motion`
   and have a switch. Onboarding is an inline card, never a modal, so deep links keep working.
 
@@ -44,7 +45,7 @@ All of it is pure: `today` is always passed in, there is no `Date.now()` in `sha
 - **Clock moves backwards**: the streak holds, `lastDay` is re-anchored on the next practice, card intervals never go negative.
 - **Content edited**: question ids are positional, so a card stores a hash of the question; a mismatch drops the card.
   `missed` entries for unknown ids are kept (harmless, and the migration stays lossless).
-- **Replaying a lesson**: counts towards the ring and practice (so it is never wasted) but cannot lengthen a card's interval.
+- **Replaying a lesson, or one question again**: practice is always welcome and is never blocked, but the reward is for the first time each day. A question already answered today earns at most 2 XP, does not count for the daily goal again, and scales the perfect-lesson bonus down; it still counts as practice in the lifetime counters, and the review card only has its bookkeeping updated while it is not due yet (an early review never lengthens an interval). The next day it pays in full again. See "Doing the same question again" in [learning-features.md](learning-features.md).
 - **A week away**: the next day's goal is halved once. Cards that are very overdue lose strength gradually (retention is floored at 10%).
 - **Interview date**: past dates are ignored (with a "Set a new date?" prompt), today or tomorrow switches Today to due cards and weak spots, and card intervals are capped at half the time left.
 

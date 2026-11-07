@@ -49,13 +49,15 @@ test.describe('daily challenge', () => {
     await expect(card(page)).toContainText('passed');
     await expect(page.getByTestId('challenge-streak')).toContainText('1 day in a row');
 
-    // a replay is plain practice: no XP, no second result
+    // a replay is plain practice: no bonus, no second result, only the reduced XP of a question already done today,
+    // and it does not count for the goal again
     await page.goto('/#/challenge');
     await expect(page.locator('.kicker')).toBeVisible();
     await solveAndContinue(page, q);
     const again = await stored(page);
-    expect(again!.xp).toBe(p!.xp + 10);
+    expect(again!.xp).toBe(p!.xp + 2);
     expect(again!.challenge).toEqual({ [TODAY]: 'pass' });
+    expect(again!.days[TODAY].answered).toBe(1);
   });
 
   test('giving up still completes the day: no bonus, the streak is kept, copy stays neutral', async ({ page }) => {
