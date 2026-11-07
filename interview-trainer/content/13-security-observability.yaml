@@ -44,7 +44,7 @@ lessons:
           - { id: c, text: "Cross-site scripting in the unescaped JSON response, fixed by HTML-encoding each field before sending" }
           - { id: d, text: "A guessable token issued to Alice, fixed by issuing longer random tokens" }
         answer: a
-        explanation: "Authentication answered 'who are you?'; authorization must still answer 'may you do this to that record?'. Broken access control tops the OWASP Top 10. The token worked and nothing was injected or reflected into a page: the server simply returned another user's record. Hard-to-guess ids are not a fix, only obscurity. Scope the query by the caller (`WHERE id = ? AND customer_id = ?`) or check the permission centrally."
+        explanation: "Authentication answered 'who are you?'; authorization must still answer 'may you do this to that record?'. Broken access control is A01 in the OWASP Top 10 (both the 2021 and the 2025 editions). The token worked and nothing was injected or reflected into a page: the server simply returned another user's record. Hard-to-guess ids are not a fix, only obscurity. Scope the query by the caller (`WHERE id = ? AND customer_id = ?`) or check the permission centrally."
 
       - type: match
         prompt: Match each web risk to its standard defence.
@@ -54,7 +54,7 @@ lessons:
           - { left: "Cross-site request forgery (CSRF)", right: "Anti-forgery tokens and SameSite cookies, so another site cannot trigger actions with the user's cookies" }
           - { left: "Server-side request forgery (SSRF)", right: "Allowlist the destinations the server may fetch and block internal and cloud-metadata addresses" }
           - { left: "Credential brute force", right: "Rate limiting, backoff or lockout, and multi-factor authentication" }
-        explanation: "CSRF matters when the browser attaches credentials automatically (cookies); an API using a bearer token in a header is not affected in the same way. SSRF is dangerous because the server can reach networks and metadata endpoints that the attacker cannot."
+        explanation: "CSRF matters when the browser attaches credentials automatically (cookies); an API using a bearer token in a header is not affected in the same way. SameSite cookies are a useful extra layer, but OWASP does not treat them as a replacement for anti-forgery tokens. SSRF is dangerous because the server can reach networks and metadata endpoints that the attacker cannot."
 
       - type: single
         prompt: "Which practice best reduces the supply-chain risk of third-party dependencies?"
