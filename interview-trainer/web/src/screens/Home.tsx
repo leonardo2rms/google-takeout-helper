@@ -11,7 +11,7 @@ import { Ring } from '../components/Ring';
 import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
 import { formatCount, plural } from '../lib/format';
-import { dueInToday, dueLine, goalMetHero, homeTier, readinessLine, reinforceText } from '../lib/home-copy';
+import { currentUnitId, dueInToday, dueLine, goalMetHero, homeTier, readinessLine, reinforceText } from '../lib/home-copy';
 import { clearResume, useResume } from '../lib/resume';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
@@ -35,6 +35,14 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const [iosTip, setIosTip] = useState(shouldShowIosTip);
   const resume = useResume();
   const confirm = useConfirm();
+  // Only the unit being worked in is open; finished and future units are one line each (every lesson stays one tap away).
+  const [openUnits, setOpenUnits] = useState<ReadonlySet<string>>(() => {
+    const current = currentUnitId(course.units, progress.lessons);
+    return new Set(current ? [current] : []);
+  });
+  const setUnitOpen = (id: string, open: boolean) =>
+    setOpenUnits((s) => (s.has(id) === open ? s : new Set(open ? [...s, id] : [...s].filter((x) => x !== id))));
+  const allUnitsOpen = openUnits.size === course.units.length;
 
   const overview = useMemo(() => dueOverview(course, progress, today), [course, progress, today]);
   const daily = useMemo(() => buildDailySession(course, progress, today), [course, progress, today]);
@@ -102,13 +110,6 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       {reviewable > 0 && <Icon name="chevron-right" className="go" />}
     </a>
   );
-  const mixCard = (
-    <a key="mix" className="card action" href="#/mix" data-testid="mix-card">
-      <span className="tile-i" aria-hidden="true"><Icon name="shuffle" size={22} /></span>
-      <span><b>Mixed practice</b><small>{done === 0 ? '8 questions from across the course' : '8 questions, weighted toward what you know least'}</small></span>
-      <Icon name="chevron-right" className="go" />
-    </a>
-  );
   const progressCard = (
     <a key="progress" className="card action progress-link" href="#/progress" data-testid="progress-link">
       <span className="tile-i" aria-hidden="true"><Icon name="chart-column" size={22} /></span>
@@ -119,38 +120,32 @@ export function Home({ course, progress, health, update, onReset }: Props) {
       <Icon name="chevron-right" className="go" />
     </a>
   );
-  const mockCard = (
-    <a key="mock" className="card action mock-link" href="#/mock" data-testid="mock-link">
-      <span className="tile-i" aria-hidden="true"><Icon name="timer" size={22} /></span>
-      <span>
-        <b>Mock interview</b>
-        <small>{progress.mocks[0] ? `Timed, no feedback until the end · last: ${progress.mocks[0].score}%` : 'Timed, no feedback until the end · optional'}</small>
-      </span>
-      <Icon name="chevron-right" className="go" />
-    </a>
-  );
-  const libraryCard = (
-    <a key="library" className="card action library-link" href="#/library" data-testid="library-link">
-      <span className="tile-i" aria-hidden="true"><Icon name="library" size={22} /></span>
-      <span>
+  // The three modes with nothing live to report share one compact row, so Today stays the one primary action.
+  const saved = Object.keys(progress.bookmarks).length;
+  const tiles = (
+    <div className="mode-tiles" role="group" aria-label="More ways to practise" key="tiles">
+      <a className="mode-tile" href="#/mix" data-testid="mix-card" aria-label={`Mixed practice: ${done === 0 ? '8 questions from across the course' : '8 questions, weighted toward what you know least'}`}>
+        <Icon name="shuffle" size={22} />
+        <b>Mixed</b>
+        <small>8 questions</small>
+      </a>
+      <a className="mode-tile" href="#/mock" data-testid="mock-link" aria-label={`Mock interview: timed, no feedback until the end${progress.mocks[0] ? `, last score ${progress.mocks[0].score}%` : ', optional'}`}>
+        <Icon name="timer" size={22} />
+        <b>Mock</b>
+        <small>{progress.mocks[0] ? `last ${progress.mocks[0].score}%` : 'timed · optional'}</small>
+      </a>
+      <a className="mode-tile" href="#/library" data-testid="library-link" aria-label={`Library: search every question${saved > 0 ? `, ${saved} saved` : ''}`}>
+        <Icon name="library" size={22} />
         <b>Library</b>
-        <small>Search every question{Object.keys(progress.bookmarks).length > 0 ? ` · ${Object.keys(progress.bookmarks).length} saved` : ''}</small>
-      </span>
-      <Icon name="chevron-right" className="go" />
-    </a>
+        <small>{saved > 0 ? `${saved} saved` : 'search all'}</small>
+      </a>
+    </div>
   );
   const challengeCard = <ChallengeCard key="challenge" course={course} progress={progress} today={today} />;
-  const all = [
-    { id: 'challenge', node: challengeCard },
-    { id: 'review', node: reviewCard },
-    { id: 'mix', node: mixCard },
-    { id: 'progress', node: progressCard },
-    { id: 'mock', node: mockCard },
-    { id: 'library', node: libraryCard },
-  ];
-  const onPage = tier === 0 ? [] : tier === 1 ? ['challenge', 'review', 'progress'] : all.map((c) => c.id);
-  const inline = all.filter((c) => onPage.includes(c.id));
-  const more = all.filter((c) => !onPage.includes(c.id));
+  // Rows with something live to show (today's question, what is due, readiness), then the compact row. A newcomer sees none of
+  // it on the page; after the first lessons the rows appear, after three the compact row too. What is not on the page is
+  // one tap away under "More ways to practise".
+  const rows = [challengeCard, reviewCard, progressCard];
 
   // "Up next" sits right under the hero once a learner has started (not on day 0, where the hero already is the first lesson), and is
   // left out when the hero already offers that very lesson.
@@ -293,16 +288,17 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </div>
       )}
 
-      {(tier > 0 || more.length > 0) && (
+      {tier > 0 && (
         <section className="practice" aria-label="Practice">
-          {inline.map((c) => c.node)}
+          {rows}
+          {tier >= 2 && tiles}
         </section>
       )}
 
-      {more.length > 0 && (
+      {tier < 2 && (
         <details className="more-practice" data-testid="more-practice">
           <summary><Icon name="chevron-down" className="chev" />More ways to practise</summary>
-          <div className="practice">{more.map((c) => c.node)}</div>
+          <div className="practice">{tier === 0 && rows}{tiles}</div>
         </details>
       )}
 
@@ -310,6 +306,9 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         <div className="row">
           <span className="label">{done} / {total} lessons</span>
           {!nextLesson && <span className="label">All lessons done</span>}
+          <button type="button" className="link inline" data-testid="units-toggle" onClick={() => setOpenUnits(allUnitsOpen ? new Set() : new Set(course.units.map((u) => u.id)))}>
+            {allUnitsOpen ? 'Collapse all' : 'Expand all'}
+          </button>
         </div>
         <div className="segs" aria-hidden="true">
           {Array.from({ length: total }, (_, i) => <i key={i} className={i < done ? 'on' : ''} />)}
@@ -320,14 +319,22 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         const completed = unit.lessons.filter((l) => progress.lessons[l.id]).length;
         const { icon, style } = unitStyle(unit);
         return (
-          <section key={unit.id} className="unit-section" style={style} aria-labelledby={`unit-${unit.id}`}>
-            <div className="unit-head">
+          <details
+            key={unit.id}
+            className={`unit-section ${completed === unit.lessons.length ? 'complete' : ''}`}
+            style={style}
+            open={openUnits.has(unit.id)}
+            onToggle={(e) => setUnitOpen(unit.id, e.currentTarget.open)}
+            data-testid={`unit-${unit.id}`}
+          >
+            <summary className="unit-head">
               <span className="glyph" aria-hidden="true"><Icon name={icon} size={20} /></span>
               <span className="label">Unit {String(ui + 1).padStart(2, '0')}</span>
               <span className="tally" aria-label={`${completed} of ${unit.lessons.length} lessons done`}>{completed}/{unit.lessons.length}</span>
               <h2 id={`unit-${unit.id}`}>{unit.title}</h2>
-              <p>{unit.description}</p>
-            </div>
+              <Icon name="chevron-down" className="chev unit-chev" size={18} />
+            </summary>
+            <p className="unit-desc">{unit.description}</p>
             <ol className="lessons">
               {unit.lessons.map((lesson, i) => {
                 const rec = progress.lessons[lesson.id];
@@ -361,7 +368,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
                 );
               })}
             </ol>
-          </section>
+          </details>
         );
       })}
 

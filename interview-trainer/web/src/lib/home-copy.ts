@@ -20,6 +20,14 @@ export function homeTier(p: Pick<Progress, 'stats' | 'lessons' | 'cards'>): Home
   return lessons >= FULL_HOME_AFTER_LESSONS ? 2 : 1;
 }
 
+/**
+ * The unit Home keeps open: the first one with a lesson not yet done (where the learner is working). Null when every lesson
+ * is done. Every other unit is a one-line row; all of their lessons stay one tap away.
+ */
+export function currentUnitId(units: readonly { id: string; lessons: readonly { id: string }[] }[], done: Readonly<Record<string, unknown>>): string | null {
+  return units.find((u) => u.lessons.some((l) => !done[l.id]))?.id ?? null;
+}
+
 /** The one phrase for the one meaning of "due" (a card whose due date has arrived): "5 due". */
 export const dueText = (n: number): string => `${n} due`;
 
