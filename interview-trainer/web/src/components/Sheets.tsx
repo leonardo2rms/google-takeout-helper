@@ -55,6 +55,7 @@ export function GoalSheet({ progress, today, update, onClose }: Props) {
       <p className="big-number" data-testid="goal-value">{shown.sentence}</p>
       {g.comeback && <p>Easy restart: {g.target} today. Welcome back.</p>}
       {g.done === 0 && !g.comeback && <p className="muted">{GOAL_PRESETS.light} questions is about five minutes.</p>}
+      <p className="muted" data-testid="goal-rule">Each question counts once a day, and an interviewer follow-up belongs to its question.</p>
       {g.met && <p>{shown.bonus > 0 ? `Goal met, plus ${plural(shown.bonus, 'bonus question')}.` : 'Goal met. Anything more is a bonus.'}</p>}
       <DayChart bars={lastDays(progress, today, 14)} />
       <dl className="facts">

@@ -10,6 +10,9 @@ const PREVIEW_SCALE: Record<TextSize, number> = { S: 0.9, M: 1, L: 1.2, XL: 1.4 
 
 const SIZE_NAMES: Record<TextSize, string> = { S: 'Small', M: 'Medium', L: 'Large', XL: 'Extra large' };
 
+/** The closed group's one-line state: "Medium text", "Large text, easier font". */
+export const readingSummary = (r: Progress['prefs']['reading']): string => `${SIZE_NAMES[r.textSize]} text${r.dyslexiaFont ? ', easier font' : ''}`;
+
 /** Settings -> Reading: text size and an optional dyslexia-friendly font stack. Applied live through data attributes (see useReadingPrefs). */
 export function ReadingSection({ progress, update }: Props) {
   const { textSize, dyslexiaFont } = progress.prefs.reading;
@@ -17,8 +20,7 @@ export function ReadingSection({ progress, update }: Props) {
     update((p) => ({ ...p, prefs: { ...p.prefs, reading: { ...p.prefs.reading, ...patch } } }));
 
   return (
-    <section aria-labelledby="reading-h">
-      <h3 id="reading-h">Reading</h3>
+    <>
       <div className="choice-grid four reading-sizes" role="radiogroup" aria-label="Text size">
         {TEXT_SIZES.map((size) => (
           <label key={size} className={`choice ${textSize === size ? 'on' : ''}`}>
@@ -32,9 +34,9 @@ export function ReadingSection({ progress, update }: Props) {
         <input type="checkbox" checked={dyslexiaFont} onChange={(e) => set({ dyslexiaFont: e.target.checked })} data-testid="dyslexia-font" />
         <span>
           <b>Easier-to-read font</b>
-          <small>Uses a plain, wide-lettered font from your device with more space between letters and lines. Code stays monospaced.</small>
+          <small>A plain, wide-lettered font with more spacing. Code stays monospaced.</small>
         </span>
       </label>
-    </section>
+    </>
   );
 }

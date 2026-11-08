@@ -128,6 +128,16 @@ export async function forgetSavedSession(page: Page): Promise<void> {
   }, RESUME_KEY);
 }
 
+/**
+ * Opens a folded Settings group (`reading`, `reminders` or `data`) so its controls can be used. Safe to call when it is
+ * already open. The Settings sheet must be open.
+ */
+export async function openSettingsGroup(page: Page, id: 'reading' | 'reminders' | 'data'): Promise<void> {
+  const group = page.getByTestId(`group-${id}`);
+  if (!(await group.evaluate((el) => (el as HTMLDetailsElement).open))) await group.locator(':scope > summary').click();
+  await group.locator(':scope > .group-body').waitFor();
+}
+
 export const dueCount = (page: Page) => page.getByTestId('due-count');
 export const stored = (page: Page, key = KEY_V2) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? 'null') as Record<string, any> | null, key);
 

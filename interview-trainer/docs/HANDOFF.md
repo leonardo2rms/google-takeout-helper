@@ -30,7 +30,7 @@ self-contained HTML page.
 | `npm test` | 1,608 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 334 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 352 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,608 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 334
+1,608 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 352
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -317,10 +317,21 @@ reduced XP; I also made the goal count distinct questions, as proposed.
 **P2-2 Spread the first reviews** [N-4 remainder]: three lessons on day 1 leave about 25 cards due on day 2. Spread
 first-review dates over 1-3 days (this changes intervals asserted in the SRS tests; update them deliberately).
 
-**P2-3 Long pages and pacing** [N-14, N-15, N-17, UX-29, UX-34, N-8]: Settings is ~1,760px (shorten copy, group
-sections); the Progress page for heavy users is ~5,000px (group badges, fold mock history further); rank thresholds are
-too low (Engineer after 2 lessons); mock results need saving explicitly (autosave once self-assessment is done); the
-summary's "of 8 today" count ignores follow-up answers (decide whether follow-ups count).
+**P2-3 Long pages and pacing** [N-14, N-15, N-17, UX-29, UX-34, N-8]: **done** (2026-11-08).
+- **Mock results save by themselves** (UX-34): written as soon as the scorecard shows when nothing needs self-checking; with
+  open answers to tick (no AI) "Save results" stays and any way of leaving also saves what is on screen, once. Learning notes
+  in [learning-features.md](learning-features.md) explain why the leave listeners are registered at module load. Not
+  added: a "Discard" for a saved mock (undoing a session's streak, badges and cards safely is a bigger change).
+- **Settings** went from about 1,800px to about 980px: Reading, Reminders and Your data are one-line `SettingsGroup`s that
+  show their state; toggle hints are shorter. (The notify toggle, the paste disclosure and the Reset section were already
+  handled in the audit rounds.)
+- **Progress** for a heavy user went from about 5,000px to about 2,600px: earned badges fold by group with counts and stay
+  open while a recent badge is in them. (Started topics, "not started" and "Earlier mocks" were already folded.)
+- **N-8 follow-ups:** decided as a definition, not a change of counting: the goal counts distinct questions and a follow-up
+  belongs to its question; the goal sheet now says so. **N-17 ranks:** thresholds left as they are, because the audit's other
+  option (celebrate the first promotion quietly) was already in place and changing them would re-rank existing profiles.
+- Tests: `e2e/settings-groups.spec.ts` (8), `e2e/progress-heavy.spec.ts` (5), 5 new mock-saving tests in
+  `e2e/mock.spec.ts`; a helper `openSettingsGroup` for specs that use the folded groups. 22 mutants caught.
 
 **P2-4 Engagement-spec features not built** (spec in `research/engagement-spec.md`): a **weekly recap** card;
 **teach-back** prompts (explain a concept in your own words, AI- or self-graded); a **transfer code / QR** to move

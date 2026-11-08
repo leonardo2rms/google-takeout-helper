@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { KEY_V2, SHOTS, cardFor, day, dueCards, expectNoOverflow, lessons, openMore, questions, seed, stored, useClock, v2 } from './engage';
+import { cardFor, day, dueCards, expectNoOverflow, KEY_V2, lessons, openMore, openSettingsGroup, questions, seed, SHOTS, stored, useClock, v2 } from './engage';
 import { answerCorrectly, check, next, solveAndContinue } from './solve';
 
 const LESSON = 'kotlin-null-types';
@@ -81,6 +81,7 @@ test.describe('bookmarks and notes', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
+    await openSettingsGroup(page, 'data');
     const [download] = await Promise.all([page.waitForEvent('download'), sheet.getByRole('button', { name: 'Download backup' }).click()]);
     const file = info.outputPath('backup.json');
     await download.saveAs(file);
@@ -91,6 +92,7 @@ test.describe('bookmarks and notes', () => {
     expect((await stored(page))!.notes).toEqual({});
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await openSettingsGroup(page, 'data');
     await page.getByTestId('import-file').setInputFiles(file);
     await page.getByTestId('import-confirm').getByRole('button', { name: 'Replace my progress' }).click();
     await page.getByTestId('replace-confirm-ok').click();

@@ -29,6 +29,12 @@ async function startMock(page: Page, opts: { length?: 10 | 20; minutes?: number;
   await expect(page.getByTestId('mock-run')).toBeVisible();
 }
 
+/**
+ * Waits until the real Home is showing. `.home` alone is not enough: the mock setup and results screens are `.home` too, so it is
+ * true before a navigation away from them has finished (popstate arrives before hashchange).
+ */
+const onHome = (page: Page) => page.locator('.home-top').waitFor();
+
 const next = (page: Page) => page.getByTestId('mock-next').or(page.getByTestId('mock-finish')).click();
 
 /** Plays a whole mock: answer[i] says how to answer question i. Then submits. */
@@ -184,13 +190,99 @@ test.describe('mock interview: running', () => {
     await expect(page.getByTestId('mock-timed-out')).toContainText('Time was up');
     await expect(page.getByTestId('mock-timed-out')).toContainText('not answered');
     await page.screenshot({ path: `${SHOTS}/mock-timeup.png` });
-    await page.getByTestId('mock-save').click();
-    await expect(page.getByTestId('mock-saved')).toBeVisible();
+    await expect(page.getByTestId('mock-saved')).toBeVisible(); // saved by itself: nothing was left to self-assess
     const p = await stored(page);
     expect(p!.mocks).toHaveLength(1);
     expect(p!.mocks[0]).toMatchObject({ timedOut: true, limitMin: 10, total: 10, answered: 1, usedSec: 600 });
     // unanswered questions are not recorded for review, the answered one is
     expect(Object.keys(p!.cards)).toEqual([qs[0]!.id]);
+  });
+});
+
+test.describe('mock interview: saving never depends on a button (UX-34)', () => {
+  const opens = (qs: Question[]) => qs.filter((q) => q.type === 'open');
+
+  test('with nothing to self-assess the result is saved the moment it shows, and there is no Save button', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    const qs = planned();
+    await startMock(page);
+    await playMock(page, qs, (q) => (q.type === 'open' ? 'blank' : 'right'));
+    await expect(page.getByTestId('mock-saved')).toBeVisible();
+    await expect(page.getByTestId('mock-save')).toHaveCount(0);
+    await expect(page.getByTestId('mock-unsaved')).toHaveCount(0);
+    await expect(page.getByTestId('mock-another')).toBeVisible();
+    const p = (await stored(page))!;
+    expect(p.mocks).toHaveLength(1);
+    // leaving afterwards does not save a second one
+    await page.getByTestId('mock-home').click();
+    await onHome(page);
+    expect((await stored(page))!.mocks).toHaveLength(1);
+    expect((await stored(page))!.xp).toBe(p.xp);
+  });
+
+  test('with open answers to check yourself: no result is written until you are done, then Save results writes it once', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    const qs = planned();
+    test.skip(opens(qs).length === 0, 'no open question drawn');
+    await startMock(page);
+    await playMock(page, qs, () => 'right');
+    await expect(page.getByTestId('mock-self-note')).toContainText('Press Save results');
+    await expect(page.getByTestId('mock-saved')).toHaveCount(0);
+    expect((await stored(page))?.mocks ?? []).toEqual([]); // not yet: the score can still change
+    await page.getByTestId('mock-save').click();
+    await expect(page.getByTestId('mock-saved')).toBeVisible();
+    await page.getByTestId('mock-home').click();
+    await onHome(page);
+    expect((await stored(page))!.mocks).toHaveLength(1); // saved once, not again on leaving
+  });
+
+  test('leaving the results by a link saves what is on screen, including the ticks', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    const qs = planned();
+    test.skip(opens(qs).length === 0, 'no open question drawn');
+    await startMock(page);
+    await playMock(page, qs, () => 'right');
+    const boxes = page.locator('.mock-results .rubric input[type="checkbox"]');
+    for (let i = 0; i < (await boxes.count()); i++) await boxes.nth(i).uncheck();
+    const shown = Number((await page.getByTestId('mock-score').innerText()).replace('%', ''));
+    await page.getByRole('link', { name: 'Back to home' }).click();
+    await onHome(page);
+    const p = (await stored(page))!;
+    expect(p.mocks).toHaveLength(1);
+    expect(p.mocks[0].score).toBe(shown); // what was on screen is what was kept
+  });
+
+  test('the browser Back button saves too', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    const qs = planned();
+    test.skip(opens(qs).length === 0, 'no open question drawn');
+    await page.goto('/');
+    await onHome(page);
+    await startMock(page);
+    await playMock(page, qs, () => 'right');
+    expect((await stored(page))?.mocks ?? []).toEqual([]);
+    await page.goBack();
+    await onHome(page);
+    expect((await stored(page))!.mocks).toHaveLength(1);
+  });
+
+  test('closing or hiding the page saves, once', async ({ page }) => {
+    await useClock(page);
+    await seed(page, { [KEY_V2]: v2() });
+    const qs = planned();
+    test.skip(opens(qs).length === 0, 'no open question drawn');
+    await startMock(page);
+    await playMock(page, qs, () => 'right');
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event('pagehide'));
+      window.dispatchEvent(new Event('pagehide'));
+    });
+    expect((await stored(page))!.mocks).toHaveLength(1);
+    await expect(page.getByTestId('mock-saved')).toBeVisible();
   });
 });
 
@@ -268,7 +360,6 @@ test.describe('mock interview: results', () => {
 
     await startMock(page, { length: 20 });
     await playMock(page, qs, (q) => (q.type === 'open' ? 'blank' : 'right'));
-    await page.getByTestId('mock-save').click();
     await expect(page.getByTestId('mock-saved')).toContainText(`+${MOCK_XP_CAP} XP`);
     let p = await stored(page);
     expect(p!.mocks).toHaveLength(10); // the oldest dropped
@@ -291,7 +382,6 @@ test.describe('mock interview: results', () => {
       }
       await page.getByTestId('mock-submit').click();
       await page.getByTestId('mock-results').waitFor();
-      await page.getByTestId('mock-save').click();
       await expect(page.getByTestId('mock-saved')).toContainText(expectXp ? 'XP' : 'No XP this time');
     }
     p = await stored(page);
@@ -306,7 +396,6 @@ test.describe('mock interview: results', () => {
     await startMock(page);
     await playMock(page, qs, () => 'blank');
     await expect(page.getByTestId('mock-score')).toHaveText('0%');
-    await page.getByTestId('mock-save').click();
     await expect(page.getByTestId('mock-saved')).toContainText('Nothing to review');
     expect((await stored(page))?.mocks ?? []).toEqual([]);
   });

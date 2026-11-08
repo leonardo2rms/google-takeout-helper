@@ -46,6 +46,11 @@ test.describe('the same lesson twice in one day', () => {
     await expect(notes(page)).toContainText(`${total} questions you had already done today`);
     await expect(notes(page)).toContainText(`${XP_REPEAT} XP each`);
     await page.screenshot({ path: `${SHOTS}/repeat-summary.png` });
+    // the goal sheet states the rule the summary just applied (and says where interviewer follow-ups fit)
+    await page.getByRole('button', { name: 'Back home', exact: true }).click();
+    await page.getByTestId('goal-ring').click();
+    await expect(page.getByTestId('goal-rule')).toContainText('Each question counts once a day');
+    await expect(page.getByTestId('goal-rule')).toContainText('follow-up belongs to its question');
   });
 
   test('a repeated question says so, and the XP in the header is the reduced one', async ({ page }) => {

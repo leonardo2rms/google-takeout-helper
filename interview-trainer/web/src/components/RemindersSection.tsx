@@ -9,6 +9,9 @@ interface Props {
   update: (fn: (p: Progress) => Progress) => void;
 }
 
+/** The closed group's one-line state: "Off", "Daily at 19:30", "Daily at 19:30, notifications on". */
+export const remindersSummary = (r: Progress['prefs']['reminders']): string => (r.time ? `Daily at ${r.time}${r.notify ? ', notifications on' : ''}` : 'Off');
+
 /** Settings -> Reminders: a calendar event that always works, and an honest, optional, once-a-day notification. */
 export function RemindersSection({ progress, update }: Props) {
   const { time, notify } = progress.prefs.reminders;
@@ -60,11 +63,8 @@ export function RemindersSection({ progress, update }: Props) {
   const canNotify = permission !== 'unsupported';
 
   return (
-    <section aria-labelledby="reminders-h">
-      <h3 id="reminders-h">Reminders</h3>
-      <p className="muted">
-        Optional. Nothing is sent from a server and nothing is tracked.
-      </p>
+    <>
+      <p className="muted">Optional. Nothing is sent from a server and nothing is tracked.</p>
 
       <div className="field">
         <label htmlFor="reminder-time"><b>Daily reminder time</b></label>
@@ -102,6 +102,6 @@ export function RemindersSection({ progress, update }: Props) {
 
       {message && <p role="status" className="notice" data-testid="reminder-message">{message}</p>}
       {(time || notify) && <button type="button" className="link" onClick={off} data-testid="reminder-off">Turn reminders off</button>}
-    </section>
+    </>
   );
 }

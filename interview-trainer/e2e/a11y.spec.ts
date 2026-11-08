@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { defaultPrefs, questionHash, type Lesson, type Question } from '../shared/src';
-import { KEY_V2, TODAY, course, day, dueCards, forgetSavedSession, lessons, playLesson, questions, seed, useClock, v2 } from './engage';
+import { course, day, dueCards, forgetSavedSession, KEY_V2, lessons, openSettingsGroup, playLesson, questions, seed, TODAY, useClock, v2 } from './engage';
 import { answerCorrectly, answerWrongly, check, next, solveAndContinue } from './solve';
 
 /**
@@ -75,6 +75,10 @@ for (const scheme of SCHEMES) test.describe(`axe: home and sheets (${scheme})`, 
 
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await scan(page, 'settings sheet');
+    for (const group of ['reading', 'reminders', 'data'] as const) {
+      await openSettingsGroup(page, group);
+      await scan(page, `settings sheet (${group} open)`);
+    }
     await page.getByText('Paste backup text instead').click();
     await scan(page, 'settings sheet (paste backup open)');
   });
@@ -206,8 +210,7 @@ for (const scheme of SCHEMES) test.describe(`axe: learning features (${scheme})`
     await page.getByTestId('mock-submit').click();
     await page.getByTestId('mock-results').waitFor();
     await scan(page, 'mock results');
-    await page.getByTestId('mock-save').click();
-    await page.getByTestId('mock-saved').waitFor();
+    await page.getByTestId('mock-saved').waitFor(); // saved by itself: nothing to self-assess
     await scan(page, 'mock saved');
   });
 
@@ -266,11 +269,13 @@ for (const scheme of SCHEMES) test.describe(`axe: learning features (${scheme})`
     await seed(page, { [KEY_V2]: v2({ xp: 80, prefs: { ...defaultPrefs(), reminders: { time: '19:00', notify: false, lastNotified: null } } }) });
     await page.goto('/');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await openSettingsGroup(page, 'reading');
     await page.getByRole('heading', { name: 'Reading' }).scrollIntoViewIfNeeded();
     await page.getByTestId('text-size-XL').check();
     await scan(page, 'settings at XL text size');
     await page.getByTestId('dyslexia-font').check();
     await scan(page, 'settings with the easier-to-read font');
+    await openSettingsGroup(page, 'data');
     await page.getByTestId('import-file').setInputFiles({ name: 'junk.json', mimeType: 'application/json', buffer: Buffer.from('this is not a backup') });
     await scan(page, 'settings with an import error');
   });

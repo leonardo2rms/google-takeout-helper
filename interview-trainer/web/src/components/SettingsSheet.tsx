@@ -5,8 +5,9 @@ import { exportText, importContext, mergeIntoProgress, replaceProgress } from '.
 import { useConfirm } from './ConfirmDialog';
 import { RecoveredData } from './DataSafety';
 import { Icon } from './icons';
-import { ReadingSection } from './ReadingSection';
-import { RemindersSection } from './RemindersSection';
+import { ReadingSection, readingSummary } from './ReadingSection';
+import { RemindersSection, remindersSummary } from './RemindersSection';
+import { SettingsGroup } from './SettingsGroup';
 import { RestDays } from './RestDays';
 import { Sheet } from './Sheet';
 
@@ -24,17 +25,17 @@ interface Pending {
 }
 
 const TOGGLES: { key: keyof Pick<Settings, 'confetti' | 'haptics' | 'tips' | 'confidence'>; label: string; hint?: string }[] = [
-  { key: 'confetti', label: 'Confetti on big moments', hint: 'Only for real milestones; off when your device asks for reduced motion.' },
+  { key: 'confetti', label: 'Confetti on big moments', hint: 'Real milestones only; off with reduced motion.' },
   { key: 'haptics', label: 'Vibration on correct answers', hint: 'Where your device supports it.' },
   {
     key: 'confidence',
     label: 'Ask "How sure are you?"',
-    hint: 'A one-tap rating before you check. Sure and wrong brings a question back sooner. Skippable.',
+    hint: 'A one-tap rating before you check. Skippable.',
   },
   {
     key: 'tips',
     label: "Interviewer's tip",
-    hint: `About 1 session in ${TIP_ONE_IN} shows a short reminder, worth +${TIP_BONUS_XP} XP.`,
+    hint: `About 1 session in ${TIP_ONE_IN}: a short reminder, +${TIP_BONUS_XP} XP.`,
   },
 ];
 
@@ -122,12 +123,15 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
         ))}
       </section>
 
-      <ReadingSection progress={progress} update={update} />
+      <SettingsGroup id="reading" title="Reading" summary={readingSummary(progress.prefs.reading)}>
+        <ReadingSection progress={progress} update={update} />
+      </SettingsGroup>
 
-      <RemindersSection progress={progress} update={update} />
+      <SettingsGroup id="reminders" title="Reminders" summary={remindersSummary(progress.prefs.reminders)}>
+        <RemindersSection progress={progress} update={update} />
+      </SettingsGroup>
 
-      <section>
-        <h3>Your data</h3>
+      <SettingsGroup id="data" title="Your data" summary="Backup and import">
         <p className="muted">Stored on this device only. A backup file moves you to a new phone and protects you if the browser clears its storage.</p>
         <div className="stack">
           <button type="button" className="btn secondary wide" onClick={() => void download()}>Download backup</button>
@@ -181,7 +185,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
             </div>
           </div>
         )}
-      </section>
+      </SettingsGroup>
 
       <RecoveredData />
 
