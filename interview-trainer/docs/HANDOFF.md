@@ -27,10 +27,10 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,604 unit/content/docs tests (vitest) |
+| `npm test` | 1,608 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 322 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 334 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,604 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 322
+1,608 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 334
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -303,9 +303,16 @@ reduced XP; I also made the goal count distinct questions, as proposed.
 
 ### P2: product improvements
 
-**P2-1 Home for returning users** [N-12, UX-15]: after a few lessons Home is a stack of equally weighted rows (Today,
-Daily challenge, Review, Mixed, Progress, Mock, Library) and the curriculum starts far down. Give it a clear hierarchy
-(one primary action, secondary practice modes, the curriculum reachable in one tap; "Show all units").
+**P2-1 Home for returning users** [N-12, UX-15]: **done** (2026-11-08).
+- Today stays the one solid primary action. Daily challenge, Review due and Progress are full rows (they carry live
+  numbers); Mixed, Mock and Library share one compact three-up row (`.mode-tile`, wraps at larger text sizes, keeps full
+  accessible names). Only the unit being worked in is open (`currentUnitId` in `web/src/lib/home-copy.ts`); every other
+  unit is a one-line native `<details>` with its name and tally, with "Expand all" / "Collapse all". A returning
+  learner's Home went from about 4,900px to about 2,200px; a newcomer sees one open unit instead of thirteen.
+- Tests: `e2e/home-returning.spec.ts` (12 tests: layout, tap targets, one-row tiles, keyboard toggling, 320px, XL text,
+  every stage of the learner) and the pure `currentUnitId`; 9 mutants of the Home code are caught.
+- Not done: remembering which units a learner opened between visits (they reset to "the current unit"), and a
+  "Show all units" view with progress bars per unit (Expand all is the simple version).
 
 **P2-2 Spread the first reviews** [N-4 remainder]: three lessons on day 1 leave about 25 cards due on day 2. Spread
 first-review dates over 1-3 days (this changes intervals asserted in the SRS tests; update them deliberately).

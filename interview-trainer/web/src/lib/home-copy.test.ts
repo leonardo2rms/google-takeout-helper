@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { emptyProgress } from '@trainer/shared';
-import { FULL_HOME_AFTER_LESSONS, READINESS_NEEDS, REVIEW_SIZE, dueInToday, dueLine, dueText, goalMetHero, homeTier, readinessLine, reinforceText } from './home-copy';
+import { FULL_HOME_AFTER_LESSONS, READINESS_NEEDS, REVIEW_SIZE, currentUnitId, dueInToday, dueLine, dueText, goalMetHero, homeTier, readinessLine, reinforceText } from './home-copy';
 
 const lessons = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`l${i}`, { bestAccuracy: 1, completions: 1, lastDay: '2026-11-04' }]));
 
@@ -91,5 +91,31 @@ describe('readinessLine', () => {
   });
   it('names the threshold', () => {
     expect(READINESS_NEEDS).toBe('25%');
+  });
+});
+
+describe('currentUnitId: the one unit Home keeps open', () => {
+  const units = [
+    { id: 'a', lessons: [{ id: 'a1' }, { id: 'a2' }] },
+    { id: 'b', lessons: [{ id: 'b1' }, { id: 'b2' }] },
+    { id: 'c', lessons: [{ id: 'c1' }] },
+  ];
+  const done = (...ids: string[]) => Object.fromEntries(ids.map((id) => [id, true]));
+
+  it('is the first unit for a new learner', () => {
+    expect(currentUnitId(units, {})).toBe('a');
+  });
+  it('stays on a unit until its last lesson is done, then moves on', () => {
+    expect(currentUnitId(units, done('a1'))).toBe('a');
+    expect(currentUnitId(units, done('a1', 'a2'))).toBe('b');
+    expect(currentUnitId(units, done('a1', 'a2', 'b1'))).toBe('b');
+  });
+  it('is the first unit with something left even when later ones were done out of order', () => {
+    expect(currentUnitId(units, done('b1', 'b2', 'c1'))).toBe('a');
+    expect(currentUnitId(units, done('a2'))).toBe('a');
+  });
+  it('is null once everything is done, and for a course with no units', () => {
+    expect(currentUnitId(units, done('a1', 'a2', 'b1', 'b2', 'c1'))).toBeNull();
+    expect(currentUnitId([], {})).toBeNull();
   });
 });
