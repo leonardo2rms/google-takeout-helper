@@ -3,10 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { fnv1a, readiness, type Progress } from '../shared/src';
-import {
-  KEY_V1, KEY_V2, SHOTS, TODAY, course, cardFor, currentQuestion, day, dueCards, dueCount, expectNoOverflow, homeAfterSummary, lessons, playLesson,
-  playSession, questions, seed, setDay, stored, unitOf, useClock, v2, watchErrors,
-} from './engage';
+import { cardFor, course, currentQuestion, day, dueCards, dueCount, expectNoOverflow, homeAfterSummary, KEY_V1, KEY_V2, lessons, openSettingsGroup, playLesson, playSession, questions, seed, setDay, SHOTS, stored, TODAY, unitOf, useClock, v2, watchErrors } from './engage';
 import { answerCorrectly, answerWrongly, check, expectNoHorizontalOverflow, next, solveAndContinue } from './solve';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -427,6 +424,7 @@ test.describe('export and import', () => {
     const sheet = page.getByRole('dialog', { name: 'Settings', exact: true });
     await expectNoOverflow(page);
     await page.screenshot({ path: `${SHOTS}/settings-sheet.png` });
+    await openSettingsGroup(page, 'data');
     const [download] = await Promise.all([page.waitForEvent('download'), sheet.getByRole('button', { name: 'Download backup' }).click()]);
     expect(download.suggestedFilename()).toBe('interview-trainer-progress-2026-11-04.json');
     const file = info.outputPath('backup.json');
@@ -442,6 +440,7 @@ test.describe('export and import', () => {
 
     // a broken file is rejected
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await openSettingsGroup(page, 'data');
     const input = page.getByTestId('import-file');
     await input.setInputFiles({ name: 'junk.json', mimeType: 'application/json', buffer: Buffer.from('this is not a backup') });
     await expect(page.getByTestId('import-error')).toContainText('not a valid backup');
@@ -485,6 +484,7 @@ test.describe('export and import', () => {
     await seed(page, { [KEY_V2]: v2({ xp: 100, streak: 4, longestStreak: 4, lastDay: TODAY }) });
     await page.goto('/');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await openSettingsGroup(page, 'data');
     await page.getByTestId('import-file').setInputFiles(file);
     await page.getByRole('button', { name: /Merge/ }).click();
     await page.getByRole('button', { name: 'Close' }).click();
@@ -498,6 +498,7 @@ test.describe('export and import', () => {
     await seed(page, { [KEY_V2]: v2({ xp: 33 }) });
     await page.goto('/');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await openSettingsGroup(page, 'data');
     await page.getByText('Paste backup text instead').click();
     await page.getByLabel('Backup text').fill(JSON.stringify(v2({ xp: 777 })));
     await page.getByRole('button', { name: 'Check pasted text' }).click();

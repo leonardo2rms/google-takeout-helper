@@ -61,3 +61,20 @@ details.unit-section[open] > summary .unit-chev { transform: rotate(180deg); }
 details.unit-section > .unit-desc { margin: 0; padding: 0 14px 12px 17px; border-left: 3px solid var(--pen, var(--cobalt)); color: var(--graphite); font-size: var(--fs-14); line-height: 1.4; }
 details.unit-section.complete .tally { color: var(--teal); }
 .progress-line .row .link.inline { margin-left: auto; padding-block: 0; }
+
+/* Settings: the long, rarely-used sections fold to one line that says what they are set to. */
+.settings-group { border-top: 1px solid var(--hairline); }
+.settings-group > summary { display: grid; grid-template-columns: auto 1fr auto; gap: 0 var(--s3); align-items: center; min-height: 52px; font-weight: inherit; }
+.settings-group > summary h3 { font-size: var(--fs-16); }
+.settings-group > summary .state { color: var(--graphite); font-size: var(--fs-14); text-align: right; overflow-wrap: anywhere; }
+.settings-group > summary .chev { color: var(--graphite); }
+.settings-group[open] > summary .chev { transform: rotate(180deg); }
+.settings-group > .group-body { display: grid; gap: var(--s3); padding: 4px 0 var(--s4); }
+
+/* Earned badges fold by group to one line with a count; a group with a recent badge stays open. */
+details.trophy-group > summary { display: flex; align-items: center; gap: var(--s3); min-height: 48px; border-top: 1px solid var(--hairline); cursor: pointer; font-weight: inherit; }
+details.trophy-group > summary h3 { margin: 0; flex: 1; }
+details.trophy-group > summary .muted { font: 500 var(--fs-13) var(--mono); font-variant-numeric: tabular-nums slashed-zero; }
+details.trophy-group > summary .chev { color: var(--graphite); }
+details.trophy-group[open] > summary .chev { transform: rotate(180deg); }
+details.trophy-group > .badge-grid { margin-bottom: var(--s3); }

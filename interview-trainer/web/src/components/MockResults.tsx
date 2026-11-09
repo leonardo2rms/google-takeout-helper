@@ -70,13 +70,9 @@ export function MockResults({ course, questions, answers, outcomes, flagged, use
         {!timedOut && notReached > 0 && <p className="muted">{plural(notReached, 'question')} left unanswered (counted as zero, never held against your review queue).</p>}
       </section>
 
-      {!saved && pendingSelf.length === 0 && (
-        <p className="muted" data-testid="mock-unsaved">Not saved yet. Saving adds the questions you missed to your review queue and records the XP.</p>
-      )}
-
       {pendingSelf.length > 0 && !saved && (
         <p className="notice" role="note" data-testid="mock-self-note">
-          AI grading is not available, so check your {plural(pendingSelf.length, 'open answer')} yourself: open each one, compare with the model answer and tick the points you covered. The score above updates as you tick.
+          AI grading is not available, so check your {plural(pendingSelf.length, 'open answer')} yourself: open each one, compare with the model answer and tick the points you covered. The score above updates as you tick. Press Save results when you are done; leaving this page saves what you see.
         </p>
       )}
 

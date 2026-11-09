@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { defaultPrefs } from '../shared/src';
-import { KEY_V2, SHOTS, dueCards, expectNoOverflow, seed, setDay, stored, useClock, v2, watchErrors } from './engage';
+import { dueCards, expectNoOverflow, KEY_V2, openSettingsGroup, seed, setDay, SHOTS, stored, useClock, v2, watchErrors } from './engage';
 
 /** Replaces the Notification API with a recorder (kept in localStorage so it survives reloads). */
 async function fakeNotifications(page: Page, permission: 'granted' | 'denied' | 'default' | 'none') {
@@ -33,6 +33,7 @@ const withReminder = (over: Partial<ReturnType<typeof defaultPrefs>['reminders']
 
 async function openReminders(page: Page) {
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsGroup(page, 'reminders');
   await page.getByRole('heading', { name: 'Reminders' }).scrollIntoViewIfNeeded();
 }
 

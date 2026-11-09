@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { type Question } from '../shared/src';
-import { KEY_V2, SHOTS, TODAY, course, dueCards, expectNoOverflow, forgetSavedSession, lessons, seed, stored, useClock, v2 } from './engage';
+import { course, dueCards, expectNoOverflow, forgetSavedSession, KEY_V2, lessons, openSettingsGroup, seed, SHOTS, stored, TODAY, useClock, v2 } from './engage';
 import { answerCorrectly, check, solveAndContinue, visible } from './solve';
 
 /** Walks the keyboard Tab order of the current screen and reports every stop that has no visible focus ring. */
@@ -271,6 +271,7 @@ test.describe('visible focus rings', () => {
 test.describe('reading settings', () => {
   const settings = async (page: Page) => {
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await openSettingsGroup(page, 'reading');
     await page.getByRole('heading', { name: 'Reading' }).scrollIntoViewIfNeeded();
   };
   const fontPx = (page: Page, sel = 'body') => page.evaluate((s) => parseFloat(getComputedStyle(document.querySelector(s)!).fontSize), sel);

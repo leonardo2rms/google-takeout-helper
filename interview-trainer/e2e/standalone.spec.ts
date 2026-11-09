@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
-import { KEY_V2, TODAY, dueCards, questions, seed, useClock, v2, watchErrors } from './engage';
+import { dueCards, KEY_V2, openSettingsGroup, questions, seed, TODAY, useClock, v2, watchErrors } from './engage';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FILE = `file://${resolve(root, 'dist/interview-trainer.standalone.html')}`;
@@ -102,6 +102,8 @@ async function openHosted(page: Page, route: string) {
 async function openSettings(page: Page) {
   await openHosted(page, '');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await openSettingsGroup(page, 'data');
+  await openSettingsGroup(page, 'reminders');
   return page.getByRole('dialog', { name: 'Settings', exact: true });
 }
 

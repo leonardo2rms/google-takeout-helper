@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   MOCK_LENGTHS, MOCK_MINUTES, MOCK_REWARDED_PER_DAY, MOCK_XP_CAP, applyMock, buildMock, dayKey, defaultMinutes, mockSeed,
   type Course, type MockConfig, type MockLength, type Progress, type Question,
@@ -9,7 +9,7 @@ import { MockResults, type SavedMock } from '../components/MockResults';
 import { MockRun, type MockRunResult } from '../components/MockRun';
 import type { GradeFn, Outcome } from '../lib/evaluate';
 import { runCodeInWorker } from '../lib/run-code';
-import { markMock, mockResults } from '../lib/mock-marking';
+import { isAnswered, markMock, mockResults } from '../lib/mock-marking';
 import { updateProgress } from '../lib/store';
 import { useToday } from '../lib/today';
 
@@ -20,11 +20,85 @@ interface Props {
   grade?: GradeFn;
 }
 
+type ResultsStage = { name: 'results'; questions: Question[]; minutes: number; run: MockRunResult; outcomes: Record<string, Outcome>; saved: SavedMock | null };
 type Stage =
   | { name: 'setup' }
   | { name: 'running'; questions: Question[]; minutes: number }
   | { name: 'marking'; questions: Question[]; minutes: number; run: MockRunResult; done: number }
-  | { name: 'results'; questions: Question[]; minutes: number; run: MockRunResult; outcomes: Record<string, Outcome>; saved: SavedMock | null };
+  | ResultsStage;
+
+/**
+ * What to do when the learner leaves while a result is still unsaved. The listeners are registered once, when this module
+ * loads, which is before the app mounts and so before its own `hashchange` listener. That order matters: React renders a
+ * route change right after the app's listener returns, which unmounts the results screen, and a listener added by the screen
+ * itself would be removed before it got its turn.
+ */
+let saveOnLeave: (() => void) | null = null;
+if (typeof window !== 'undefined') {
+  for (const type of ['hashchange', 'pagehide'] as const) window.addEventListener(type, () => saveOnLeave?.());
+}
+
+/**
+ * The scorecard stage. The result is saved without a button press, so it can never be lost by leaving:
+ * - when nothing is left to self-assess (the AI marked everything, or there were no open answers) it is saved as soon as it shows;
+ * - when the learner has open answers to tick against the model answer (no AI), "Save results" is how they say they are done,
+ *   and leaving the page by any route (Back, a link, closing the tab) saves what is on screen, so nothing is dropped.
+ */
+function ResultsScreen({ course, stage, setStage }: { course: Course; stage: ResultsStage; setStage: (s: Stage) => void }) {
+  const latest = useRef(stage);
+  latest.current = stage;
+  const needsSelfCheck = stage.questions.some((q) => q.type === 'open' && isAnswered(q, stage.run.answers[q.id]) && stage.outcomes[q.id]?.open?.needsSelfAssessment);
+
+  const save = () => {
+    const s = latest.current;
+    if (s.saved) return;
+    let saved: SavedMock | null = null;
+    updateProgress((p) => {
+      const res = applyMock(
+        p,
+        { results: mockResults(course, s.questions, s.run.answers, s.outcomes, new Set(s.run.flagged)), limitMin: s.minutes, usedSec: s.run.usedSec, timedOut: s.run.timedOut },
+        { today: dayKey(new Date()), course },
+      );
+      saved = { credit: res.credit, wrong: res.report.wrong.length };
+      return res.progress;
+    });
+    latest.current = { ...s, saved }; // at once: a second trigger (leaving right after) must not save twice
+    setStage(latest.current);
+  };
+
+  const autosaved = useRef(false); // refs survive the double effect run of StrictMode
+  useEffect(() => {
+    if (autosaved.current || needsSelfCheck) return;
+    autosaved.current = true;
+    save();
+  }, []);
+
+  // A layout effect, not a passive one: it runs at commit, before the screen can receive a click, so there is no gap in which
+  // leaving would find nothing registered.
+  useLayoutEffect(() => {
+    saveOnLeave = save;
+    return () => {
+      if (saveOnLeave === save) saveOnLeave = null;
+    };
+  }, []);
+
+  return (
+    <MockResults
+      course={course}
+      questions={stage.questions}
+      answers={stage.run.answers}
+      outcomes={stage.outcomes}
+      flagged={new Set(stage.run.flagged)}
+      usedSec={stage.run.usedSec}
+      limitMin={stage.minutes}
+      timedOut={stage.run.timedOut}
+      saved={stage.saved}
+      onOutcome={(id, o) => setStage({ ...stage, outcomes: { ...stage.outcomes, [id]: o } })}
+      onSave={save}
+      onAnother={() => setStage({ name: 'setup' })}
+    />
+  );
+}
 
 /**
  * A timed mock interview. Opt-in, no feedback while it runs, open answers marked at the end (by the AI when it is
@@ -72,40 +146,7 @@ export function MockScreen({ course, progress, grade }: Props) {
     );
   }
 
-  if (stage.name === 'results') {
-    const { questions, run, minutes } = stage;
-    const flagged = new Set(run.flagged);
-    const save = () => {
-      let saved: SavedMock | null = null;
-      const todayKey = dayKey(new Date());
-      updateProgress((p) => {
-        const res = applyMock(
-          p,
-          { results: mockResults(course, questions, run.answers, stage.outcomes, flagged), limitMin: minutes, usedSec: run.usedSec, timedOut: run.timedOut },
-          { today: todayKey, course },
-        );
-        saved = { credit: res.credit, wrong: res.report.wrong.length };
-        return res.progress;
-      });
-      setStage({ ...stage, saved });
-    };
-    return (
-      <MockResults
-        course={course}
-        questions={questions}
-        answers={run.answers}
-        outcomes={stage.outcomes}
-        flagged={flagged}
-        usedSec={run.usedSec}
-        limitMin={minutes}
-        timedOut={run.timedOut}
-        saved={stage.saved}
-        onOutcome={(id, o) => setStage({ ...stage, outcomes: { ...stage.outcomes, [id]: o } })}
-        onSave={save}
-        onAnother={() => setStage({ name: 'setup' })}
-      />
-    );
-  }
+  if (stage.name === 'results') return <ResultsScreen course={course} stage={stage} setStage={setStage} />;
 
   const unitTitle = cfg.unitId ? course.units.find((u) => u.id === cfg.unitId)?.title : null;
   return (

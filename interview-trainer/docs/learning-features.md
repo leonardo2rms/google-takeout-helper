@@ -87,7 +87,7 @@ any kind** (code questions have no "Run tests"). At zero the answers are submitt
 code in the worker, open questions by the AI when available, otherwise by the learner on the results screen (the score updates as boxes are ticked).
 
 Results: overall score (unanswered counts as zero), a scorecard by topic with weak spots (below 60%), and every question with its explanation.
-**Save results** then writes: wrong answers become due cards tomorrow, right ones are scheduled like first-try answers, unanswered ones are left alone
+**Saving needs no button.** When nothing is left to self-assess (the AI marked everything, or there were no open answers) the result is written the moment the scorecard shows. When the learner has open answers to tick against the model answer (no AI), the score is still moving, so **Save results** is how they say they are done; leaving the page by any route (Back, a link, closing or hiding the tab) saves what is on screen, once, so a result is never lost. The listeners are registered once at module load (`Mock.tsx`), before the app's own `hashchange` listener, because React unmounts the screen right after that listener and a listener added by the screen would be removed first. Saving writes: wrong answers become due cards tomorrow, right ones are scheduled like first-try answers, unanswered ones are left alone
 (no penalty for not reaching them), the mock joins the history (last 10, shown on the setup screen and on Progress).
 
 Rewards are capped so a mock cannot inflate the daily goal: only the first **2 mocks of a day** earn anything, at most **40 XP** (4 per answer), and
