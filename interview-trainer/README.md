@@ -112,7 +112,7 @@ rules we hold ourselves to are in [`docs/engagement.md`](docs/engagement.md).
 
 **How scheduling works** (`shared/src/srs.ts`): a question answered right on the first try is scheduled 1 day out, then 3, then
 `interval x ease` (capped at 120 days); a miss, or an answer that only came right after seeing the feedback, comes back tomorrow with a lower ease.
-Reviewing early never lengthens the interval, so replaying a lesson ten times cannot game the schedule. With an interview date set,
+Reviewing early never lengthens the interval, so replaying a lesson ten times cannot game the schedule. **First reviews are spread:** at most 10 new cards fall due on any one day (the size of a review session), and the extras slide to the next day or two, so three lessons on day 1 show "10 due" on day 2, not 25; one lesson a day is untouched, and misses and later reviews are never moved. With an interview date set,
 intervals are capped at half the time left, so every card gets at least two more looks before the day. Cards carry a hash of the
 question text: if a prompt in the YAML is rewritten, the old card is dropped instead of being attached to a different question.
 

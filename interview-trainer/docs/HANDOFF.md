@@ -27,10 +27,10 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,608 unit/content/docs tests (vitest) |
+| `npm test` | 1,629 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 352 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 356 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -161,7 +161,7 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,608 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 352
+1,629 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 356
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
 green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
 
@@ -314,8 +314,19 @@ reduced XP; I also made the goal count distinct questions, as proposed.
 - Not done: remembering which units a learner opened between visits (they reset to "the current unit"), and a
   "Show all units" view with progress bars per unit (Expand all is the simple version).
 
-**P2-2 Spread the first reviews** [N-4 remainder]: three lessons on day 1 leave about 25 cards due on day 2. Spread
-first-review dates over 1-3 days (this changes intervals asserted in the SRS tests; update them deliberately).
+**P2-2 Spread the first reviews** [N-4 remainder]: **done** (2026-11-09).
+- `applyToCards` (`shared/src/srs.ts`) keeps at most `FIRST_REVIEW_DAY_CAP` = 10 first reviews due on any one day and slides
+  the extras by up to `FIRST_REVIEW_MAX_SLIDE` = 2 days (`spreadFirstReview`, pure and deterministic): three lessons on day 1
+  (25 cards) fall due as 10 / 10 / 5 instead of 25 on day 2. One lesson a day is untouched. Only a card's first successful
+  review moves; misses stay due tomorrow, later reviews and early reviews are untouched, and an interview date's interval
+  cap is respected. I chose a load-aware rule over a fixed "1, 2 or 3 days" so the common single-lesson learner keeps the
+  standard 1-day first interval.
+- Two knock-on changes, both for numbers that must agree: the lesson's note for a first review now says "in the next few days"
+  (it cannot know where the other cards of the session will land), and the summary's forecast covers everything that is
+  coming, not only that session's cards, capped to the next three days with reviews, so it matches Home tomorrow.
+- Tests: `shared/src/srs-spread.test.ts` (20, including a property test), `e2e/first-reviews.spec.ts` (4); 12 mutants caught.
+- Not done: the same smoothing for later intervals (a general due-date "load balancer"); the cap of 10 is a constant, not a
+  setting.
 
 **P2-3 Long pages and pacing** [N-14, N-15, N-17, UX-29, UX-34, N-8]: **done** (2026-11-08).
 - **Mock results save by themselves** (UX-34): written as soon as the scorecard shows when nothing needs self-checking; with

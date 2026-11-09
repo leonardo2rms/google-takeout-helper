@@ -165,6 +165,36 @@ export function reviewQueue(p: Progress, questions: readonly Question[], today: 
 }
 
 /**
+ * First reviews are spread out: at most this many cards become due on one day for their first review. A learner who does
+ * three lessons in a day would otherwise face every one of those cards the next morning ("25 due" on the first return).
+ */
+export const FIRST_REVIEW_DAY_CAP = 10;
+/** A first review slides at most this many days later than the schedule says (so 1 to 3 days for a normal first answer). */
+export const FIRST_REVIEW_MAX_SLIDE = 2;
+
+/** True when answering this question correctly now would be its first review (a new card, or one that was only ever missed). */
+export function isFirstReview(p: Pick<Progress, 'cards'>, q: Question): boolean {
+  const card = p.cards[q.id];
+  return !card || card.h !== questionHash(q) || card.reps === 0;
+}
+
+/**
+ * Picks the due day for a first review: the scheduled day if fewer than FIRST_REVIEW_DAY_CAP cards are due then, otherwise
+ * the next day (up to FIRST_REVIEW_MAX_SLIDE later) that has room, otherwise the least loaded of them (the earliest on a tie).
+ * `load` maps a day to the number of cards due on it; `maxSlide` is further limited by an interview date's interval cap.
+ * Pure and deterministic: the same cards always give the same answer.
+ */
+export function spreadFirstReview(due: Day, load: ReadonlyMap<Day, number>, maxSlide: number = FIRST_REVIEW_MAX_SLIDE): number {
+  let best = 0;
+  for (let slide = 0; slide <= maxSlide; slide++) {
+    const n = load.get(addDays(due, slide)) ?? 0;
+    if (n < FIRST_REVIEW_DAY_CAP) return slide;
+    if (n < (load.get(addDays(due, best)) ?? 0)) best = slide;
+  }
+  return best;
+}
+
+/**
  * Applies a finished session to the cards. Questions that no longer exist are ignored.
  * Returns a new object; the input is not modified.
  */
@@ -177,15 +207,27 @@ export function applyToCards(
 ): Progress['cards'] {
   const byId = new Map(questions.map((q) => [q.id, q] as const));
   const next = { ...cards };
+  // How many cards are due on each day, kept up to date as this session's cards are scheduled (see spreadFirstReview).
+  const load = new Map<Day, number>();
+  for (const c of Object.values(cards)) load.set(c.due, (load.get(c.due) ?? 0) + 1);
+  const bump = (day: Day, by: number) => load.set(day, (load.get(day) ?? 0) + by);
+
   for (const [id, outcome] of Object.entries(outcomes)) {
     const q = byId.get(id);
     if (!q) continue;
     const conf = opts.confidence?.[id];
-    next[id] = scheduleCard(cards[id], gradeFor(outcome, conf, opts.hinted?.includes(id)), today, {
-      hash: questionHash(q),
-      deadline: opts.deadline,
-      hypercorrect: isHypercorrection(outcome, conf),
-    });
+    const before = cards[id];
+    const grade = gradeFor(outcome, conf, opts.hinted?.includes(id));
+    let card = scheduleCard(before, grade, today, { hash: questionHash(q), deadline: opts.deadline, hypercorrect: isHypercorrection(outcome, conf) });
+    if (before) bump(before.due, -1);
+    if (grade !== 'again' && card.reps === 1 && (before?.reps ?? 0) === 0) {
+      // A first successful review: keep any one day's load under the cap, without breaking an interview date's interval cap.
+      const room = Math.max(0, intervalCap(card.last, opts.deadline) - card.interval);
+      const slide = spreadFirstReview(card.due, load, Math.min(FIRST_REVIEW_MAX_SLIDE, room));
+      if (slide > 0) card = { ...card, due: addDays(card.due, slide), interval: card.interval + slide };
+    }
+    bump(card.due, 1);
+    next[id] = card;
   }
   return next;
 }
