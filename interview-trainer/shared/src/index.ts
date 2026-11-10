@@ -21,6 +21,7 @@ export * from './streak';
 export * from './goal';
 export * from './srs';
 export * from './due';
+export * from './track';
 export * from './mastery';
 export * from './daily';
 export * from './plan';

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
   ACHIEVEMENTS, XP_REPEAT, allQuestions, alreadyDoneToday, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
-  isFirstReview, isResumeKind, reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
+  isFirstReview, isResumeKind, nextLessonFor, reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
@@ -167,7 +167,7 @@ function Screens() {
 
     const tipEvent = events.find((e): e is Extract<SessionEvent, { type: 'tip' }> => e.type === 'tip');
     const tipQuestion = tipEvent ? allQuestions(course).find((q) => q.id === tipEvent.questionId) : undefined;
-    const nextLesson = course.units.flatMap((u) => u.lessons).find((l) => !after.lessons[l.id] && l.id !== lessonId);
+    const nextLesson = nextLessonFor(course, after.profile.role, after.lessons, lessonId);
     setFinished({
       title,
       kind: sessionKind,

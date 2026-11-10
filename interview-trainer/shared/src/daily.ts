@@ -5,6 +5,7 @@ import type { Progress } from './progress';
 import { mulberry32 } from './rng';
 import { allQuestions, type Course, type Question } from './schema';
 import { cardFor, dueQuestions } from './srs';
+import { trackOrder } from './track';
 
 export const DAILY_SIZE = 8;
 export const DAILY_MAX_DUE = 5;
@@ -64,7 +65,8 @@ export function buildDailySession(course: Course, p: Progress, today: Day, opts:
   const dueList = dueQuestions(p, all, today, unitOf);
   const weakList = weakSpots(course, p, today, all.length, seed);
   const seenIds = new Set(all.filter((q) => cardFor(p, q)).map((q) => q.id));
-  const freshList = all.filter((q) => !seenIds.has(q.id));
+  // New material follows the learner's track: the role's focus units first, each in course order (no role: course order).
+  const freshList = trackOrder(course.units, p.profile.role).flatMap((u) => u.lessons.flatMap((l) => l.questions)).filter((q) => !seenIds.has(q.id));
 
   const chosen: Question[] = [];
   const ids = new Set<string>();

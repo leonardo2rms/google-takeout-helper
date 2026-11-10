@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import {
-  buildDailySession, dueOverview, goalDisplay, goalToday, planFor, rankFor, readiness, resumeProgress, streakStatus,
+  buildDailySession, dueOverview, goalDisplay, goalToday, hasTrack, isFocusUnit, nextLessonFor, planFor, rankFor, readiness, resumeProgress, ROLE_LABEL, streakStatus, trackOrder,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { ChallengeCard } from '../components/ChallengeCard';
@@ -37,7 +37,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const confirm = useConfirm();
   // Only the unit being worked in is open; finished and future units are one line each (every lesson stays one tap away).
   const [openUnits, setOpenUnits] = useState<ReadonlySet<string>>(() => {
-    const current = currentUnitId(course.units, progress.lessons);
+    const current = currentUnitId(trackOrder(course.units, progress.profile.role), progress.lessons);
     return new Set(current ? [current] : []);
   });
   const setUnitOpen = (id: string, open: boolean) =>
@@ -55,8 +55,10 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const note = streakNote(progress, today);
   const total = course.units.reduce((n, u) => n + u.lessons.length, 0);
   const done = Object.keys(progress.lessons).length;
-  const nextLesson = course.units.flatMap((u) => u.lessons).find((l) => !progress.lessons[l.id]);
-  const firstLesson = course.units[0]?.lessons[0];
+  const role = progress.profile.role;
+  const units = useMemo(() => trackOrder(course.units, role), [course, role]);
+  const nextLesson = nextLessonFor(course, role, progress.lessons);
+  const firstLesson = units[0]?.lessons[0];
   const dueCount = overview.due;
   const reviewable = overview.reviewable;
   const shownGoal = goalDisplay(goal);
@@ -315,12 +317,15 @@ export function Home({ course, progress, health, update, onReset }: Props) {
         </div>
       </div>
 
-      {course.units.map((unit, ui) => {
+      {units.map((unit) => {
+        const ui = course.units.indexOf(unit); // numbers are the course's, so "Unit 05" and "5.2" mean the same thing everywhere
+        const split = hasTrack(role) ? (unit.id === units[0]!.id ? 'track' : unit.id === units.find((u) => !isFocusUnit(role, u.id))?.id ? 'other' : null) : null;
         const completed = unit.lessons.filter((l) => progress.lessons[l.id]).length;
         const { icon, style } = unitStyle(unit);
         return (
+          <Fragment key={unit.id}>
+          {split && <h3 className="track-split" data-testid={`track-${split}`}>{split === 'track' ? `Your track · ${ROLE_LABEL[role!]}` : 'Other topics'}</h3>}
           <details
-            key={unit.id}
             className={`unit-section ${completed === unit.lessons.length ? 'complete' : ''}`}
             style={style}
             open={openUnits.has(unit.id)}
@@ -369,6 +374,7 @@ export function Home({ course, progress, health, update, onReset }: Props) {
               })}
             </ol>
           </details>
+          </Fragment>
         );
       })}
 

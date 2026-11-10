@@ -27,10 +27,10 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,629 unit/content/docs tests (vitest) |
+| `npm test` | 1,645 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 356 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 367 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -96,7 +96,7 @@ Designed from `research/engagement-spec.md`; the rules and edge cases are in [en
 - **Spaced repetition** (SM-2-lite cards per question, keyed with a prompt hash so content edits do not corrupt
   history) and **Review due**; one definition of "due" everywhere (`shared/src/due.ts`).
 - **Readiness and mastery**: per-topic mastery, an honest readiness score hidden until 25% of the course is seen,
-  "weakest topic" only once 3 topics are started; the onboarding **role** only weights readiness (see P2-6).
+  "weakest topic" only once 3 topics are started; the onboarding **role** sets a track: its units come first on Home, in Today's new material and in "Up next", and weigh more in readiness, Mixed practice and Mock (P2-6).
 - **Onboarding** as an inline card (role, interview date with countdown plan, practice time), deferrable.
 - **Tomorrow bridge**: the summary says what is scheduled for tomorrow and offers a calendar reminder once.
 - Code: `shared/src/srs.ts`, `shared/src/streak.ts`, `shared/src/goal.ts`, `shared/src/rank.ts`,
@@ -161,9 +161,9 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,629 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 356
+1,645 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 367
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
-green, `npm test` green from a fresh clone. 88 committed screenshots in `e2e/screenshots` show every screen.
+green, `npm test` green from a fresh clone. One known flake, present before P2-6: `a11y-behaviour.spec.ts` "the code editor is not a keyboard trap" fails about 1 run in 12 under parallel load (not yet root-caused; it passes on re-run). 89 committed screenshots in `e2e/screenshots` show every screen.
 
 ---
 
@@ -357,9 +357,25 @@ components, validated against a reference topology) that was deferred from the f
 discriminated union, so a new type is one schema entry, one grader, one component (see "adding a question type" in
 [contributing.md](contributing.md)).
 
-**P2-6 Role-targeted tracks**: onboarding asks for a role (`backend-kotlin`, `staff-architect`, `generalist`) but it
-only weights the readiness score (`shared/src/mastery.ts`). Use it to order units, pick Today's new material and
-suggest mock topics.
+**P2-6 Role-targeted tracks**: **done** (2026-11-10).
+- `shared/src/track.ts` is the one definition: `ROLE_FOCUS` lists each role's unit ids (backend: kotlin, coroutines, spring,
+  jvm, data, messaging, testing; architect: ddd, scale, complexity, ai, system-design, security-observability; generalist and
+  no role: none), `trackOrder` puts the focus units first with each group in course order, `nextLessonFor` finds the next
+  undone lesson in that order, and `roleWeights` (`FOCUS_WEIGHT` = 1.5) replaces the old hand-written `ROLE_WEIGHTS`.
+  Unit and lesson numbers stay the course's ("Unit 05", "5.2"), so they mean the same thing in Home, Library and lesson titles.
+- Where the role now acts: Home lists the track first under "Your track · <role>" and the rest under "Other topics" (every
+  unit and lesson stays one tap away); the first-run hero, "Up next", the summary's "Next lesson" and the open unit follow
+  the track; Today's *new* questions come from the track first (due cards and weak spots are untouched, and it spills into
+  the other units once the track is all seen); Mixed practice and Mock draw from focus units 1.5x as often; the Mock topic
+  list groups "Your track" first with a one-line note; Settings names the track. Readiness gets the longer lists too, so
+  the data, messaging, testing and system-design units now count for the roles they belong to.
+- Nothing is stored beyond the role the plan already saved, so changing the role in the plan (or leaving the card empty)
+  reorders everything at once; a generalist sees exactly what they saw before.
+- Tests: `shared/src/track.test.ts` (16, including a property test and a check that every track unit exists in the real
+  course), `e2e/tracks.spec.ts` (11); 15 mutants caught.
+- Not done: the role does not lock or hide anything (a deliberate choice: a track is an order, not a gate); no per-role
+  question sets or company tracks (not claimed, see COMPETITORS.md item 13); the focus lists are a judgement call, listed
+  in one place so they are easy to change.
 
 **P2-7 Kotlin for code questions**: challenges are JavaScript because they run in a browser sandbox. Real Kotlin
 needs a server-side runner with container isolation (no network, CPU/memory/time limits, per-run sandbox), e.g. a

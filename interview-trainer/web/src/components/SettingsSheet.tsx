@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
+import { ROLE_LABEL, TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
 import { DECLINED_NOTE, saveFile } from '../lib/files';
 import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
 import { useConfirm } from './ConfirmDialog';
@@ -103,6 +103,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
         <p className="muted">
           {progress.profile.interviewDate ? `Interview on ${progress.profile.interviewDate}. ` : 'No interview date set. '}
           Goal: {progress.goal.target} questions a day.
+          {progress.profile.role && <> Track: {ROLE_LABEL[progress.profile.role]}.</>}
         </p>
         <button type="button" className="btn secondary wide" onClick={onEditPlan}>Edit my plan</button>
       </section>
