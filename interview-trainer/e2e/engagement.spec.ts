@@ -140,7 +140,7 @@ async function solveAndContinueWithHint(page: Page) {
   const q = LESSON_Q[0]!;
   await answerCorrectly(page, q);
   await check(page);
-  await expect(page.getByTestId('srs-note')).toHaveText("You'll see this again tomorrow.");
+  await expect(page.getByTestId('srs-note')).toHaveText("You'll see this again in the next few days.");
   await next(page);
 }
 

@@ -5,9 +5,12 @@ export const inDays = (n: number): string => (n <= 1 ? 'tomorrow' : `in ${n} day
 
 export const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n === 1 ? one : many}`;
 
-/** "5 questions tomorrow, 4 in 3 days": what the count belongs to is said out loud. */
+/** Days of the forecast that are spelled out; a learner with a long tail of reviews hears about the next few. */
+export const FORECAST_DAYS_SHOWN = 3;
+
+/** "5 questions tomorrow, 4 in 3 days": what the count belongs to is said out loud. At most the next FORECAST_DAYS_SHOWN days with reviews. */
 export const forecastText = (buckets: readonly ForecastBucket[]): string =>
-  buckets.map((b, i) => `${i === 0 ? plural(b.count, 'question') : b.count} ${inDays(b.inDays)}`).join(', ');
+  buckets.slice(0, FORECAST_DAYS_SHOWN).map((b, i) => `${i === 0 ? plural(b.count, 'question') : b.count} ${inDays(b.inDays)}`).join(', ');
 
 /** "A", "A and B", "A, B and C". */
 export const listNames = (names: readonly string[]): string =>

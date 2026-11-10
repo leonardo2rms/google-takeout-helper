@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import course from 'virtual:course';
 import {
   ACHIEVEMENTS, XP_REPEAT, allQuestions, alreadyDoneToday, applySession, challengeQuestion, challengeResult, challengeStreak, findQuestion, settleChallenge, buildDailySession, dayKey, dayNumber, explanationOf, findLesson, goalToday, mixFilterFor, outcomesOf, pickMix, previewInterval,
-  isResumeKind, reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
+  isFirstReview, isResumeKind, reviewForecast, reviewQueue, REVIEW_SESSION_SIZE, seededShuffle, streakStatus, unitOfFor, weakSpots,
   type HealthResponse, type Progress, type Question, type SessionEvent, type SessionSummary,
 } from '@trainer/shared';
 import { useReadingPrefs, useRouteAnnouncer } from './lib/a11y';
@@ -179,7 +179,9 @@ function Screens() {
       events,
       goalBefore: goalToday(before, today),
       goalAfter: goalToday(after, today),
-      forecast: reviewForecast(after.cards, Object.keys(outcomes), today),
+      // Everything that is coming, not just this session's cards: first reviews are spread over several days, so what is due
+      // tomorrow can come from earlier lessons, and the number must match what Home will say.
+      forecast: reviewForecast(after.cards, Object.keys(after.cards), today),
       tip: tipEvent && tipQuestion ? { text: explanationOf(tipQuestion), bonusXp: tipEvent.bonusXp } : null,
       extraNotes: [
         ...(kind === 'challenge' ? [`Daily challenge ${pass ? `passed (+${challengeBonus} XP)` : 'done'}. Challenge streak: ${plural(challengeStreak(after, today).current, 'day')}.`] : []),
@@ -197,6 +199,9 @@ function Screens() {
   const reviewHint = useCallback(
     (q: Question, outcome: 'first' | 'retry' | 'failed') => {
       if (outcome === 'failed') return null; // it comes straight back in this session
+      // A first review is spread over the next few days to keep any one day light, and where it lands depends on the other cards of
+      // this session, which are not scheduled yet: so no exact day is promised (the summary, after scheduling, gives the real counts).
+      if (outcome === 'first' && isFirstReview(getProgress(), q)) return "You'll see this again in the next few days.";
       const days = previewInterval(getProgress(), q, outcome, dayKey(new Date()));
       return days >= 1 ? `You'll see this again ${inDays(days)}.` : null;
     },

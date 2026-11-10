@@ -47,6 +47,11 @@ describe('format helpers', () => {
     expect(forecastText([{ inDays: 1, count: 1 }])).toBe('1 question tomorrow');
     expect(forecastText([])).toBe('');
   });
+
+  it('forecastText spells out only the next three days with reviews', () => {
+    const many = [1, 2, 4, 6, 9].map((d, i) => ({ inDays: d, count: 10 - i }));
+    expect(forecastText(many)).toBe('10 questions tomorrow, 9 in 2 days, 8 in 4 days');
+  });
   it('listNames reads like a sentence', () => {
     expect(listNames([])).toBe('');
     expect(listNames(['A'])).toBe('A');
