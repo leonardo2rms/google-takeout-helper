@@ -343,7 +343,7 @@ lessons:
 
 1. `npm run content:check` - validates the schema and the cross-field rules and prints the counts.
 2. `npx vitest run content` - the content tests: open rubrics, code solutions, hints, mix of types.
-3. If the unit should weigh into a target role, add its id to `ROLE_WEIGHTS` in `shared/src/mastery.ts`.
+3. If the unit belongs on a target role's track, add its id to that role in `ROLE_FOCUS` in `shared/src/track.ts` (it then comes first on Home for that role and weighs more in readiness, Mixed practice and Mock; `shared/src/track.test.ts` checks every listed id exists).
 4. `npm run dev` and play it: read every question on a phone-sized window, and read each explanation after a deliberately wrong answer.
 5. `npm run e2e` (the suite derives its expectations from the YAML; it plays every lesson perfectly). Update screenshots only if the UI changed.
 6. Update the question and lesson counts in the README table if they are mentioned there.

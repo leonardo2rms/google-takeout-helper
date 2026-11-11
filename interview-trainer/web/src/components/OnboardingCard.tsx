@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GOAL_PRESETS, isDay, setGoalTarget, type Progress, type RoleId } from '@trainer/shared';
+import { GOAL_PRESETS, ROLE_HINT, ROLE_LABEL, ROLE_IDS, isDay, setGoalTarget, type Progress, type RoleId } from '@trainer/shared';
 import { Icon } from './icons';
 
 interface Props {
@@ -10,11 +10,7 @@ interface Props {
   startOpen?: boolean;
 }
 
-const ROLES: { id: RoleId; label: string; hint: string }[] = [
-  { id: 'backend-kotlin', label: 'Backend / Kotlin', hint: 'Kotlin, coroutines, Spring, JVM first' },
-  { id: 'staff-architect', label: 'Staff / architect', hint: 'DDD, scale and AI first' },
-  { id: 'generalist', label: 'Generalist', hint: 'Everything equally' },
-];
+const ROLES = ROLE_IDS.map((id) => ({ id, label: ROLE_LABEL[id], hint: ROLE_HINT[id] }));
 
 const GOALS: { key: keyof typeof GOAL_PRESETS; label: string }[] = [
   { key: 'light', label: 'Light' },

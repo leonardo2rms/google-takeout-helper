@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   MOCK_LENGTHS, MOCK_MINUTES, MOCK_REWARDED_PER_DAY, MOCK_XP_CAP, applyMock, buildMock, dayKey, defaultMinutes, mockSeed,
+  ROLE_LABEL, hasTrack, isFocusUnit, trackOrder,
   type Course, type MockConfig, type MockLength, type Progress, type Question,
 } from '@trainer/shared';
 import { Icon } from '../components/icons';
@@ -148,6 +149,7 @@ export function MockScreen({ course, progress, grade }: Props) {
 
   if (stage.name === 'results') return <ResultsScreen course={course} stage={stage} setStage={setStage} />;
 
+  const role = progress.profile.role;
   const unitTitle = cfg.unitId ? course.units.find((u) => u.id === cfg.unitId)?.title : null;
   return (
     <div className="home mock-setup">
@@ -191,8 +193,20 @@ export function MockScreen({ course, progress, grade }: Props) {
         <label htmlFor="mock-topic"><b>Topic</b></label>
         <select id="mock-topic" className="lib-select" data-testid="mock-topic" value={cfg.unitId ?? ''} onChange={(e) => setCfg({ ...cfg, unitId: e.target.value || null })}>
           <option value="">All topics (weighted to your weak spots)</option>
-          {course.units.map((u) => <option key={u.id} value={u.id}>{u.title}</option>)}
+          {hasTrack(role) ? (
+            <>
+              <optgroup label={`Your track · ${ROLE_LABEL[role]}`}>
+                {course.units.filter((u) => isFocusUnit(role, u.id)).map((u) => <option key={u.id} value={u.id}>{u.title}</option>)}
+              </optgroup>
+              <optgroup label="Other topics">
+                {course.units.filter((u) => !isFocusUnit(role, u.id)).map((u) => <option key={u.id} value={u.id}>{u.title}</option>)}
+              </optgroup>
+            </>
+          ) : (
+            trackOrder(course.units, role).map((u) => <option key={u.id} value={u.id}>{u.title}</option>)
+          )}
         </select>
+        {hasTrack(role) && !cfg.unitId && <small className="muted">Questions from your track ({ROLE_LABEL[role]}) come up a little more often.</small>}
       </section>
 
       <ul className="mock-rules">

@@ -8,6 +8,7 @@ import { mulberry32 } from './rng';
 import { allQuestions, type Course, type Question } from './schema';
 import { applySession, type SessionEvent } from './events';
 import { cardFor, strength, type Outcome } from './srs';
+import { roleWeights } from './track';
 
 // ---------- setup ----------
 
@@ -36,7 +37,7 @@ const TYPE_DECAY = 0.55;
 
 /**
  * Picks the mock's questions: a seeded draw without replacement, weighted towards weak topics and weak questions
- * (like Mixed practice), with a penalty for formats already chosen so the mix stays varied, capped counts of the slow
+ * (like Mixed practice) and slightly towards the role's focus units, with a penalty for formats already chosen so the mix stays varied, capped counts of the slow
  * formats (code, open), and finally interleaved so neighbours rarely share a topic. Deterministic for a given seed.
  */
 export function buildMock(course: Course, p: Progress, today: Day, cfg: MockConfig, seed: number): Question[] {
@@ -47,7 +48,8 @@ export function buildMock(course: Course, p: Progress, today: Day, cfg: MockConf
   const n = Math.min(cfg.length, pool.length);
   const caps: Partial<Record<Question['type'], number>> = { code: Math.max(1, Math.round(n / 10)), open: Math.max(1, Math.round(n / 5)) };
 
-  const weight = (q: Question) => (1 + 2 * (1 - strength(cardFor(p, q), today))) * (1 + 1.5 * (1 - (topics.get(unitOf(q)) ?? 0)));
+  const byRole = roleWeights(p.profile.role);
+  const weight = (q: Question) => (1 + 2 * (1 - strength(cardFor(p, q), today))) * (1 + 1.5 * (1 - (topics.get(unitOf(q)) ?? 0))) * (byRole[unitOf(q)] ?? 1);
   const chosen: Question[] = [];
   const perType: Partial<Record<Question['type'], number>> = {};
   const remaining = [...pool];

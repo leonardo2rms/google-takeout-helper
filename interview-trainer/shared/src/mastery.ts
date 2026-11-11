@@ -4,12 +4,13 @@ import { mulberry32 } from './rng';
 import type { Course, Question } from './schema';
 import { allQuestions } from './schema';
 import { cardFor, isDue, lessonIdOf, strength, type UnitOf } from './srs';
+import { roleWeights } from './track';
 
-/** Unit weights per target role (default 1). Keyed by unit id. */
+/** Unit weights per target role (default 1). Keyed by unit id; the units come from the role's track (`ROLE_FOCUS`). */
 export const ROLE_WEIGHTS: Record<RoleId, Record<string, number>> = {
-  'backend-kotlin': { kotlin: 1.5, coroutines: 1.5, spring: 1.5, jvm: 1.5 },
-  'staff-architect': { ddd: 1.5, scale: 1.5, ai: 1.5 },
-  generalist: {},
+  'backend-kotlin': roleWeights('backend-kotlin'),
+  'staff-architect': roleWeights('staff-architect'),
+  generalist: roleWeights('generalist'),
 };
 
 const unitIndexCache = new WeakMap<Course, Map<QuestionId, string>>();
@@ -107,7 +108,7 @@ export function labelFor(coverage: number, score: number, weakest: number | null
 }
 
 export function readiness(course: Course, p: Progress, today: Day, weights?: Record<string, number>): Readiness {
-  const w = weights ?? (p.profile.role ? ROLE_WEIGHTS[p.profile.role] : {});
+  const w = weights ?? roleWeights(p.profile.role);
   const stats = topicStats(course, p, today).filter((s) => s.total > 0);
   let num = 0;
   let den = 0;
@@ -183,13 +184,15 @@ export function mixFilterFor(p: Pick<Progress, 'stats' | 'lessons'>): ((q: Quest
 }
 
 /**
- * Mixed practice: a seeded draw without replacement, weighted by `1 + 2 * (1 - strength)` so weak material shows up more.
+ * Mixed practice: a seeded draw without replacement, weighted by `1 + 2 * (1 - strength)` so weak material shows up more, and by the role's focus units (`FOCUS_WEIGHT`).
  * `only` limits the pool (a first-ever session passes `isGentleFormat`).
  */
 export function pickMix(course: Course, p: Progress, today: Day, n: number, seed: number, only?: (q: Question) => boolean): Question[] {
   const rand = mulberry32(seed);
+  const unitOf = unitOfFor(course);
+  const byRole = roleWeights(p.profile.role);
   const keyed = allQuestions(course).filter((q) => !only || only(q)).map((q) => {
-    const weight = 1 + 2 * (1 - strength(cardFor(p, q), today));
+    const weight = (1 + 2 * (1 - strength(cardFor(p, q), today))) * (byRole[unitOf(q)] ?? 1);
     return { q, key: -Math.log(1 - rand()) / weight };
   });
   keyed.sort((a, b) => a.key - b.key);
