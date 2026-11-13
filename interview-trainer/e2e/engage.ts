@@ -18,6 +18,7 @@ export const KEY_V1 = 'interview-trainer.progress.v1';
 export const KEY_V2 = 'interview-trainer.progress.v2';
 /** The unfinished session (see resume.spec.ts). Opening a lesson that was left half way carries on from it. */
 export const RESUME_KEY = 'interview-trainer.resume.v1';
+export const BACKUP_KEY = 'interview-trainer.backup.v1';
 
 /** The pretend "now" for deterministic tests: Wednesday 2026-11-04, 10:00 local time. */
 export const NOW = new Date(2026, 10, 4, 10, 0, 0);
@@ -37,7 +38,9 @@ export async function setDay(page: Page, dayKey: string): Promise<void> {
 
 /** Writes localStorage entries before the app loads. Only once per context, so reloads keep what the app saved. */
 export async function seed(target: Page | BrowserContext, entries: Record<string, unknown>): Promise<void> {
-  const flat = Object.fromEntries(Object.entries(entries).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)]));
+  // A seeded learner has "just backed up" unless a spec says otherwise, so the backup reminder does not appear in specs about something else.
+  const withBackup = BACKUP_KEY in entries ? entries : { ...entries, [BACKUP_KEY]: { v: 1, lastBackup: TODAY, snoozedUntil: null } };
+  const flat = Object.fromEntries(Object.entries(withBackup).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)]));
   await target.addInitScript((e: Record<string, string>) => {
     if (localStorage.getItem('__seeded')) return;
     for (const [k, v] of Object.entries(e)) localStorage.setItem(k, v);

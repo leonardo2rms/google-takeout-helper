@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
-import { ROLE_LABEL, TIP_BONUS_XP, TIP_ONE_IN, backupFileName, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
-import { DECLINED_NOTE, saveFile } from '../lib/files';
-import { exportText, importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
+import { ROLE_LABEL, TIP_BONUS_XP, TIP_ONE_IN, daysSinceBackup, dayKey, importProgress, summarizeProgress, type Progress, type Settings } from '@trainer/shared';
+import { copyBackup, downloadBackup, useBackupNote } from '../lib/backup-note';
+import { DECLINED_NOTE } from '../lib/files';
+import { importContext, mergeIntoProgress, replaceProgress } from '../lib/store';
 import { useConfirm } from './ConfirmDialog';
 import { RecoveredData } from './DataSafety';
 import { Icon } from './icons';
@@ -46,6 +47,8 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
   const [pasted, setPasted] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const confirm = useConfirm();
+  const note = useBackupNote();
+  const since = daysSinceBackup(note, dayKey(new Date()));
 
   const say = (m: string) => {
     setError('');
@@ -57,19 +60,15 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
   };
 
   const download = async () => {
-    const result = await saveFile(backupFileName(dayKey(new Date())), exportText(), 'application/json');
+    const result = await downloadBackup();
     if (result === 'saved') say('Backup saved to your downloads. Keep it somewhere safe.');
     else if (result === 'declined') say(DECLINED_NOTE);
     else fail('Downloads are blocked here. Use "Copy backup text" instead.');
   };
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(exportText());
-      say('Backup copied. Paste it into a note or message to yourself.');
-    } catch {
-      fail('Copying is not allowed here. Use "Download backup" instead.');
-    }
+    if (await copyBackup()) say('Backup copied. Paste it into a note or message to yourself.');
+    else fail('Copying is not allowed here. Use "Download backup" instead.');
   };
 
   const check = (text: string) => {
@@ -134,6 +133,7 @@ export function SettingsSheet({ progress, update, onEditPlan, onReset, onClose }
 
       <SettingsGroup id="data" title="Your data" summary="Backup and import">
         <p className="muted">Stored on this device only. A backup file moves you to a new phone and protects you if the browser clears its storage.</p>
+        <p className="muted" data-testid="last-backup">{since === null ? 'No backup made from this device yet.' : since === 0 ? 'Last backup: today.' : `Last backup: ${since === 1 ? 'yesterday' : `${since} days ago`}.`}</p>
         <div className="stack">
           <button type="button" className="btn secondary wide" onClick={() => void download()}>Download backup</button>
           <button type="button" className="btn secondary wide" onClick={() => void copy()}>Copy backup text</button>

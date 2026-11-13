@@ -77,7 +77,7 @@ export const rawProgressArb: fc.Arbitrary<Record<string, unknown>> = fc.record(
         { requiredKeys: [] },
       ),
     ),
-    settings: maybeJunk(fc.record({ haptics: fc.boolean(), sound: fc.boolean(), confetti: fc.boolean(), tips: fc.boolean(), confidence: fc.boolean() }, { requiredKeys: [] })),
+    settings: maybeJunk(fc.record({ haptics: fc.boolean(), confetti: fc.boolean(), tips: fc.boolean(), confidence: fc.boolean() }, { requiredKeys: [] })),
     stats: maybeJunk(fc.record({ sessions: int(), answered: int(), firstTry: int(), perfect: int(), practiceDays: int() }, { requiredKeys: [] })),
     milestones: maybeJunk(fc.dictionary(fc.oneof(keyArb, fc.string({ minLength: 70, maxLength: 90 })), fc.oneof(recentDayArb, fc.string()), { maxKeys: 5 })),
     calibration: maybeJunk(fc.record({ n: fc.array(int(50), { maxLength: 4 }), right: fc.array(int(50), { maxLength: 4 }) }, { requiredKeys: [] })),

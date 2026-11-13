@@ -27,10 +27,10 @@ self-contained HTML page.
 | `npm install` | install all workspaces |
 | `npm run dev` | web on :5173 (reloads on content edits) + API on :8787 |
 | `npm run build` then `npm run start` | production build served by the API on :8787 |
-| `npm test` | 1,645 unit/content/docs tests (vitest) |
+| `npm test` | 1,664 unit/content/docs tests (vitest) |
 | `npm run coverage` | same, with the coverage ratchet (fails if coverage drops) |
 | `npm run typecheck` | all workspaces + the e2e folder |
-| `npm run e2e` | 367 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
+| `npm run e2e` | 378 Playwright tests at phone size; set `E2E_PORT` to a free port if anything else runs |
 | `npm run content:check` / `npm run content:lint` | validate the course / measure answer-option bias |
 | `npm run build:standalone` | the single-file build in `dist/` (fragment for hosts + full document for file://) |
 
@@ -161,9 +161,9 @@ leaked.
 
 ### 2.10 Quality bar at handoff
 
-1,645 unit tests (coverage 99.7% statements / 97.6% branches; thresholds in the coverage config are a ratchet), 367
+1,664 unit tests (coverage 99.7% statements / 98.0% branches; thresholds in the coverage config are a ratchet), 378
 e2e tests including axe in light and dark, all hand-made mutants killed in the last round, typecheck clean, both builds
-green, `npm test` green from a fresh clone. One known flake, present before P2-6: `a11y-behaviour.spec.ts` "the code editor is not a keyboard trap" fails about 1 run in 12 under parallel load (not yet root-caused; it passes on re-run). 89 committed screenshots in `e2e/screenshots` show every screen.
+green, `npm test` green from a fresh clone. One known flake, present before P2-6: `a11y-behaviour.spec.ts` "the code editor is not a keyboard trap" fails about 1 run in 12 under parallel load (not yet root-caused; it passes on re-run). Seen on 2026-11-13 in a fresh container whose Playwright 1.56 had to be pointed at a newer pre-installed Chromium (a throwaway config with `launchOptions.executablePath`, not committed): `engagement.spec.ts` "several tabs" failed every time and `share-card.spec.ts` "text-only share" about 1 run in 6, both also on the code before P2-4a, so most likely the browser build; both passed in the earlier container. 90 committed screenshots in `e2e/screenshots` show every screen.
 
 ---
 
@@ -344,11 +344,25 @@ reduced XP; I also made the goal count distinct questions, as proposed.
 - Tests: `e2e/settings-groups.spec.ts` (8), `e2e/progress-heavy.spec.ts` (5), 5 new mock-saving tests in
   `e2e/mock.spec.ts`; a helper `openSettingsGroup` for specs that use the folded groups. 22 mutants caught.
 
-**P2-4 Engagement-spec features not built** (spec in `research/engagement-spec.md`): a **weekly recap** card;
-**teach-back** prompts (explain a concept in your own words, AI- or self-graded); a **transfer code / QR** to move
-progress to another device without a server (export already works; this is the convenient path); a **weekly backup
-nudge**; optional **sound** (a `sound` setting already exists in `Progress.settings` but nothing plays it and there is no
-toggle: either implement or remove it). Keep the ethics line in [engagement.md](engagement.md).
+**P2-4 Engagement-spec features not built** (spec in `research/engagement-spec.md`), in parts. Keep the ethics line in
+[engagement.md](engagement.md).
+- **P2-4a Backup reminder and the dead `sound` setting: done** (2026-11-13).
+  - `shared/src/backup-nudge.ts` (pure rules) and `web/src/lib/backup-note.ts` (storage in its own key
+    `interview-trainer.backup.v1`, memory fallback, `downloadBackup` / `copyBackup` that record only a real success). Home shows
+    one quiet line below the practice rows after 5 practice days when no backup exists or the last is 14 days old; "Later"
+    waits 7 days. Settings, Your data says "Last backup: 3 days ago" or "No backup made from this device yet". The data-safety
+    banner's own download and copy buttons record too. The date is deliberately not in `Progress` (not exported, merged or
+    migrated; a restored old backup cannot rewind it).
+  - `Progress.settings.sound` is removed (nothing played it, no toggle, and the ethics line rules out auto-playing sound).
+    `normalizeProgress` drops unknown keys, so saves and backups that still carry it load unchanged (tested).
+  - `e2e/engage.ts`'s `seed` now also writes "just backed up" unless a spec passes its own note, so the reminder does not
+    appear in specs about something else.
+  - Tests: `shared/src/backup-nudge.test.ts` (12 incl. a property test), `web/src/lib/backup-note.test.ts` (7),
+    `e2e/backup-nudge.spec.ts` (11); 11 mutants caught. Not covered by a test (storage is deliberately blocked in that
+    scenario, so the note cannot be read back): that the data-safety banner's buttons record.
+- **Still open in P2-4:** a **weekly recap** card; **teach-back** prompts (explain a concept in your own words, AI- or
+  self-graded); a **transfer code / QR** to move progress to another device without a server (export already works; this is
+  the convenient path). Next suggested: the weekly recap (pure derivation from `days`, no new stored data).
 
 **P2-5 Competitor gaps not built** (from [COMPETITORS.md](COMPETITORS.md)): flashcards mode, difficulty adaptation
 (questions carry `difficulty` but selection ignores it), voice answers for open questions, localisation (copy is British

@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import {
-  buildDailySession, dueOverview, goalDisplay, goalToday, hasTrack, isFocusUnit, nextLessonFor, planFor, rankFor, readiness, resumeProgress, ROLE_LABEL, streakStatus, trackOrder,
+  buildDailySession, daysSinceBackup, dueOverview, goalDisplay, goalToday, hasTrack, isFocusUnit, nextLessonFor, planFor, rankFor, readiness, resumeProgress, ROLE_LABEL, shouldNudgeBackup, streakStatus, trackOrder,
   type Course, type HealthResponse, type Progress,
 } from '@trainer/shared';
 import { ChallengeCard } from '../components/ChallengeCard';
@@ -12,6 +12,8 @@ import { SettingsSheet } from '../components/SettingsSheet';
 import { GoalSheet, StreakSheet, streakNote } from '../components/Sheets';
 import { formatCount, plural } from '../lib/format';
 import { currentUnitId, dueInToday, dueLine, goalMetHero, homeTier, readinessLine, reinforceText } from '../lib/home-copy';
+import { downloadBackup, snoozeBackupNudge, useBackupNote } from '../lib/backup-note';
+import { DECLINED_NOTE } from '../lib/files';
 import { clearResume, useResume } from '../lib/resume';
 import { dismissIosTip, shouldShowIosTip } from '../lib/store';
 import { useToday } from '../lib/today';
@@ -34,6 +36,8 @@ export function Home({ course, progress, health, update, onReset }: Props) {
   const [sheet, setSheet] = useState<SheetName>(null);
   const [iosTip, setIosTip] = useState(shouldShowIosTip);
   const resume = useResume();
+  const backupNote = useBackupNote();
+  const [backupMsg, setBackupMsg] = useState('');
   const confirm = useConfirm();
   // Only the unit being worked in is open; finished and future units are one line each (every lesson stays one tap away).
   const [openUnits, setOpenUnits] = useState<ReadonlySet<string>>(() => {
@@ -303,6 +307,37 @@ export function Home({ course, progress, health, update, onReset }: Props) {
           <div className="practice">{tier === 0 && rows}{tiles}</div>
         </details>
       )}
+
+      {shouldNudgeBackup(progress, backupNote, today) && (() => {
+        const since = daysSinceBackup(backupNote, today);
+        return (
+          <section className="notice backup-nudge" aria-label="Back up your progress" data-testid="backup-nudge">
+            <Icon name="info" />
+            <div>
+              <p>
+                <b>{since === null ? 'Your progress is stored only on this device.' : `Your last backup was ${since} days ago.`}</b>{' '}
+                A backup file keeps your {progress.stats.practiceDays} days of practice safe if the browser clears its storage or you change phone.
+              </p>
+              <span className="safety-actions">
+                <button
+                  type="button"
+                  className="btn small secondary"
+                  data-testid="backup-now"
+                  onClick={async () => {
+                    const result = await downloadBackup();
+                    if (result === 'declined') setBackupMsg(DECLINED_NOTE);
+                    else if (result === 'unsupported') setBackupMsg('Downloads are blocked here. Open Settings and use "Copy backup text".');
+                  }}
+                >
+                  Download backup
+                </button>
+                <button type="button" className="btn small ghost" data-testid="backup-later" onClick={snoozeBackupNudge}>Later</button>
+              </span>
+              {backupMsg && <p className="muted" role="status" data-testid="backup-nudge-msg">{backupMsg}</p>}
+            </div>
+          </section>
+        );
+      })()}
 
       <div className="progress-line">
         <div className="row">

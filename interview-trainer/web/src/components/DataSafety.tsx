@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { backupFileName, dayKey, importProgress, summarizeProgress, type ParkedCopy } from '@trainer/shared';
+import { recordBackup } from '../lib/backup-note';
 import { DECLINED_NOTE, copyText, saveFile } from '../lib/files';
 import { formatDay } from '../lib/format';
 import { acknowledgeRecovered, exportText, importContext, listParkedCopies, mergeIntoProgress, replaceProgress, useProgress, useSafetyStatus, type SafetyStatus } from '../lib/store';
@@ -127,7 +128,10 @@ function ExportActions() {
   const download = async () => {
     const t = exportText();
     const result = await saveFile(backupFileName(dayKey(new Date())), t, 'application/json');
-    if (result === 'saved') setNote('Backup saved to your downloads.');
+    if (result === 'saved') {
+      recordBackup();
+      setNote('Backup saved to your downloads.');
+    }
     else if (result === 'declined') setNote(DECLINED_NOTE);
     else {
       setText(t);
@@ -136,8 +140,10 @@ function ExportActions() {
   };
   const copy = async () => {
     const t = exportText();
-    if (await copyText(t)) setNote('Backup copied. Paste it into a note or message to yourself.');
-    else {
+    if (await copyText(t)) {
+      recordBackup();
+      setNote('Backup copied. Paste it into a note or message to yourself.');
+    } else {
       setText(t);
       setNote('Copying is blocked here. Select the text below and copy it by hand.');
     }

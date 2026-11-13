@@ -103,6 +103,7 @@ rules we hold ourselves to are in [`docs/engagement.md`](docs/engagement.md).
 - **Today**: one tap to a session of 8 questions, interleaved across topics: up to 5 due reviews, 2 weak spots, the rest new. A brand-new learner is simply invited to start the first lesson.
 - **Review due**: questions whose review date has come, plus anything you missed. Shown as "N due" (the real number; a session takes 10 at a time).
 - **A Home that stays short**: Today is the one primary action; challenge, review and progress are rows, Mixed / Mock / Library share one compact row, and only the unit you are working in is open (the others are one line each, with "Expand all").
+- **Backup reminder**: once you have practised five days, a quiet line on Home (never a pop-up) suggests a backup file when there is none from this device or the last is two weeks old; "Later" waits a week. Settings shows when you last backed up.
 - **Resume**: leave a lesson or practice session half way (the X, or the browser's Back button) and Home offers to carry on from the next question, with your XP so far. Opening the same lesson again does too; nothing is counted until the session is finished.
 - **Daily goal ring** (default 8 questions, presets 8 / 16 / 24): tap for a 14-day chart. A question counts once per day, and doing it again earns little XP, so repeating one easy question cannot fill the goal. After a week away the next day's goal is halved once ("Easy restart").
 - **Streak chip**: practising any day keeps it alive. Every 7 days in a row earns a **freeze** (hold up to 2) that covers a missed day automatically; **rest days** you choose (up to 3 weekdays) are covered for free. A freeze is only spent when it covers the whole gap; otherwise you get a fresh start and keep the freeze. Longest streak and total days practised never reset.
@@ -128,7 +129,7 @@ longestStreak, freezes (0..2)
 cards{questionId -> h, ease, interval, due, reps, lapses, seen, firstTry, last}      spaced-repetition state
 days{YYYY-MM-DD -> xp, answered, firstTry, target}                                    per-day log, last 400 days
 goal{target}, profile{onboarded, role, interviewDate, restDays[], practiceTime}
-settings{haptics, sound, confetti, tips, confidence}, stats{sessions, answered, firstTry, perfect, practiceDays}
+settings{haptics, confetti, tips, confidence}, stats{sessions, answered, firstTry, perfect, practiceDays}
 prefs{reminders{time,notify,lastNotified}, reading{textSize,dyslexiaFont}}               device preferences, namespaced; kept local on import/merge
 milestones{key -> day}        dedupes celebrations ("rank:3", "streak:7", "unit:ddd:80", "goal:first", ...)
 ```

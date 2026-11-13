@@ -155,7 +155,7 @@ describe('normalizeProgress / v2 repair', () => {
     expect(p).toMatchObject({ xp: 0, streak: 3, longestStreak: 3, lastDay: null, freezes: 2 });
     expect(p.goal.target).toBe(100);
     expect(p.profile).toEqual({ onboarded: false, role: null, interviewDate: null, restDays: [0, 1, 3], practiceTime: null });
-    expect(p.settings).toEqual({ haptics: true, sound: false, confetti: false, tips: true, confidence: false });
+    expect(p.settings).toEqual({ haptics: true, confetti: false, tips: true, confidence: false });
     expect(p.stats).toMatchObject({ sessions: 0, answered: 0 });
     expect(Object.keys(p.cards)).toEqual([q.id]);
     expect(p.cards[q.id]).toMatchObject({ ease: 2.8, interval: MAX_INTERVAL, due: addDays(today, MAX_INTERVAL), reps: 0, lapses: 2 });
@@ -234,5 +234,14 @@ describe('normalizeProgress: bounded size (QA S2-19)', () => {
     const r = migrateProgress({ version: 2, missed: ['a/1', 'a/2'], lessons: { a: { bestAccuracy: 0.5, completions: 2, lastDay: today } } }, ctx).progress;
     expect(r.missed).toEqual(['a/1', 'a/2']);
     expect(r.lessons.a).toMatchObject({ completions: 2 });
+  });
+});
+
+describe('the retired sound setting', () => {
+  it('is dropped from saved progress and from backups that still carry it, without disturbing the other settings', () => {
+    const old = { ...emptyProgress(), settings: { haptics: false, sound: true, confetti: true, tips: false, confidence: true } };
+    const p = normalizeProgress(old, ctx);
+    expect(p.settings).toEqual({ haptics: false, confetti: true, tips: false, confidence: true });
+    expect('sound' in p.settings).toBe(false);
   });
 });

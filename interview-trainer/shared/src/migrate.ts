@@ -160,7 +160,6 @@ export function normalizeProgress(input: unknown, ctx: MigrationContext): Progre
     },
     settings: {
       haptics: bool(settings.haptics, d.settings.haptics),
-      sound: bool(settings.sound, d.settings.sound),
       confetti: bool(settings.confetti, d.settings.confetti),
       tips: bool(settings.tips, d.settings.tips),
       confidence: bool(settings.confidence, d.settings.confidence),

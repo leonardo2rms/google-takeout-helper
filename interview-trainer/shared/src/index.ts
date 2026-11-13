@@ -28,6 +28,7 @@ export * from './plan';
 export * from './events';
 export * from './migrate';
 export * from './backup';
+export * from './backup-nudge';
 export * from './storage';
 export * from './explain';
 export * from './prefs';

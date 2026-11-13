@@ -57,7 +57,6 @@ export interface Profile {
 
 export interface Settings {
   haptics: boolean;
-  sound: boolean;
   confetti: boolean;
   tips: boolean;
   confidence: boolean;
@@ -123,7 +122,7 @@ export const emptyProgress = (): Progress => ({
   days: {},
   goal: { target: DEFAULT_GOAL },
   profile: { onboarded: false, role: null, interviewDate: null, restDays: [], practiceTime: null },
-  settings: { haptics: true, sound: false, confetti: true, tips: true, confidence: false },
+  settings: { haptics: true, confetti: true, tips: true, confidence: false },
   stats: { sessions: 0, answered: 0, firstTry: 0, perfect: 0, practiceDays: 0 },
   milestones: {},
   ...emptyExtras(),
